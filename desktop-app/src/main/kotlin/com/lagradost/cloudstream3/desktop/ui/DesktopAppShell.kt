@@ -19,12 +19,17 @@ import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import coil3.compose.AsyncImage
+import com.lagradost.cloudstream3.desktop.input.GamepadButton
+import com.lagradost.cloudstream3.desktop.input.GamepadManager
 import com.lagradost.cloudstream3.desktop.ui.components.DockItem
+import com.lagradost.cloudstream3.desktop.ui.components.GamepadHintsOverlay
 import com.lagradost.cloudstream3.desktop.ui.components.TopBar
 import com.lagradost.cloudstream3.desktop.ui.navigation.Config
 import com.lagradost.cloudstream3.desktop.ui.theme.AppearanceConfig
@@ -50,8 +55,100 @@ fun DesktopAppShell(
     val dockPosition by AppearanceConfig.dockPosition.collectAsState()
     val posterCardStyle = com.lagradost.cloudstream3.desktop.ui.components.rememberPosterCardStyle()
 
+    val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
+
+    LaunchedEffect(Unit) {
+        GamepadManager.init()
+    }
+
+    LaunchedEffect(title, homeUiState, focusManager) {
+        GamepadManager.events.collect { button ->
+            when (button) {
+                GamepadButton.DPAD_UP -> focusManager.moveFocus(androidx.compose.ui.focus.FocusDirection.Up)
+                GamepadButton.DPAD_DOWN -> focusManager.moveFocus(androidx.compose.ui.focus.FocusDirection.Down)
+                GamepadButton.DPAD_LEFT -> focusManager.moveFocus(androidx.compose.ui.focus.FocusDirection.Left)
+                GamepadButton.DPAD_RIGHT -> focusManager.moveFocus(androidx.compose.ui.focus.FocusDirection.Right)
+                GamepadButton.BUTTON_A -> {
+                    try {
+                        val focusOwner = java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager().focusOwner
+                        if (focusOwner != null) {
+                            val time = System.currentTimeMillis()
+                            val pressEnter = java.awt.event.KeyEvent(focusOwner, java.awt.event.KeyEvent.KEY_PRESSED, time, 0, java.awt.event.KeyEvent.VK_ENTER, '\n')
+                            val releaseEnter = java.awt.event.KeyEvent(focusOwner, java.awt.event.KeyEvent.KEY_RELEASED, time, 0, java.awt.event.KeyEvent.VK_ENTER, '\n')
+                            focusOwner.dispatchEvent(pressEnter)
+                            focusOwner.dispatchEvent(releaseEnter)
+
+                            val pressSpace = java.awt.event.KeyEvent(focusOwner, java.awt.event.KeyEvent.KEY_PRESSED, time, 0, java.awt.event.KeyEvent.VK_SPACE, ' ')
+                            val releaseSpace = java.awt.event.KeyEvent(focusOwner, java.awt.event.KeyEvent.KEY_RELEASED, time, 0, java.awt.event.KeyEvent.VK_SPACE, ' ')
+                            focusOwner.dispatchEvent(pressSpace)
+                            focusOwner.dispatchEvent(releaseSpace)
+                        } else {
+                            val robot = java.awt.Robot()
+                            robot.keyPress(java.awt.event.KeyEvent.VK_ENTER)
+                            robot.keyRelease(java.awt.event.KeyEvent.VK_ENTER)
+                        }
+                    } catch (_: Throwable) {}
+                }
+                GamepadButton.BUTTON_B -> {
+                    if (com.lagradost.cloudstream3.desktop.ui.components.GlobalContextMenuState.isActive) {
+                        com.lagradost.cloudstream3.desktop.ui.components.GlobalContextMenuState.dismiss()
+                    } else if (homeUiState?.showHomeManagement == true) {
+                        homeActionDispatcher?.invoke(com.lagradost.cloudstream3.desktop.ui.screens.home.contract.HomeUiEvent.OnShowHomeManagement(false))
+                    } else if (title != "Home" && title != null) {
+                        onBack()
+                    }
+                }
+                GamepadButton.BUTTON_X -> {
+                    if (title == "Home") {
+                        onNavigate(Config.Search)
+                    }
+                }
+                GamepadButton.BUTTON_Y -> {
+                    if (title == "Home") {
+                        homeActionDispatcher?.invoke(com.lagradost.cloudstream3.desktop.ui.screens.home.contract.HomeUiEvent.OnShowHomeManagement(true))
+                    }
+                }
+                GamepadButton.SHOULDER_LEFT -> {
+                    val mainTabs = listOf(Config.Home, Config.Search, Config.Library, Config.Settings)
+                    val currentIdx = when (title) {
+                        "Search" -> 1
+                        "Library" -> 2
+                        "Settings" -> 3
+                        else -> 0
+                    }
+                    val prevIdx = (currentIdx - 1 + mainTabs.size) % mainTabs.size
+                    onNavigate(mainTabs[prevIdx])
+                }
+                GamepadButton.SHOULDER_RIGHT -> {
+                    val mainTabs = listOf(Config.Home, Config.Search, Config.Library, Config.Settings)
+                    val currentIdx = when (title) {
+                        "Search" -> 1
+                        "Library" -> 2
+                        "Settings" -> 3
+                        else -> 0
+                    }
+                    val nextIdx = (currentIdx + 1) % mainTabs.size
+                    onNavigate(mainTabs[nextIdx])
+                }
+                else -> {}
+            }
+        }
+    }
+
     CompositionLocalProvider(com.lagradost.cloudstream3.desktop.ui.components.LocalPosterCardStyle provides posterCardStyle) {
-        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+        Surface(
+            modifier = Modifier
+                .fillMaxSize()
+                .pointerInput(Unit) {
+                    awaitPointerEventScope {
+                        while (true) {
+                            awaitPointerEvent(PointerEventPass.Initial)
+                            GamepadManager.notifyKeyboardOrMouseUsed()
+                        }
+                    }
+                },
+            color = MaterialTheme.colorScheme.background,
+        ) {
             Box(Modifier.fillMaxSize()) {
             val ambientGlowEnabled by AppearanceConfig.ambientGlowEnabled.collectAsState()
             val ambientGlowIntensity by AppearanceConfig.ambientGlowIntensity.collectAsState()
@@ -250,12 +347,6 @@ fun DesktopAppShell(
                             end = basePadding,
                             bottom = 82.dp + basePadding,
                         )
-                        else -> PaddingValues(
-                            start = 82.dp + basePadding,
-                            top = safeTop + basePadding,
-                            end = basePadding,
-                            bottom = basePadding,
-                        )
                     }
                 } else {
                     PaddingValues(
@@ -351,6 +442,11 @@ fun DesktopAppShell(
                         }
                     }
                 }
+
+                GamepadHintsOverlay(
+                    currentTitle = title ?: "Home",
+                    modifier = Modifier.align(Alignment.BottomEnd).zIndex(80f),
+                )
 
                 SnackbarHost(
                     hostState = snackbarHostState,

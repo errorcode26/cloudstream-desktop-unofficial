@@ -14,6 +14,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -43,6 +44,7 @@ fun DesktopFilterChip(
                 color = if (isSelected) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.1f),
                 shape = RoundedCornerShape(10.dp)
             )
+            .focusProperties { canFocus = false }
             .clickable(onClick = onClick)
             .padding(horizontal = 16.dp),
         contentAlignment = Alignment.Center
@@ -88,6 +90,7 @@ fun DesktopIconButton(
                 color = borderColor,
                 shape = RoundedCornerShape(10.dp)
             )
+            .focusProperties { canFocus = false }
             .clickable(enabled = enabled, onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
@@ -119,7 +122,7 @@ fun DesktopActionBadge(
         shape = RoundedCornerShape(10.dp),
         color = if (isActive) activeColor.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
         border = BorderStroke(1.dp, if (isActive) activeColor.copy(alpha = 0.5f) else Color.White.copy(alpha = 0.1f)),
-        modifier = modifier.height(height)
+        modifier = modifier.height(height).focusProperties { canFocus = false }
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,

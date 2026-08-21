@@ -8,6 +8,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -300,6 +301,46 @@ fun DetailsContent(
         data is com.lagradost.cloudstream3.MovieLoadResponse || data is com.lagradost.cloudstream3.TorrentLoadResponse || data is com.lagradost.cloudstream3.LiveStreamLoadResponse ||
             (data is com.lagradost.cloudstream3.TvSeriesLoadResponse && data.episodes.size == 1) ||
             (data is com.lagradost.cloudstream3.AnimeLoadResponse && data.episodes.values.sumOf { it.size } == 1)
+    }
+
+    LaunchedEffect(data, provider, uiState) {
+        com.lagradost.cloudstream3.desktop.input.GamepadManager.events.collect { button ->
+            when (button) {
+                com.lagradost.cloudstream3.desktop.input.GamepadButton.RIGHT_STICK_DOWN -> {
+                    scrollState.animateScrollBy(420f)
+                }
+                com.lagradost.cloudstream3.desktop.input.GamepadButton.RIGHT_STICK_UP -> {
+                    scrollState.animateScrollBy(-420f)
+                }
+                com.lagradost.cloudstream3.desktop.input.GamepadButton.TRIGGER_RIGHT -> {
+                    scrollState.animateScrollBy(850f)
+                }
+                com.lagradost.cloudstream3.desktop.input.GamepadButton.TRIGGER_LEFT -> {
+                    scrollState.animateScrollBy(-850f)
+                }
+                com.lagradost.cloudstream3.desktop.input.GamepadButton.BUTTON_X,
+                com.lagradost.cloudstream3.desktop.input.GamepadButton.BUTTON_Y,
+                com.lagradost.cloudstream3.desktop.input.GamepadButton.THUMB_RIGHT -> {
+                    val bookmarkId = "${provider.name}_${data.url.hashCode()}"
+                    val allBookmarks = uiState?.bookmarks ?: emptyMap()
+                    val currentBookmark = allBookmarks[bookmarkId]
+                    if (currentBookmark != null) {
+                        com.lagradost.cloudstream3.desktop.repo.BookmarksRepository.removeBookmark(bookmarkId)
+                    } else {
+                        val newBookmark = com.lagradost.common.storage.DesktopBookmark(
+                            id = bookmarkId,
+                            name = data.name.takeIf { it.isNotBlank() } ?: uiState?.preloadedName ?: "",
+                            url = data.url,
+                            apiName = provider.name,
+                            posterUrl = data.posterUrl,
+                            watchType = com.lagradost.common.storage.DesktopWatchType.WATCHING.id,
+                        )
+                        com.lagradost.cloudstream3.desktop.repo.BookmarksRepository.addBookmark(newBookmark)
+                    }
+                }
+                else -> {}
+            }
+        }
     }
 
     val detailsSectionOrder by AppearanceConfig.detailsSectionOrder.collectAsState()

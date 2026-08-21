@@ -7,7 +7,9 @@ import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -18,6 +20,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -37,19 +40,21 @@ fun DockItem(
 ) {
     val itemInteraction = remember { MutableInteractionSource() }
     val isHovered by itemInteraction.collectIsHoveredAsState()
+    val isFocused by itemInteraction.collectIsFocusedAsState()
+    val isHighlighted = isHovered || isFocused
 
     val theme = LocalDesktopTheme.current
     val iconTint = when {
         selected -> MaterialTheme.colorScheme.primary
-        isHovered -> theme.TextPrimary
+        isHighlighted -> theme.TextPrimary
         else -> theme.TextMuted
     }
     val bgAlpha by animateFloatAsState(
-        targetValue = if (isHovered) 1f else 0f,
+        targetValue = if (isHighlighted) 1f else 0f,
         label = "dockItemBgAlpha",
     )
     val scale by animateFloatAsState(
-        targetValue = if (isHovered) 1.15f else 1f,
+        targetValue = if (isHighlighted) 1.15f else 1f,
         animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
         label = "dockItemScale",
     )
@@ -65,6 +70,7 @@ fun DockItem(
             )
             .clip(RoundedCornerShape(14.dp))
             .hoverable(itemInteraction)
+            .focusProperties { canFocus = false }
             .clickable(onClick = onClick),
     ) {
         // Hover Background layer (using graphicsLayer to avoid Compose Desktop alpha blending bugs)

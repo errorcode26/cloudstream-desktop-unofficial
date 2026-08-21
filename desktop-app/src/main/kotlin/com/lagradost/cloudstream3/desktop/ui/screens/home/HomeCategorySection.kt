@@ -192,7 +192,7 @@ fun HomeCategorySection(
                             CategoryRowWithHeader(
                                 title = titleStr,
                                 itemCount = section.list.size,
-                                isInfinite = isLoop,
+                                isInfinite = false,
                                 onViewAll = { onViewAll(provider, section.name, section.list) },
                                 rowContentPadding = androidx.compose.foundation.layout.PaddingValues(
                                     horizontal = 10.dp,
@@ -207,14 +207,10 @@ fun HomeCategorySection(
                                 itemSpacing = spacingDp,
                             ) {
                                 items(
-                                    count = if (isLoop) Int.MAX_VALUE else section.list.size,
-                                    key = { index ->
-                                        val itemIndex = if (isLoop) index % section.list.size else index
-                                        "${section.list[itemIndex].url}_$index"
-                                    },
+                                    count = section.list.size,
+                                    key = { index -> "${section.list[index].url}_$index" },
                                 ) { index ->
-                                    val itemIndex = if (isLoop) index % section.list.size else index
-                                    val posterItem = section.list[itemIndex]
+                                    val posterItem = section.list[index]
                                     PosterCard(
                                         item = posterItem,
                                         provider = provider,

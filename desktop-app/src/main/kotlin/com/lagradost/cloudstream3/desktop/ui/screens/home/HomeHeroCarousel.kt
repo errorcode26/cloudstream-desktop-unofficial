@@ -10,6 +10,8 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -22,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
@@ -401,23 +404,34 @@ fun HomeHeroCarousel(
                             Spacer(Modifier.height(24.dp))
 
                             Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                                val playInteraction = remember { MutableInteractionSource() }
+                                val isPlayFocused by playInteraction.collectIsFocusedAsState()
+
                                 Button(
                                     onClick = { onItemClick(item, meta?.backdropUrl, true) },
+                                    interactionSource = playInteraction,
                                     colors = ButtonDefaults.buttonColors(
                                         containerColor = Color.White,
                                         contentColor = Color.Black,
                                     ),
                                     shape = RoundedCornerShape(12.dp),
                                     contentPadding = PaddingValues(horizontal = 32.dp),
-                                    modifier = Modifier.height(56.dp).widthIn(min = 190.dp),
+                                    modifier = Modifier
+                                        .height(56.dp)
+                                        .widthIn(min = 190.dp)
+                                        .then(if (isPlayFocused) Modifier.border(2.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(12.dp)) else Modifier),
                                 ) {
                                     Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(26.dp))
                                     Spacer(Modifier.width(8.dp))
                                     Text("Play", fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleMedium)
                                 }
 
+                                val detailsInteraction = remember { MutableInteractionSource() }
+                                val isDetailsFocused by detailsInteraction.collectIsFocusedAsState()
+
                                 Button(
                                     onClick = { onItemClick(item, meta?.backdropUrl, false) },
+                                    interactionSource = detailsInteraction,
                                     colors = ButtonDefaults.buttonColors(
                                         containerColor = Color.White.copy(alpha = 0.18f),
                                         contentColor = Color.White,
@@ -425,7 +439,10 @@ fun HomeHeroCarousel(
                                     shape = RoundedCornerShape(12.dp),
                                     border = androidx.compose.foundation.BorderStroke(1.2.dp, Color.White.copy(alpha = 0.35f)),
                                     contentPadding = PaddingValues(horizontal = 24.dp),
-                                    modifier = Modifier.height(56.dp).widthIn(min = 160.dp),
+                                    modifier = Modifier
+                                        .height(56.dp)
+                                        .widthIn(min = 160.dp)
+                                        .then(if (isDetailsFocused) Modifier.border(2.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(12.dp)) else Modifier),
                                 ) {
                                     Icon(Icons.Default.Info, contentDescription = null, modifier = Modifier.size(22.dp))
                                     Spacer(Modifier.width(8.dp))
@@ -449,7 +466,8 @@ fun HomeHeroCarousel(
                                                 1.2.dp,
                                                 if (currentBookmark != null) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.35f),
                                                 RoundedCornerShape(12.dp),
-                                            ),
+                                            )
+                                            .focusProperties { canFocus = false },
                                     ) {
                                         Icon(
                                             imageVector = if (currentBookmark != null) Icons.Default.Check else Icons.Default.Add,

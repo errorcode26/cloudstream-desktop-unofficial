@@ -1,7 +1,10 @@
 package com.lagradost.cloudstream3.desktop.ui.screens.home
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
@@ -20,6 +23,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
@@ -50,6 +56,18 @@ fun HomeManagementDialog(
     var isAdvancedMode by remember { mutableStateOf(activeProviders.size > 1) }
     var catalogProvider by remember { mutableStateOf<MainAPI?>(null) }
     var providerTypeFilter by remember { mutableStateOf(emptySet<TvType>()) }
+
+    val initialFocusRequester = remember { FocusRequester() }
+    val isControllerActive by com.lagradost.cloudstream3.desktop.input.GamepadManager.isControllerActive.collectAsState()
+
+    LaunchedEffect(show, isControllerActive) {
+        if (show && isControllerActive) {
+            kotlinx.coroutines.delay(100L)
+            try {
+                initialFocusRequester.requestFocus()
+            } catch (_: Exception) {}
+        }
+    }
 
     fun fuzzyMatchIcon(providerName: String): String? {
         val pName = providerName.lowercase().replace(Regex("[^a-z0-9]"), "").replace("provider", "").replace("plugin", "")
@@ -109,6 +127,7 @@ fun HomeManagementDialog(
                         Spacer(modifier = Modifier.width(8.dp))
                         Switch(
                             checked = isAdvancedMode,
+                            modifier = Modifier.focusProperties { canFocus = false },
                             onCheckedChange = { enabled ->
                                 isAdvancedMode = enabled
                                 if (!enabled) {
@@ -211,12 +230,20 @@ fun HomeManagementDialog(
                     ) {
                         items(sortedProviders, key = { it.name }) { provider ->
                             val isActive = activeProviders.contains(provider.name)
+                            val isFirst = sortedProviders.firstOrNull()?.name == provider.name
+                            val isTargetForFocus = if (activeProviders.isNotEmpty()) isActive else isFirst
+
+                            val interactionSource = remember { MutableInteractionSource() }
+                            val isFocused by interactionSource.collectIsFocusedAsState()
+
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
+                                    .then(if (isTargetForFocus) Modifier.focusRequester(initialFocusRequester) else Modifier)
+                                    .then(if (isFocused) Modifier.border(2.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(8.dp)) else Modifier)
                                     .clip(RoundedCornerShape(8.dp))
                                     .background(if (isActive) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface)
-                                    .clickable {
+                                    .clickable(interactionSource = interactionSource, indication = null) {
                                         onSetSingleProvider(provider.name)
                                         onDismissRequest()
                                     }
@@ -246,7 +273,10 @@ fun HomeManagementDialog(
                                     Text("${provider.mainPage.size} catalogs", style = MaterialTheme.typography.bodySmall, color = if (isActive) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
 
-                                IconButton(onClick = { catalogProvider = provider }) {
+                                IconButton(
+                                    onClick = { catalogProvider = provider },
+                                    modifier = Modifier.focusProperties { canFocus = false },
+                                ) {
                                     Icon(Icons.Default.Tune, contentDescription = "Customize Catalogs", tint = if (isActive) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                             }

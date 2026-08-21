@@ -10,7 +10,10 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -150,12 +153,15 @@ fun EpisodeCard(
     onMarkPreviousWatched: ((com.lagradost.cloudstream3.Episode) -> Unit)? = null,
 ) {
     var isHovered by remember { mutableStateOf(false) }
+    val interactionSource = remember { MutableInteractionSource() }
+    val isFocused by interactionSource.collectIsFocusedAsState()
+    val isHighlighted = isHovered || isFocused
 
     val releaseStatus = remember(ep.description) { parseEpisodeReleaseStatus(ep) }
     val lockUnreleasedEpisodes by com.lagradost.cloudstream3.desktop.ui.theme.AppearanceConfig.lockUnreleasedEpisodes.collectAsState()
     val isEpisodeLocked = releaseStatus.isUnreleased && lockUnreleasedEpisodes
 
-    val scale by animateFloatAsState(if (isHovered && isContextMenuEnabled && !isEpisodeLocked) 1.02f else 1f, animationSpec = tween(180))
+    val scale by animateFloatAsState(if (isHighlighted && isContextMenuEnabled && !isEpisodeLocked) 1.02f else 1f, animationSpec = tween(180))
 
     // thumbnailVersion is intentionally read here so Compose re-evaluates epImg when episode
     // thumbnails are enriched in-place (plain field mutations don't trigger recompose otherwise).
@@ -231,6 +237,11 @@ fun EpisodeCard(
     Box(
         modifier = modifier
             .aspectRatio(16f / 9f)
+            .then(if (isFocused) Modifier.border(2.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(12.dp)) else Modifier)
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(interactionSource = interactionSource, indication = null) {
+                if (!isEpisodeLocked) onPlay(ep)
+            }
             .pointerInput(ep, isContextMenuEnabled, isEpisodeLocked) {
                 awaitPointerEventScope {
                     while (true) {

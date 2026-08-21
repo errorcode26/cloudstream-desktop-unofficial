@@ -2,6 +2,7 @@ package com.lagradost.cloudstream3.desktop.ui.screens
 
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -102,6 +103,45 @@ fun ComposeHomeScreen(
 
         if (allPages.isNotEmpty()) {
             val listState = rememberLazyListState()
+
+            val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
+            val isControllerActive by com.lagradost.cloudstream3.desktop.input.GamepadManager.isControllerActive.collectAsState()
+
+            LaunchedEffect(isControllerActive) {
+                if (isControllerActive) {
+                    kotlinx.coroutines.delay(120L)
+                    focusManager.moveFocus(androidx.compose.ui.focus.FocusDirection.Next)
+                }
+            }
+
+            LaunchedEffect(Unit) {
+                com.lagradost.cloudstream3.desktop.input.GamepadManager.events.collect { button ->
+                    when (button) {
+                        com.lagradost.cloudstream3.desktop.input.GamepadButton.BUTTON_B -> {
+                            if (!uiState.showHomeManagement && !com.lagradost.cloudstream3.desktop.ui.components.GlobalContextMenuState.isActive) {
+                                listState.animateScrollToItem(0)
+                            }
+                        }
+                        com.lagradost.cloudstream3.desktop.input.GamepadButton.RIGHT_STICK_DOWN -> {
+                            listState.animateScrollBy(420f)
+                        }
+                        com.lagradost.cloudstream3.desktop.input.GamepadButton.RIGHT_STICK_UP -> {
+                            listState.animateScrollBy(-420f)
+                        }
+                        com.lagradost.cloudstream3.desktop.input.GamepadButton.TRIGGER_RIGHT -> {
+                            listState.animateScrollBy(850f)
+                        }
+                        com.lagradost.cloudstream3.desktop.input.GamepadButton.TRIGGER_LEFT -> {
+                            listState.animateScrollBy(-850f)
+                        }
+                        com.lagradost.cloudstream3.desktop.input.GamepadButton.BACK_SELECT -> {
+                            onNavigate(Config.History)
+                        }
+                        else -> {}
+                    }
+                }
+            }
+
             val safeArea = com.lagradost.cloudstream3.desktop.ui.LocalSafeArea.current
 
             // Extract individual safe padding components

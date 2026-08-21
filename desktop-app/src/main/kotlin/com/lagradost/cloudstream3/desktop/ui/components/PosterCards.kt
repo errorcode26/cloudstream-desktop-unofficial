@@ -4,8 +4,11 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -113,7 +116,8 @@ fun PosterCard(
 
     val interactionSource = remember { MutableInteractionSource() }
     val isHoveredRaw by interactionSource.collectIsHoveredAsState()
-    val isHovered = isHoveredRaw && isHoverEnabled
+    val isFocused by interactionSource.collectIsFocusedAsState()
+    val isHovered = (isHoveredRaw || isFocused) && isHoverEnabled
 
     val posterTitlePosition = style.titlePosition
     val showPosterRating = style.showRating
@@ -138,8 +142,10 @@ fun PosterCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .then(if (isHoverEnabled) Modifier.posterHoverEffect(shape) else Modifier)
+                    .then(if (isFocused) Modifier.border(2.dp, primary, shape) else Modifier)
                     .clip(shape)
                     .hoverable(interactionSource)
+                    .clickable(interactionSource = interactionSource, indication = null, onClick = onClick)
                     .onGloballyPositioned { coordinates ->
                         val newBounds = Rect(
                             offset = coordinates.positionInWindow(),
@@ -162,8 +168,6 @@ fun PosterCard(
                                             onClick = onClick,
                                             onPlayClick = onPlayClick,
                                         )
-                                    } else if (event.button == PointerButton.Primary) {
-                                        onClick()
                                     }
                                 }
                             }
@@ -322,7 +326,9 @@ fun WatchHistoryCard(
     val shape = remember(style.roundingDp) { RoundedCornerShape(style.roundingDp.dp) }
 
     val interactionSource = remember { MutableInteractionSource() }
-    val isHovered by interactionSource.collectIsHoveredAsState()
+    val isHoveredRaw by interactionSource.collectIsHoveredAsState()
+    val isFocused by interactionSource.collectIsFocusedAsState()
+    val isHovered = isHoveredRaw || isFocused
     val scale by animateFloatAsState(
         targetValue = if (isHovered) 1.03f else 1f,
         animationSpec = androidx.compose.animation.core.tween(200),
@@ -373,6 +379,7 @@ fun WatchHistoryCard(
                 .then(if (isHovered) Modifier.border(2.dp, MaterialTheme.colorScheme.primary, shape) else Modifier)
                 .clip(shape)
                 .hoverable(interactionSource)
+                .clickable(interactionSource = interactionSource, indication = null, onClick = onClick)
                 .onGloballyPositioned { coordinates ->
                     val newBounds = Rect(
                         offset = coordinates.positionInWindow(),
@@ -396,8 +403,6 @@ fun WatchHistoryCard(
                                         onClick = onClick,
                                         onPlayClick = onPlayClick,
                                     )
-                                } else if (event.button == PointerButton.Primary) {
-                                    onClick()
                                 }
                             }
                         }

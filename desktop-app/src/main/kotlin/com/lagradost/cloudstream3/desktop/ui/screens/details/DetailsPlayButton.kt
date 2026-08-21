@@ -4,6 +4,9 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -14,10 +17,15 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -110,13 +118,30 @@ fun DetailsPlayButton(
         }
     }
 
+    val interactionSource = remember { MutableInteractionSource() }
+    val isFocused by interactionSource.collectIsFocusedAsState()
+
+    val focusRequester = remember { FocusRequester() }
+    val isControllerActive by com.lagradost.cloudstream3.desktop.input.GamepadManager.isControllerActive.collectAsState()
+
+    LaunchedEffect(isControllerActive) {
+        if (isControllerActive) {
+            kotlinx.coroutines.delay(120L)
+            try {
+                focusRequester.requestFocus()
+            } catch (_: Exception) {}
+        }
+    }
+
     Box(
         modifier = modifier
+            .focusRequester(focusRequester)
             .height(56.dp)
             .widthIn(min = 190.dp)
+            .then(if (isFocused) Modifier.border(2.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(12.dp)) else Modifier)
             .clip(RoundedCornerShape(12.dp))
             .background(Color.White)
-            .clickable { targetActionEp?.let { onPlay(it) } }
+            .clickable(interactionSource = interactionSource, indication = null) { targetActionEp?.let { onPlay(it) } }
             .padding(horizontal = 32.dp),
         contentAlignment = Alignment.Center,
     ) {

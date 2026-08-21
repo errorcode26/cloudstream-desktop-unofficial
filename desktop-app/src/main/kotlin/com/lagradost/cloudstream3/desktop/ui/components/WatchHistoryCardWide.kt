@@ -4,8 +4,10 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -20,6 +22,7 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -59,7 +62,9 @@ fun WatchHistoryCardWide(
     val cardShape = RoundedCornerShape(posterCornerRadius.dp + 4.dp) // slightly larger for the outer card
 
     val interactionSource = remember { MutableInteractionSource() }
-    val isHovered by interactionSource.collectIsHoveredAsState()
+    val isHoveredRaw by interactionSource.collectIsHoveredAsState()
+    val isFocused by interactionSource.collectIsFocusedAsState()
+    val isHovered = isHoveredRaw || isFocused
     val scale by animateFloatAsState(
         targetValue = if (isHovered) 1.03f else 1f,
         animationSpec = androidx.compose.animation.core.tween(200),
@@ -111,10 +116,11 @@ fun WatchHistoryCardWide(
         Row(
             modifier = Modifier
                 .fillMaxSize()
-                .then(if (isHovered) Modifier.border(2.dp, primary, cardShape) else Modifier)
+                .then(if (isHovered) Modifier.border(2.5.dp, primary, cardShape) else Modifier)
                 .clip(cardShape)
                 .background(backgroundColor)
                 .hoverable(interactionSource)
+                .clickable(interactionSource = interactionSource, indication = null, onClick = onClick)
                 .onGloballyPositioned { coordinates ->
                     bounds = Rect(
                         offset = coordinates.positionInWindow(),
@@ -135,8 +141,6 @@ fun WatchHistoryCardWide(
                                         onClick = onClick,
                                         onPlayClick = onPlayClick,
                                     )
-                                } else if (event.button == PointerButton.Primary) {
-                                    onClick()
                                 }
                             }
                         }
@@ -240,6 +244,7 @@ fun WatchHistoryCardWide(
                         .size(28.dp)
                         .clip(CircleShape)
                         .background(Color.White.copy(alpha = 0.1f))
+                        .focusProperties { canFocus = false }
                         .clickable { onRemove() },
                     contentAlignment = Alignment.Center
                 ) {

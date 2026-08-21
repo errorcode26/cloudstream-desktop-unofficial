@@ -24,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
@@ -223,6 +224,8 @@ fun CategoryRowWithHeader(
     val canScrollBack by remember(isInfinite) { derivedStateOf { isInfinite || listState.canScrollBackward } }
     val canScrollForward by remember(isInfinite) { derivedStateOf { isInfinite || listState.canScrollForward } }
 
+    val isControllerActive by com.lagradost.cloudstream3.desktop.input.GamepadManager.isControllerActive.collectAsState()
+
     Column(modifier = modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
@@ -252,6 +255,7 @@ fun CategoryRowWithHeader(
                 if (onViewAll != null) {
                     Surface(
                         onClick = onViewAll,
+                        modifier = Modifier.focusProperties { canFocus = false },
                         shape = RoundedCornerShape(10.dp),
                         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
                         border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
@@ -264,30 +268,32 @@ fun CategoryRowWithHeader(
                     Spacer(modifier = Modifier.width(8.dp))
                 }
 
-                ScrollChevron(
-                    enabled = canScrollBack,
-                    onClick = {
-                        scope.launch {
-                            val target = (listState.firstVisibleItemIndex - scrollStep).coerceAtLeast(0)
-                            listState.animateScrollToItem(target)
-                        }
-                    },
-                    icon = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
-                )
+                if (!isControllerActive) {
+                    ScrollChevron(
+                        enabled = canScrollBack,
+                        onClick = {
+                            scope.launch {
+                                val target = (listState.firstVisibleItemIndex - scrollStep).coerceAtLeast(0)
+                                listState.animateScrollToItem(target)
+                            }
+                        },
+                        icon = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+                    )
 
-                Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
 
-                ScrollChevron(
-                    enabled = canScrollForward,
-                    onClick = {
-                        scope.launch {
-                            val last = (listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0) + scrollStep
-                            val maxBound = if (isInfinite) Int.MAX_VALUE else (itemCount - 1).coerceAtLeast(0)
-                            listState.animateScrollToItem(last.coerceAtMost(maxBound))
-                        }
-                    },
-                    icon = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                )
+                    ScrollChevron(
+                        enabled = canScrollForward,
+                        onClick = {
+                            scope.launch {
+                                val last = (listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0) + scrollStep
+                                val maxBound = if (isInfinite) Int.MAX_VALUE else (itemCount - 1).coerceAtLeast(0)
+                                listState.animateScrollToItem(last.coerceAtMost(maxBound))
+                            }
+                        },
+                        icon = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    )
+                }
             }
         }
 
@@ -317,7 +323,8 @@ private fun ScrollChevron(
         enabled = enabled,
         modifier = Modifier
             .padding(horizontal = 2.dp)
-            .size(38.dp),
+            .size(38.dp)
+            .focusProperties { canFocus = false },
         shape = RoundedCornerShape(10.dp),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = alpha),
         border = BorderStroke(1.dp, if (enabled) Color.White.copy(alpha = 0.1f) else Color.White.copy(alpha = 0.04f)),
