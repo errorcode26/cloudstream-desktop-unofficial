@@ -62,6 +62,10 @@ dependencies {
     implementation(kotlin("reflect")) // Required for Jackson to deserialize plugin Kotlin data classes
     implementation("org.json:json:20240303") // Required for plugins using org.json (natively included on Android)
 
+    // Embedded JavaScript Engine (QuickJS) & HTML Parser
+    implementation("io.github.dokar3:quickjs-kt:1.0.12")
+    implementation(libs.jsoup)
+
     // Coroutines (swing provides Dispatchers.Main on desktop JVM)
     val coroutinesVersion = "1.10.2"
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:$coroutinesVersion")

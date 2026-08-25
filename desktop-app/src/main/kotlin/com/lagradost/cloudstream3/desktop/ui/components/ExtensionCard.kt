@@ -39,6 +39,8 @@ fun ExtensionCard(
     onCheckedChange: ((Boolean) -> Unit)? = null,
     showSettings: Boolean = false,
     onSettingsClick: () -> Unit = {},
+    isJsPlugin: Boolean = false,
+    jsPluginType: String? = null,
     modifier: Modifier = Modifier,
 ) {
     var showConfirmDialog by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
@@ -129,6 +131,21 @@ fun ExtensionCard(
                             style = MaterialTheme.typography.titleMedium,
                             modifier = Modifier.weight(1f, fill = false),
                         )
+                        if (isJsPlugin) {
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = MaterialTheme.colorScheme.tertiaryContainer,
+                                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.tertiary.copy(alpha = 0.5f)),
+                            ) {
+                                Text(
+                                    text = jsPluginType ?: "Vega JS",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onTertiaryContainer,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp),
+                                )
+                            }
+                        }
                         FlagImage(language)
                     }
                     Spacer(modifier = Modifier.height(2.dp))

@@ -29,6 +29,8 @@ data class SitePlugin(
     @JsonProperty("authors") val authors: List<String>? = null,
     @JsonProperty("author") val author: String? = null,
     @JsonProperty("tvTypes") val tvTypes: List<String>? = null,
+    @JsonProperty("isJsPlugin") val isJsPlugin: Boolean = false,
+    @JsonProperty("jsPluginType") val jsPluginType: String? = null,
 ) {
     val authorName: String?
         get() = authors?.filter { it.isNotBlank() }?.joinToString(", ") { "@$it" }

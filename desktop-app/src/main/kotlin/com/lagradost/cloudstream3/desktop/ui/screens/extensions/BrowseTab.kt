@@ -518,16 +518,29 @@ fun BrowseTab(
                             ?: uiState.remotePluginIcons[plugin.internalName]
                             ?: uiState.remotePluginIcons[plugin.name]
 
-                        var isInstalling by remember { mutableStateOf(false) }
-                        val isPluginInstalled = remember(plugin, repoName, uiState.installedPlugins) {
-                            val cleanRepo = repoName.replace(Regex("[^a-zA-Z0-9.-]"), "_")
-                            uiState.installedPlugins.any {
-                                it.internalName == plugin.internalName && (it.file.parentFile?.name == cleanRepo || it.file.parentFile?.name == repoName)
+                        val isPluginInstalled = remember(plugin, repoName, uiState.installedPlugins, syncGeneration) {
+                            if (plugin.isJsPlugin) {
+                                uiState.installedPlugins.any {
+                                    it.internalName.equals(plugin.internalName, ignoreCase = true) ||
+                                    it.name.equals(plugin.name, ignoreCase = true) ||
+                                    it.file.name.equals(plugin.internalName, ignoreCase = true)
+                                } ||
+                                com.lagradost.cloudstream3.desktop.plugins.js.JsPluginManager.isPluginInstalled(plugin.internalName) ||
+                                com.lagradost.cloudstream3.desktop.plugins.js.JsPluginManager.isPluginInstalled(plugin.name)
+                            } else {
+                                val cleanRepo = repoName.replace(Regex("[^a-zA-Z0-9.-]"), "_")
+                                uiState.installedPlugins.any {
+                                    (it.internalName.equals(plugin.internalName, ignoreCase = true) || it.name.equals(plugin.name, ignoreCase = true)) &&
+                                    (it.file.parentFile?.name?.equals(cleanRepo, ignoreCase = true) == true ||
+                                     it.file.parentFile?.name?.equals(repoName, ignoreCase = true) == true ||
+                                     it.repoName.equals(repoName, ignoreCase = true) ||
+                                     it.repoName.equals(cleanRepo, ignoreCase = true))
+                                }
                             }
                         }
-                        var installStatus by remember(plugin, isPluginInstalled, syncGeneration) {
-                            mutableStateOf(if (isPluginInstalled) "Installed" else "")
-                        }
+                        var isInstalling by remember { mutableStateOf(false) }
+                        var installStatusMessage by remember(plugin, syncGeneration) { mutableStateOf("") }
+                        val installStatus = if (isPluginInstalled) "Installed" else installStatusMessage
 
                         ExtensionCard(
                             name = plugin.name,
@@ -540,18 +553,29 @@ fun BrowseTab(
                             isInstalled = isPluginInstalled,
                             installStatus = installStatus,
                             isInstalling = isInstalling,
+                            isJsPlugin = plugin.isJsPlugin,
+                            jsPluginType = plugin.jsPluginType,
                             onInstallClick = {
                                 if (!isInstalling && !isPluginInstalled) {
                                     isInstalling = true
-                                    installStatus = "Installing..."
+                                    installStatusMessage = "Installing..."
                                     viewModel.onEvent(
                                         ExtensionsUiEvent.OnInstallPlugin(repoName, plugin) { err ->
                                             isInstalling = false
-                                            installStatus = if (err == "Installed" || err.isEmpty()) "Installed" else "Failed: $err"
+                                            installStatusMessage = if (err == "Installed" || err.isEmpty()) "Installed" else "Failed: $err"
                                         },
                                     )
                                 }
                             },
+                            onUninstallClick = if (isPluginInstalled) {
+                                {
+                                    if (plugin.isJsPlugin) {
+                                        viewModel.onEvent(ExtensionsUiEvent.OnUninstallByInternalName(plugin.internalName))
+                                    } else {
+                                        viewModel.onEvent(ExtensionsUiEvent.OnUninstallPlugin(repoName, plugin.internalName))
+                                    }
+                                }
+                            } else null,
                             description = plugin.description,
                             fileSize = plugin.fileSize,
                         )

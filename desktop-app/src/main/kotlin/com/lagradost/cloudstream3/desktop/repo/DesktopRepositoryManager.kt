@@ -186,6 +186,45 @@ object DesktopRepositoryManager {
         if (trimmed.isEmpty()) return@withContext null
         val resolvedUrl = PluginNetworkClient.parseRepoUrl(trimmed) ?: trimmed
 
+        // Check if the input is a JS repository or shortcode (e.g. "vega-org" or "@author" or manifest URL)
+        val jsManifestItems = try {
+            com.lagradost.cloudstream3.desktop.plugins.js.repo.JsRepositoryResolver.fetchManifest(trimmed)
+        } catch (_: Exception) { emptyList() }
+
+        if (jsManifestItems.isNotEmpty()) {
+            val baseUrl = com.lagradost.cloudstream3.desktop.plugins.js.repo.JsRepositoryResolver.resolveBaseUrl(trimmed)
+            val repoName = if (trimmed.startsWith("http")) {
+                baseUrl.substringAfterLast("/").ifEmpty { "JS Extensions" }
+            } else {
+                trimmed.removePrefix("@")
+            }
+            val listUrl = "$baseUrl/manifest.json"
+            val jsRepo = Repository(
+                name = repoName,
+                pluginLists = listOf(listUrl),
+                description = "JavaScript Plugin Repository",
+            )
+            val sitePlugins = jsManifestItems.map { item ->
+                SitePlugin(
+                    name = item.displayName,
+                    internalName = item.value,
+                    url = baseUrl,
+                    version = item.version.replace(".", "").toIntOrNull() ?: 1,
+                    description = "Modular JavaScript Scraper",
+                    iconUrl = item.iconUrl,
+                    authors = listOf(repoName),
+                    isJsPlugin = true,
+                    jsPluginType = "Vega JS",
+                )
+            }
+            repoCache[baseUrl] = jsRepo
+            pluginsCache[listUrl] = sitePlugins
+            saveRepository(RepositoryData(name = repoName, url = baseUrl, iconUrl = sitePlugins.firstOrNull()?.iconUrl))
+            saveCachesToDisk()
+            incrementSyncGeneration()
+            return@withContext listOf(jsRepo)
+        }
+
         // Check if the URL resolves to a Mega Repo (JSON array)
         val request = okhttp3.Request.Builder().url(resolvedUrl).build()
         var body: String? = null
@@ -292,8 +331,19 @@ object DesktopRepositoryManager {
 
     fun getExtensionsDir(): File = PluginFileUtils.getExtensionsDir()
 
-    suspend fun downloadPlugin(repoName: String, plugin: SitePlugin): File? =
-        PluginFileUtils.downloadPlugin(repoName, plugin)
+    suspend fun downloadPlugin(repoName: String, plugin: SitePlugin): File? {
+        if (plugin.isJsPlugin) {
+            val manifestItem = com.lagradost.cloudstream3.desktop.plugins.js.repo.JsPluginManifestItem(
+                displayName = plugin.name,
+                value = plugin.internalName,
+                version = plugin.version.toString(),
+                iconUrl = plugin.iconUrl,
+            )
+            val success = com.lagradost.cloudstream3.desktop.plugins.js.repo.JsRepositoryResolver.installPlugin(plugin.url, manifestItem)
+            return if (success) File(com.lagradost.cloudstream3.desktop.plugins.js.JsPluginManager.getPluginDir(), plugin.internalName) else null
+        }
+        return PluginFileUtils.downloadPlugin(repoName, plugin)
+    }
 
     fun clearCaches() {
         repoCache.clear()

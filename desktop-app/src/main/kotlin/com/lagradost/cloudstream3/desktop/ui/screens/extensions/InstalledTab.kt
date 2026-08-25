@@ -203,6 +203,8 @@ fun InstalledTab(
                         isInstalled = true,
                         installStatus = "Installed",
                         isInstalling = false,
+                        isJsPlugin = plugin.isJsPlugin,
+                        jsPluginType = plugin.jsPluginType,
                         onInstallClick = { },
                         onUninstallClick = { viewModel.onEvent(ExtensionsUiEvent.OnUninstallPlugins(listOf(plugin))) },
                         description = plugin.description,

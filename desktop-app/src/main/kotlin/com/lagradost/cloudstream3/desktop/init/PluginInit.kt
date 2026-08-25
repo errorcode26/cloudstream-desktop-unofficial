@@ -32,11 +32,14 @@ fun initProviders() {
 }
 
 /**
- * Load installed plugins and cloned sites.
+ * Load installed plugins, JS plugins, and cloned sites.
  */
 fun initPlugins() {
     loadInstalledPlugins()
     loadClonedSites()
+    appScope.launch(Dispatchers.IO) {
+        com.lagradost.cloudstream3.desktop.plugins.js.JsPluginManager.loadAllLocalPlugins()
+    }
 }
 
 /**

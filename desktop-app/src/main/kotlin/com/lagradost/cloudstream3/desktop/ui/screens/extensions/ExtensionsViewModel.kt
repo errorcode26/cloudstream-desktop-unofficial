@@ -25,6 +25,8 @@ data class LocalPlugin(
     val tvTypes: List<String>?,
     val description: String? = null,
     val fileSize: Long = 0L,
+    val isJsPlugin: Boolean = false,
+    val jsPluginType: String? = null,
 )
 
 class ExtensionsViewModel : BaseMviViewModel<ExtensionsUiState, ExtensionsUiEvent, ExtensionsUiEffect>(
@@ -209,11 +211,102 @@ class ExtensionsViewModel : BaseMviViewModel<ExtensionsUiState, ExtensionsUiEven
                     list.add(LocalPlugin(jar, name, internalName, version, iconUrl, repoName, language, tvTypes, description, jar.length()))
                 }
         }
+
+        // Scan and include installed JavaScript plugins
+        val jsPluginsDir = com.lagradost.cloudstream3.desktop.plugins.js.JsPluginManager.getPluginDir()
+        if (jsPluginsDir.exists()) {
+            jsPluginsDir.listFiles()?.forEach { file ->
+                val value = file.nameWithoutExtension
+                val displayName = file.nameWithoutExtension.replace("_", " ").replace("-", " ")
+                val remoteMatch = allRemote.find {
+                    it.second.internalName.equals(value, ignoreCase = true) ||
+                    it.second.name.equals(displayName, ignoreCase = true) ||
+                    it.second.name.equals(file.name, ignoreCase = true)
+                }
+                val repoName = remoteMatch?.first ?: "JS Extensions"
+                val iconUrl = remoteMatch?.second?.iconUrl ?: DesktopRepositoryManager.remotePluginIcons.value[value] ?: DesktopRepositoryManager.remotePluginIcons.value[displayName]
+                list.add(
+                    LocalPlugin(
+                        file = file,
+                        name = remoteMatch?.second?.name ?: displayName,
+                        internalName = remoteMatch?.second?.internalName ?: value,
+                        version = remoteMatch?.second?.version ?: 1,
+                        iconUrl = iconUrl,
+                        repoName = repoName,
+                        language = remoteMatch?.second?.language ?: "en",
+                        tvTypes = remoteMatch?.second?.tvTypes ?: listOf("Movie", "TvSeries"),
+                        description = remoteMatch?.second?.description ?: "Modular JavaScript Scraper",
+                        fileSize = if (file.isDirectory) file.walkTopDown().sumOf { it.length() } else file.length(),
+                        isJsPlugin = true,
+                        jsPluginType = "Vega JS",
+                    )
+                )
+            }
+        }
+
+        // Also ensure all currently active in-memory JS providers are represented
+        val loadedJsProviders = com.lagradost.cloudstream3.desktop.plugins.js.JsPluginManager.getInstalledProviders()
+        for (provider in loadedJsProviders) {
+            val providerName = provider.name
+            val sourcePath = provider.sourcePlugin
+            val file = if (sourcePath != null) File(sourcePath) else File(jsPluginsDir, providerName)
+            if (list.none { it.internalName.equals(providerName, ignoreCase = true) || it.name.equals(providerName, ignoreCase = true) || it.file.absolutePath == file.absolutePath }) {
+                val remoteMatch = allRemote.find {
+                    it.second.internalName.equals(providerName, ignoreCase = true) ||
+                    it.second.name.equals(providerName, ignoreCase = true)
+                }
+                list.add(
+                    LocalPlugin(
+                        file = file,
+                        name = providerName,
+                        internalName = remoteMatch?.second?.internalName ?: providerName,
+                        version = remoteMatch?.second?.version ?: 1,
+                        iconUrl = remoteMatch?.second?.iconUrl ?: DesktopRepositoryManager.remotePluginIcons.value[providerName],
+                        repoName = remoteMatch?.first ?: "JS Extensions",
+                        language = remoteMatch?.second?.language ?: "en",
+                        tvTypes = remoteMatch?.second?.tvTypes ?: listOf("Movie", "TvSeries"),
+                        description = "Modular JavaScript Scraper",
+                        fileSize = if (file.exists()) (if (file.isDirectory) file.walkTopDown().sumOf { it.length() } else file.length()) else 0L,
+                        isJsPlugin = true,
+                        jsPluginType = "Vega JS",
+                    )
+                )
+            }
+        }
+
         updateState { copy(installedPlugins = list) }
     }
 
     private fun installPlugin(repoName: String, plugin: SitePlugin, onResult: (String) -> Unit) {
         viewModelScope.launch {
+            if (plugin.isJsPlugin) {
+                try {
+                    val downloadedFile = withContext(Dispatchers.IO) {
+                        DesktopRepositoryManager.downloadPlugin(repoName, plugin)
+                    }
+                    if (downloadedFile != null) {
+                        onResult("Installed")
+                        refreshInstalled()
+                        DesktopRepositoryManager.incrementSyncGeneration()
+                        com.lagradost.cloudstream3.desktop.ui.components.AppToastManager.showSuccess(
+                            "Installed '${plugin.name}' (v${plugin.version})"
+                        )
+                    } else {
+                        onResult("Failed")
+                        com.lagradost.cloudstream3.desktop.ui.components.AppToastManager.showError(
+                            "Failed to download '${plugin.name}': Network or server error"
+                        )
+                    }
+                } catch (e: Throwable) {
+                    com.lagradost.common.logging.AppLogger.e("Error installing JS plugin", e)
+                    onResult("Error")
+                    com.lagradost.cloudstream3.desktop.ui.components.AppToastManager.showError(
+                        "Failed to install '${plugin.name}': ${e.message ?: e.javaClass.simpleName}"
+                    )
+                }
+                return@launch
+            }
+
             val repoCleanName = repoName.replace(Regex("[^a-zA-Z0-9.-]"), "_")
             val targetDir = java.io.File(DesktopRepositoryManager.getExtensionsDir(), repoCleanName)
             val jarFile = java.io.File(targetDir, "${plugin.internalName}.jar")
@@ -348,6 +441,11 @@ class ExtensionsViewModel : BaseMviViewModel<ExtensionsUiState, ExtensionsUiEven
             updateState { copy(isUninstalling = true) }
             for (plugin in plugins) {
                 try {
+                    if (plugin.isJsPlugin) {
+                        com.lagradost.cloudstream3.desktop.plugins.js.repo.JsRepositoryResolver.uninstallPlugin(plugin.internalName)
+                        continue
+                    }
+
                     // Step 1: Gracefully unload (calls beforeUnload, removes providers from APIHolder).
                     ExtensionLoader.unloadPlugin(plugin.file.absolutePath)
 
@@ -411,22 +509,36 @@ class ExtensionsViewModel : BaseMviViewModel<ExtensionsUiState, ExtensionsUiEven
         viewModelScope.launch(Dispatchers.IO) {
             val cleanRepo = repoName.replace(Regex("[^a-zA-Z0-9.-]"), "_")
             val installedMatch = uiState.value.installedPlugins.find {
-                it.internalName == internalName && (
+                it.internalName.equals(internalName, ignoreCase = true) && (
                     it.file.parentFile?.name?.equals(cleanRepo, ignoreCase = true) == true ||
-                    it.repoName.equals(repoName, ignoreCase = true)
+                    it.file.parentFile?.name?.equals(repoName, ignoreCase = true) == true ||
+                    it.repoName.equals(repoName, ignoreCase = true) ||
+                    it.isJsPlugin
                 )
             }
             if (installedMatch != null) {
                 uninstallPlugins(listOf(installedMatch))
+            } else {
+                com.lagradost.cloudstream3.desktop.plugins.js.repo.JsRepositoryResolver.uninstallPlugin(internalName)
+                com.lagradost.cloudstream3.desktop.plugins.js.JsPluginManager.unloadPlugin(internalName)
+                refreshInstalled()
+                DesktopRepositoryManager.incrementSyncGeneration()
             }
         }
     }
 
     private fun uninstallByInternalName(internalName: String) {
         viewModelScope.launch(Dispatchers.IO) {
-            val installedMatch = uiState.value.installedPlugins.find { it.internalName == internalName }
+            val installedMatch = uiState.value.installedPlugins.find {
+                it.internalName.equals(internalName, ignoreCase = true) || it.name.equals(internalName, ignoreCase = true)
+            }
             if (installedMatch != null) {
                 uninstallPlugins(listOf(installedMatch))
+            } else {
+                com.lagradost.cloudstream3.desktop.plugins.js.repo.JsRepositoryResolver.uninstallPlugin(internalName)
+                com.lagradost.cloudstream3.desktop.plugins.js.JsPluginManager.unloadPlugin(internalName)
+                refreshInstalled()
+                DesktopRepositoryManager.incrementSyncGeneration()
             }
         }
     }
