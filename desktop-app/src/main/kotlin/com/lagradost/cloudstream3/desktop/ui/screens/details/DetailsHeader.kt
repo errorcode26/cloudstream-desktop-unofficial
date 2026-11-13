@@ -188,10 +188,8 @@ fun AdaptiveMetadataLayout(
         Column(
             modifier = modifier,
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(24.dp),
         ) {
             mainContent()
-            sideContent()
         }
     } else {
         Row(

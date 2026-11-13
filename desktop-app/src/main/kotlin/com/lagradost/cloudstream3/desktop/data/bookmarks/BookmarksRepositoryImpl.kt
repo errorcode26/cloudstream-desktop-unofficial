@@ -26,19 +26,23 @@ class BookmarksRepositoryImpl(
 
     init {
         scope.launch {
-            loadFromStorage()
+            DesktopDataStore.bookmarkUpdates.collect {
+                refreshFromStorage()
+            }
+        }
+    }
+
+    private suspend fun refreshFromStorage() = withContext(Dispatchers.IO) {
+        initMutex.withLock {
+            val list = DesktopDataStore.getBookmarks()
+            _bookmarksFlow.value = list.associateBy { it.id }
+            isInitialized.set(true)
         }
     }
 
     private suspend fun loadFromStorage() = withContext(Dispatchers.IO) {
         if (!isInitialized.get()) {
-            initMutex.withLock {
-                if (!isInitialized.get()) {
-                    val list = DesktopDataStore.getBookmarks()
-                    _bookmarksFlow.value = list.associateBy { it.id }
-                    isInitialized.set(true)
-                }
-            }
+            refreshFromStorage()
         }
     }
 

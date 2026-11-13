@@ -1,6 +1,9 @@
 package com.lagradost.cloudstream3.desktop.ui.screens.person
 
 import androidx.compose.animation.*
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.*
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -9,35 +12,37 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.lagradost.cloudstream3.TvType
 import com.lagradost.cloudstream3.desktop.ui.components.DesktopBackButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopVerticalScrollbar
 import com.lagradost.cloudstream3.desktop.ui.components.LocalDesktopTheme
 import com.lagradost.cloudstream3.desktop.ui.components.WindowControlsPill
+import com.lagradost.cloudstream3.desktop.ui.components.defaultScrollbarStyle
 import com.lagradost.cloudstream3.desktop.ui.navigation.Config
 import com.lagradost.cloudstream3.desktop.explore.models.ExploreItem
 import com.lagradost.cloudstream3.desktop.explore.ui.ExploreProviderDialog
 import com.lagradost.cloudstream3.desktop.ui.screens.person.model.FilmographyCategory
 import com.lagradost.cloudstream3.desktop.ui.screens.person.model.PersonDetail
 import com.lagradost.cloudstream3.desktop.ui.screens.person.model.PersonMediaCredit
+import java.time.LocalDate
+import java.time.Period
 
 @Composable
 fun PersonScreen(
@@ -60,25 +65,11 @@ fun PersonScreen(
             .fillMaxSize()
             .background(theme.Background),
     ) {
-        // Ambient backdrop glow from person's photo
-        val ambientPhoto = uiState.personDetail?.profileUrl ?: image
-        if (!ambientPhoto.isNullOrBlank()) {
-            AsyncImage(
-                model = ambientPhoto,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .blur(100.dp)
-                    .graphicsLayer(alpha = 0.12f),
-            )
-        }
-
         // Main Content Area
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(top = 64.dp, start = 24.dp, end = 24.dp, bottom = 16.dp),
+                .padding(top = 64.dp, start = 32.dp, end = 32.dp, bottom = 16.dp),
         ) {
             if (uiState.isLoading) {
                 Box(
@@ -120,22 +111,31 @@ fun PersonScreen(
                 val detail = uiState.personDetail ?: return@Box
                 BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
                     if (maxWidth >= 900.dp) {
-                        // Desktop Split-View
+                        // Desktop Split-View: Generous horizontal space with natural flow & boundary bar
                         Row(
                             modifier = Modifier.fillMaxSize(),
-                            horizontalArrangement = Arrangement.spacedBy(32.dp),
+                            horizontalArrangement = Arrangement.spacedBy(28.dp),
                         ) {
-                            // Left Sidebar: Hero & Bio
+                            // Left Sidebar: Centered portrait, justified bio, generous breathing space
                             PersonHeroSidebar(
                                 detail = detail,
                                 fallbackImage = image,
                                 isScrollable = true,
                                 modifier = Modifier
-                                    .width(320.dp)
+                                    .width(415.dp)
                                     .fillMaxHeight(),
                             )
 
-                            // Right Area: Filmography Tabs & Grid
+                            // Slim Vertical Boundary Bar
+                            VerticalDivider(
+                                modifier = Modifier
+                                    .fillMaxHeight()
+                                    .padding(vertical = 12.dp),
+                                color = Color.White.copy(alpha = 0.08f),
+                                thickness = 1.dp,
+                            )
+
+                            // Right Area: Filmography Header & Grid
                             Column(
                                 modifier = Modifier
                                     .weight(1f)
@@ -155,7 +155,7 @@ fun PersonScreen(
                             modifier = Modifier
                                 .fillMaxSize()
                                 .verticalScroll(scrollState),
-                            verticalArrangement = Arrangement.spacedBy(24.dp),
+                            verticalArrangement = Arrangement.spacedBy(28.dp),
                         ) {
                             PersonHeroSidebar(
                                 detail = detail,
@@ -247,141 +247,200 @@ private fun PersonHeroSidebar(
 ) {
     val scrollState = rememberScrollState()
     val theme = LocalDesktopTheme.current
-    var isBioExpanded by remember { mutableStateOf(false) }
 
-    Column(
-        modifier = modifier.then(if (isScrollable) Modifier.verticalScroll(scrollState) else Modifier),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        // High-res Portrait with Soft Border
-        Surface(
-            shape = RoundedCornerShape(20.dp),
-            color = theme.SurfaceCard,
-            border = BorderStroke(1.dp, theme.Divider),
+    val scrollbarInteractionSource = remember { MutableInteractionSource() }
+    val isScrollbarHovered by scrollbarInteractionSource.collectIsHoveredAsState()
+    val isScrolling = scrollState.isScrollInProgress
+    var isScrollbarVisible by remember { mutableStateOf(false) }
+
+    LaunchedEffect(isScrolling, isScrollbarHovered) {
+        if (isScrolling || isScrollbarHovered) {
+            isScrollbarVisible = true
+        } else {
+            kotlinx.coroutines.delay(1000)
+            isScrollbarVisible = false
+        }
+    }
+
+    val scrollbarAlpha by animateFloatAsState(
+        targetValue = if (isScrollbarVisible) 1f else 0f,
+        animationSpec = tween(durationMillis = 250),
+        label = "person_scrollbar_alpha",
+    )
+
+    Box(modifier = modifier) {
+        Column(
             modifier = Modifier
-                .width(220.dp)
-                .aspectRatio(2f / 3f),
+                .fillMaxSize()
+                .then(if (isScrollable) Modifier.verticalScroll(scrollState) else Modifier)
+                .padding(end = if (isScrollable) 14.dp else 0.dp, bottom = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            val photoUrl = detail.profileUrl ?: fallbackImage
-            if (!photoUrl.isNullOrBlank()) {
-                AsyncImage(
-                    model = photoUrl,
-                    contentDescription = detail.name,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize(),
-                )
-            } else {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = Icons.Default.Person,
-                        contentDescription = null,
-                        modifier = Modifier.size(72.dp),
-                        tint = theme.TextMuted.copy(alpha = 0.4f),
-                    )
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(18.dp))
-
-        // Name & Department
-        Text(
-            text = detail.name,
-            style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
-            color = theme.TextPrimary,
-        )
-
-        if (!detail.knownForDepartment.isNullOrBlank()) {
-            Spacer(modifier = Modifier.height(6.dp))
+            // High-res Portrait (Centered with Soft Border & subtle elevation)
             Surface(
-                shape = RoundedCornerShape(6.dp),
-                color = theme.Accent.copy(alpha = 0.14f),
-                border = BorderStroke(1.dp, theme.Accent.copy(alpha = 0.35f)),
+                shape = RoundedCornerShape(18.dp),
+                color = Color(0xFF141416),
+                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.12f)),
+                modifier = Modifier
+                    .width(240.dp)
+                    .aspectRatio(2f / 3f),
             ) {
-                Text(
-                    text = detail.knownForDepartment,
-                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
-                    color = theme.Accent,
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(20.dp))
-
-        // Personal Details Card
-        Surface(
-            shape = RoundedCornerShape(16.dp),
-            color = theme.SurfaceCard,
-            border = BorderStroke(1.dp, theme.Divider),
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                Text(
-                    text = "Personal Info",
-                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                    color = theme.TextPrimary,
-                )
-
-                if (!detail.birthday.isNullOrBlank()) {
-                    DetailRow(label = "Born", value = detail.birthday)
-                }
-
-                if (!detail.placeOfBirth.isNullOrBlank()) {
-                    DetailRow(label = "Birthplace", value = detail.placeOfBirth)
-                }
-
-                if (!detail.deathday.isNullOrBlank()) {
-                    DetailRow(label = "Died", value = detail.deathday)
-                }
-
-                DetailRow(
-                    label = "Credits",
-                    value = "${detail.movieCredits.size} Movies • ${detail.tvCredits.size} TV Shows",
-                )
-            }
-        }
-
-        // Biography Section
-        if (!detail.biography.isNullOrBlank()) {
-            Spacer(modifier = Modifier.height(16.dp))
-            Surface(
-                shape = RoundedCornerShape(16.dp),
-                color = theme.SurfaceCard,
-                border = BorderStroke(1.dp, theme.Divider),
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = "Biography",
-                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                        color = theme.TextPrimary,
+                val photoUrl = detail.profileUrl ?: fallbackImage
+                if (!photoUrl.isNullOrBlank()) {
+                    AsyncImage(
+                        model = photoUrl,
+                        contentDescription = detail.name,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize(),
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = detail.biography,
-                        style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 22.sp),
-                        color = theme.TextMuted,
-                        maxLines = if (isBioExpanded) Int.MAX_VALUE else 6,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    if (detail.biography.length > 280) {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = if (isBioExpanded) "Show Less" else "Read More",
-                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                            color = theme.Accent,
-                            modifier = Modifier
-                                .clickable { isBioExpanded = !isBioExpanded }
-                                .padding(vertical = 4.dp),
+                } else {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Default.Person,
+                            contentDescription = null,
+                            modifier = Modifier.size(76.dp),
+                            tint = theme.TextMuted.copy(alpha = 0.4f),
                         )
                     }
                 }
             }
+
+            Spacer(modifier = Modifier.height(18.dp))
+
+            // Name (Centered)
+            Text(
+                text = detail.name,
+                style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+                color = theme.TextPrimary,
+                textAlign = TextAlign.Center,
+            )
+
+            // Slim Horizontal Boundary Bar
+            Spacer(modifier = Modifier.height(20.dp))
+            HorizontalDivider(
+                modifier = Modifier.fillMaxWidth(),
+                color = Color.White.copy(alpha = 0.08f),
+                thickness = 1.dp,
+            )
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // Content Block: Personal Info Specs
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.Start,
+            ) {
+                Text(
+                    text = "Personal Info",
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    color = theme.TextPrimary,
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    if (!detail.birthday.isNullOrBlank()) {
+                        DetailRow(label = "Born", value = detail.birthday)
+                    }
+
+                    val age = calculateAge(detail.birthday, detail.deathday)
+                    if (age != null) {
+                        val isDeceased = !detail.deathday.isNullOrBlank()
+                        val ageLabel = if (isDeceased) "Age at Death" else "Age"
+                        val ageValue = "$age years old"
+                        DetailRow(label = ageLabel, value = ageValue)
+                    }
+
+                    if (!detail.deathday.isNullOrBlank()) {
+                        DetailRow(label = "Died", value = detail.deathday)
+                    }
+
+                    if (!detail.placeOfBirth.isNullOrBlank()) {
+                        DetailRow(label = "Birthplace", value = detail.placeOfBirth)
+                    }
+
+                    DetailRow(
+                        label = "Credits",
+                        value = "${detail.movieCredits.size} Movies • ${detail.tvCredits.size} TV Shows",
+                    )
+                }
+            }
+
+            // Biography Section (Clean left-aligned typography with slim boundary bar)
+            if (!detail.biography.isNullOrBlank()) {
+                Spacer(modifier = Modifier.height(20.dp))
+                HorizontalDivider(
+                    modifier = Modifier.fillMaxWidth(),
+                    color = Color.White.copy(alpha = 0.08f),
+                    thickness = 1.dp,
+                )
+                Spacer(modifier = Modifier.height(20.dp))
+
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.Start,
+                ) {
+                    Text(
+                        text = "Biography",
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                        color = theme.TextPrimary,
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    val cleanBio = remember(detail.biography) {
+                        detail.biography.replace("\r\n", "\n").trim()
+                    }
+
+                    Text(
+                        text = cleanBio,
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            lineHeight = 22.sp,
+                            letterSpacing = 0.15.sp,
+                        ),
+                        color = theme.TextMuted,
+                        textAlign = TextAlign.Start,
+                    )
+                }
+            }
         }
+
+        // Dedicated Slim Desktop Scrollbar for the sidebar (Auto-hides when idle)
+        if (isScrollable) {
+            DesktopVerticalScrollbar(
+                scrollState = scrollState,
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .fillMaxHeight()
+                    .padding(vertical = 6.dp)
+                    .graphicsLayer { alpha = scrollbarAlpha }
+                    .hoverable(scrollbarInteractionSource),
+                style = defaultScrollbarStyle().copy(
+                    thickness = 5.dp,
+                    shape = RoundedCornerShape(2.5.dp),
+                    unhoverColor = Color.White.copy(alpha = 0.35f),
+                    hoverColor = theme.Accent,
+                ),
+            )
+        }
+    }
+}
+
+private fun calculateAge(birthDateStr: String?, deathDateStr: String? = null): String? {
+    if (birthDateStr.isNullOrBlank()) return null
+    return try {
+        val birthDate = LocalDate.parse(birthDateStr.trim())
+        val endDate = if (!deathDateStr.isNullOrBlank()) {
+            LocalDate.parse(deathDateStr.trim())
+        } else {
+            LocalDate.now()
+        }
+        val years = Period.between(birthDate, endDate).years
+        if (years >= 0) years.toString() else null
+    } catch (_: Exception) {
+        null
     }
 }
 
@@ -391,12 +450,12 @@ private fun DetailRow(label: String, value: String) {
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Text(
             text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = theme.TextMuted.copy(alpha = 0.7f),
+            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+            color = theme.TextMuted.copy(alpha = 0.65f),
         )
         Text(
             text = value,
-            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
+            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Normal),
             color = theme.TextPrimary,
         )
     }
@@ -412,32 +471,60 @@ private fun FilmographySection(
     val theme = LocalDesktopTheme.current
 
     Column(modifier = Modifier.fillMaxSize()) {
-        // Category Filter Tabs
+        // Section Header Row: Title & count on left, Category Filter Tabs on right
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(bottom = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            CategoryTabPill(
-                title = "All",
-                count = detail.allCredits.size,
-                isSelected = uiState.selectedCategory == FilmographyCategory.ALL,
-                onClick = { onSelectCategory(FilmographyCategory.ALL) },
-            )
-            CategoryTabPill(
-                title = "Movies",
-                count = detail.movieCredits.size,
-                isSelected = uiState.selectedCategory == FilmographyCategory.MOVIES,
-                onClick = { onSelectCategory(FilmographyCategory.MOVIES) },
-            )
-            CategoryTabPill(
-                title = "TV Series",
-                count = detail.tvCredits.size,
-                isSelected = uiState.selectedCategory == FilmographyCategory.TV_SHOWS,
-                onClick = { onSelectCategory(FilmographyCategory.TV_SHOWS) },
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Text(
+                    text = "Filmography",
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                    color = theme.TextPrimary,
+                )
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = Color.White.copy(alpha = 0.08f),
+                ) {
+                    Text(
+                        text = "${detail.allCredits.size} titles",
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                        color = theme.TextMuted,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                    )
+                }
+            }
+
+            // Category Filter Tabs
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                CategoryTabPill(
+                    title = "All",
+                    count = detail.allCredits.size,
+                    isSelected = uiState.selectedCategory == FilmographyCategory.ALL,
+                    onClick = { onSelectCategory(FilmographyCategory.ALL) },
+                )
+                CategoryTabPill(
+                    title = "Movies",
+                    count = detail.movieCredits.size,
+                    isSelected = uiState.selectedCategory == FilmographyCategory.MOVIES,
+                    onClick = { onSelectCategory(FilmographyCategory.MOVIES) },
+                )
+                CategoryTabPill(
+                    title = "TV Series",
+                    count = detail.tvCredits.size,
+                    isSelected = uiState.selectedCategory == FilmographyCategory.TV_SHOWS,
+                    onClick = { onSelectCategory(FilmographyCategory.TV_SHOWS) },
+                )
+            }
         }
 
         // Animated Filmography Grid
@@ -499,12 +586,12 @@ private fun CategoryTabPill(
     val theme = LocalDesktopTheme.current
 
     val pillBg by animateColorAsState(
-        targetValue = if (isSelected) theme.Accent else theme.SurfaceCard,
+        targetValue = if (isSelected) theme.Accent else Color.White.copy(alpha = 0.05f),
         animationSpec = tween(180),
         label = "pillBg",
     )
     val pillBorder by animateColorAsState(
-        targetValue = if (isSelected) theme.Accent else theme.Divider,
+        targetValue = if (isSelected) theme.Accent else Color.White.copy(alpha = 0.08f),
         animationSpec = tween(180),
         label = "pillBorder",
     )
@@ -521,7 +608,7 @@ private fun CategoryTabPill(
         modifier = Modifier.clickable { onClick() },
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
@@ -538,7 +625,7 @@ private fun CategoryTabPill(
                     text = count.toString(),
                     style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                     color = if (isSelected) Color.White else theme.TextMuted,
-                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp),
+                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                 )
             }
         }
@@ -554,6 +641,14 @@ private fun FilmographyCreditCard(
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
 
+    val scale by animateFloatAsState(
+        targetValue = if (isHovered) 1.03f else 1.0f,
+        animationSpec = spring(
+            stiffness = Spring.StiffnessMediumLow,
+        ),
+        label = "creditCardScale",
+    )
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -563,14 +658,18 @@ private fun FilmographyCreditCard(
         // Poster Box
         Surface(
             shape = RoundedCornerShape(12.dp),
-            color = theme.SurfaceCard,
+            color = Color(0xFF141416),
             border = BorderStroke(
                 1.dp,
-                if (isHovered) theme.Accent.copy(alpha = 0.75f) else theme.Divider,
+                if (isHovered) theme.Accent.copy(alpha = 0.75f) else Color.White.copy(alpha = 0.08f),
             ),
             modifier = Modifier
                 .fillMaxWidth()
-                .aspectRatio(2f / 3f),
+                .aspectRatio(2f / 3f)
+                .graphicsLayer {
+                    scaleX = scale
+                    scaleY = scale
+                },
         ) {
             Box(modifier = Modifier.fillMaxSize()) {
                 if (!credit.posterUrl.isNullOrBlank()) {

@@ -340,5 +340,46 @@ fun SettingsPostersBadgesScreen(onNavigateToSubScreen: (SettingsSubScreen) -> Un
                 onCheckedChange = { AppearanceConfig.setPosterDepthEffectEnabled(it) },
             )
         }
+
+        // ── Poster Workshop Studio shortcut ───────────────────────────────
+        Surface(
+            onClick = { onNavigateToSubScreen(SettingsSubScreen.POSTER_EDITOR) },
+            shape = androidx.compose.foundation.shape.RoundedCornerShape(14.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.22f)),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                Icon(
+                    Icons.Default.AutoAwesome,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(22.dp),
+                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        "Open Poster Workshop Studio",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Text(
+                        "Interactive live preview canvas — drag sliders and see card changes in real time",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Icon(
+                    Icons.Default.Tune,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                    modifier = Modifier.size(16.dp),
+                )
+            }
+        }
     }
 }

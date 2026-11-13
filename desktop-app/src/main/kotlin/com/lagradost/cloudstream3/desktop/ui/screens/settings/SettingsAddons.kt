@@ -29,12 +29,17 @@ import com.lagradost.cloudstream3.desktop.stremio.StremioAddonManager
 import com.lagradost.cloudstream3.desktop.stremio.StremioAddonType
 import com.lagradost.cloudstream3.desktop.stremio.matchesType
 import com.lagradost.cloudstream3.desktop.ui.components.CloudstreamAlertDialog
+import com.lagradost.cloudstream3.desktop.ui.navigation.Config
 import com.lagradost.cloudstream3.desktop.ui.screens.extensions.ExtensionsViewModel
 import com.lagradost.cloudstream3.desktop.ui.screens.extensions.contract.ExtensionsUiEvent
 import com.lagradost.cloudstream3.desktop.ui.screens.settings.dialogs.AddonDetailsDialog
 
 @Composable
-fun SettingsAddons(viewModel: ExtensionsViewModel) {
+fun SettingsAddons(
+    viewModel: ExtensionsViewModel,
+    onNavigate: ((Config) -> Unit)? = null,
+    isInsideSettings: Boolean = false,
+) {
     val uiState by viewModel.uiState.collectAsState()
     val addons by StremioAddonManager.addons.collectAsState()
 
@@ -145,34 +150,16 @@ fun SettingsAddons(viewModel: ExtensionsViewModel) {
                             }
 
                             Column {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                ) {
-                                    Text(
-                                        text = "Stremio Addons & Manifests",
-                                        style = if (isCompactHeight) MaterialTheme.typography.titleSmall else MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.onSurface,
-                                    )
-                                    Surface(
-                                        shape = RoundedCornerShape(5.dp),
-                                        color = Color(0xFF00B4D8).copy(alpha = 0.15f),
-                                    ) {
-                                        Text(
-                                            text = "External Companion",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = Color(0xFF00B4D8),
-                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 10.sp,
-                                        )
-                                    }
-                                }
+                                Text(
+                                    text = "Stremio Addons & Manifests",
+                                    style = if (isCompactHeight) MaterialTheme.typography.titleSmall else MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                )
 
                                 if (!isCompactHeight) {
                                     Text(
-                                        text = "Install community web manifests to expand video stream sources, subtitles, and external catalogs.",
+                                        text = "Install community web manifests to expand video stream sources, subtitles, and catalogs.",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
                                         maxLines = 1,
@@ -186,6 +173,9 @@ fun SettingsAddons(viewModel: ExtensionsViewModel) {
                             onClick = {
                                 SettingsSession.selectedLeaf = LeafTab.INTEGRATIONS
                                 SettingsSession.activeSubScreen = SettingsSubScreen.EXPLORE_CATALOGS
+                                if (!isInsideSettings) {
+                                    onNavigate?.invoke(Config.Settings)
+                                }
                             },
                             shape = RoundedCornerShape(8.dp),
                             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),

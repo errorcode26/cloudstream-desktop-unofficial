@@ -66,9 +66,11 @@ typealias SettingsTab = LeafTab
 
 enum class SettingsSubScreen(val title: String) {
     APPEARANCE_NAV_DOCK("Navigation & Dock"),
-    APPEARANCE_THEME_WALLPAPER("Theme, Colors & Wallpaper"),
-    APPEARANCE_POSTERS_BADGES("Posters & Provider Badges"),
-    APPEARANCE_HOME_FEED("Home Feed & Cinema"),
+    APPEARANCE_THEME_WALLPAPER("Theme & Colors"),
+    APPEARANCE_TYPOGRAPHY("Typography"),
+    APPEARANCE_WALLPAPER_AMBIENCE("Wallpaper & Ambience"),
+    APPEARANCE_POSTERS_BADGES("Posters & Cards"),
+    APPEARANCE_HOME_FEED("Home Screen"),
     EXPLORE_CATALOGS("Explore & Catalog Shelves"),
     DETAILS_LAYOUT("Details Page Layout & Sections"),
     POSTER_EDITOR("Poster Workshop Studio"),
@@ -361,6 +363,8 @@ fun ComposeSettingsScreen(
                                         when (currentSubScreen) {
                                             SettingsSubScreen.APPEARANCE_NAV_DOCK -> SettingsNavDockScreen()
                                             SettingsSubScreen.APPEARANCE_THEME_WALLPAPER -> SettingsThemeWallpaperScreen()
+                                            SettingsSubScreen.APPEARANCE_TYPOGRAPHY -> SettingsTypographyScreen()
+                                            SettingsSubScreen.APPEARANCE_WALLPAPER_AMBIENCE -> SettingsWallpaperAmbienceScreen()
                                             SettingsSubScreen.APPEARANCE_POSTERS_BADGES -> SettingsPostersBadgesScreen(onNavigateToSubScreen = { activeSubScreen = it })
                                             SettingsSubScreen.APPEARANCE_HOME_FEED -> SettingsHomeFeedScreen(onNavigateToSubScreen = { activeSubScreen = it })
                                             SettingsSubScreen.EXPLORE_CATALOGS -> SettingsExploreCatalogsScreen(onNavigate = onNavigate)
@@ -390,6 +394,7 @@ fun ComposeSettingsScreen(
                                 ) { currentLeaf ->
                                     when (currentLeaf) {
                                         LeafTab.APPEARANCE -> SettingsAppearanceScreen(onNavigateToSubScreen = { activeSubScreen = it })
+                                        LeafTab.LAYOUT -> SettingsAppearanceLayoutScreen(onNavigateToSubScreen = { activeSubScreen = it })
                                         LeafTab.PLAYER -> SettingsPlayerHubScreen(viewModel = settingsViewModel, onNavigateToSubScreen = { activeSubScreen = it })
                                         LeafTab.STREAM_PRIORITIES -> SettingsStreamPrioritiesScreen(viewModel = settingsViewModel)
                                         LeafTab.AUDIO -> SettingsPlayerAudioScreen(viewModel = settingsViewModel)
@@ -417,7 +422,6 @@ fun ComposeSettingsScreen(
                                         LeafTab.UPDATES -> SettingsUpdatesScreen(viewModel = settingsViewModel)
                                         LeafTab.ABOUT -> SettingsAboutScreen()
                                         LeafTab.THEME -> SettingsAppearanceThemeScreen()
-                                        LeafTab.LAYOUT -> SettingsAppearanceLayoutScreen(onNavigateToSubScreen = { activeSubScreen = it })
                                         LeafTab.DETAILS -> SettingsDetailsSectionsScreen()
                                         LeafTab.EFFECTS -> SettingsAppearanceEffectsScreen()
                                         LeafTab.SHORTCUTS -> SettingsShortcutsScreen()

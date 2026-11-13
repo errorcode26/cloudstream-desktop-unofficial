@@ -68,7 +68,10 @@ open class LazyPluginProvider(
     }
 
     override suspend fun load(url: String): LoadResponse? {
-        val real = ensureMounted() ?: throw NotImplementedError("Provider '$name' could not be mounted from $sourcePlugin")
+        val real = ensureMounted() ?: run {
+            AppLogger.w("LazyPluginProvider: Cannot execute load('$url') - Provider '$name' could not be mounted from $sourcePlugin")
+            return null
+        }
         return real.load(url)
     }
 

@@ -4,12 +4,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Dashboard
-import androidx.compose.material.icons.filled.Layers
-import androidx.compose.material.icons.filled.Palette
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material.icons.filled.Wallpaper
+import androidx.compose.material.icons.filled.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -19,18 +14,29 @@ import com.lagradost.cloudstream3.desktop.ui.theme.AppearanceConfig
 
 @Composable
 fun SettingsAppearanceScreen(onNavigateToSubScreen: (SettingsSubScreen) -> Unit = {}) {
-    val dockPosition by AppearanceConfig.dockPosition.collectAsState()
     val isLightMode by AppearanceConfig.isLightMode.collectAsState()
     val amoledMode by AppearanceConfig.amoledMode.collectAsState()
     val themeAccent by AppearanceConfig.themeAccent.collectAsState()
-    val heroEnabled by AppearanceConfig.heroEnabled.collectAsState()
+    val selectedFont by AppearanceConfig.selectedFont.collectAsState()
+    val ambientGlowEnabled by AppearanceConfig.ambientGlowEnabled.collectAsState()
+    val bgImagePath by AppearanceConfig.backgroundImagePath.collectAsState()
+    val performanceModeEnabled by AppearanceConfig.performanceModeEnabled.collectAsState()
     val providerBadgeDisplayMode by AppearanceConfig.providerBadgeDisplayMode.collectAsState()
+    val heroEnabled by AppearanceConfig.heroEnabled.collectAsState()
+    val dockPosition by AppearanceConfig.dockPosition.collectAsState()
     val scrollState = rememberScrollState()
 
     val themeBadge = when {
         isLightMode -> "Light Theme"
         amoledMode -> "AMOLED Black"
         else -> "$themeAccent Accent"
+    }
+
+    val ambienceBadge = when {
+        performanceModeEnabled -> "Performance Mode"
+        bgImagePath.isNotBlank() -> "Wallpaper Active"
+        ambientGlowEnabled -> "Ambient Glow"
+        else -> "No Effects"
     }
 
     Column(
@@ -40,67 +46,68 @@ fun SettingsAppearanceScreen(onNavigateToSubScreen: (SettingsSubScreen) -> Unit 
             .padding(top = 16.dp, bottom = 32.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        // Card 1: Poster Workshop Studio (Promoted to Top for Real-Time Preview)
-        SettingsHubCard(
-            icon = Icons.Default.Tune,
-            title = "Poster Workshop Studio",
-            subtitle = "Interactive real-time preview canvas with live movie shelves and Continue Watching cards. Drag sliders to adjust poster width, corner radius, and card spacing live.",
-            badge = "Live Studio",
-            onClick = { onNavigateToSubScreen(SettingsSubScreen.POSTER_EDITOR) },
-        )
-
-        // Card 2: Details Page Layout & Sections (Promoted to Top-Level Sane Position)
-        SettingsHubCard(
-            icon = Icons.Default.Layers,
-            title = "Details Page Layout & Sections",
-            subtitle = "Modular drag-and-drop section ordering, show or hide trailers, cast, watch history, and content recommendations.",
-            badge = "Modular Sections",
-            onClick = { onNavigateToSubScreen(SettingsSubScreen.DETAILS_LAYOUT) },
-        )
-
-        // Card 3: Explore & Catalog Shelves
-        SettingsHubCard(
-            icon = Icons.Default.Tune,
-            title = "Explore & Catalog Shelves",
-            subtitle = "Modular drag-and-drop shelf ordering for installed add-ons, toggle categories on or off, and customize shelf titles.",
-            badge = "Modular Shelves",
-            onClick = { onNavigateToSubScreen(SettingsSubScreen.EXPLORE_CATALOGS) },
-        )
-
-        // Card 3: Theme, Colors & Wallpaper
+        // 1 — Theme & Colors
         SettingsHubCard(
             icon = Icons.Default.Palette,
-            title = "Theme, Colors & Wallpaper",
-            subtitle = "Light/Dark mode, AMOLED pure black, curated accent swatches, custom hex color picker, typography fonts, ambient glow, and custom wallpaper.",
+            title = "Theme & Colors",
+            subtitle = "Light/Dark/AMOLED mode, accent color, canvas background tone, and curated one-click presets.",
             badge = themeBadge,
             onClick = { onNavigateToSubScreen(SettingsSubScreen.APPEARANCE_THEME_WALLPAPER) },
         )
 
-        // Card 4: Posters & Provider Badges
+        // 2 — Typography
+        SettingsHubCard(
+            icon = Icons.Default.TextFields,
+            title = "Typography",
+            subtitle = "App-wide font family selection and custom font file installer (.ttf / .otf).",
+            badge = selectedFont,
+            onClick = { onNavigateToSubScreen(SettingsSubScreen.APPEARANCE_TYPOGRAPHY) },
+        )
+
+        // 3 — Wallpaper & Ambience
         SettingsHubCard(
             icon = Icons.Default.Wallpaper,
-            title = "Posters & Provider Badges",
-            subtitle = "Master Clean Mode, provider badges, auto-clean messy release titles, 4K/1080p quality tags, SUB/DUB badges, rating stars, and legibility shadows.",
+            title = "Wallpaper & Ambience",
+            subtitle = "Custom background image, ambient glow, blur and vignette controls, and performance mode for lower-end hardware.",
+            badge = ambienceBadge,
+            onClick = { onNavigateToSubScreen(SettingsSubScreen.APPEARANCE_WALLPAPER_AMBIENCE) },
+        )
+
+        // 4 — Posters & Cards
+        SettingsHubCard(
+            icon = Icons.Default.Dashboard,
+            title = "Posters & Cards",
+            subtitle = "Clean mode, provider badges, title auto-cleaning, quality tags, card shadows, and Poster Workshop Studio.",
             badge = providerBadgeDisplayMode.label,
             onClick = { onNavigateToSubScreen(SettingsSubScreen.APPEARANCE_POSTERS_BADGES) },
         )
 
-        // Card 5: Home Feed & Cinema
+        // 5 — Home Screen
         SettingsHubCard(
             icon = Icons.Default.PlayArrow,
-            title = "Home Feed & Cinema",
-            subtitle = "Hero spotlight trending slider, banner layout styles, dynamic backdrop blur, auto-slide transitions, and Continue Watching row.",
+            title = "Home Screen",
+            subtitle = "Hero spotlight carousel, Continue Watching row, banner layout style, auto-slide delay, and backdrop blur.",
             badge = if (heroEnabled) "Hero Active" else "Hero Off",
             onClick = { onNavigateToSubScreen(SettingsSubScreen.APPEARANCE_HOME_FEED) },
         )
 
-        // Card 6: Navigation & Dock
+        // 6 — Details Page Layout
         SettingsHubCard(
-            icon = Icons.Default.Dashboard,
+            icon = Icons.Default.Layers,
+            title = "Details Page Layout",
+            subtitle = "Modular drag-and-drop section ordering. Show or hide trailers, cast, watch history, and recommendations.",
+            badge = "Modular Sections",
+            onClick = { onNavigateToSubScreen(SettingsSubScreen.DETAILS_LAYOUT) },
+        )
+
+        // 7 — Navigation & Dock
+        SettingsHubCard(
+            icon = Icons.Default.GridView,
             title = "Navigation & Dock",
-            subtitle = "Dock position, floating island vs edge navbar, draggable dock button reordering, UI zoom scale, and clock formats.",
+            subtitle = "Dock position, floating vs edge style, button reorder, global UI zoom scale, and clock format.",
             badge = "${dockPosition.label} Dock",
             onClick = { onNavigateToSubScreen(SettingsSubScreen.APPEARANCE_NAV_DOCK) },
         )
     }
 }
+

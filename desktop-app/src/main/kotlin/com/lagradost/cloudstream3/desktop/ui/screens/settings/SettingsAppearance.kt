@@ -16,6 +16,14 @@ fun SettingsThemeWallpaperScreen() =
     com.lagradost.cloudstream3.desktop.ui.screens.settings.appearance.SettingsThemeWallpaperScreen()
 
 @Composable
+fun SettingsTypographyScreen() =
+    com.lagradost.cloudstream3.desktop.ui.screens.settings.appearance.SettingsTypographyScreen()
+
+@Composable
+fun SettingsWallpaperAmbienceScreen() =
+    com.lagradost.cloudstream3.desktop.ui.screens.settings.appearance.SettingsWallpaperAmbienceScreen()
+
+@Composable
 fun SettingsPostersBadgesScreen(onNavigateToSubScreen: (SettingsSubScreen) -> Unit = {}) =
     com.lagradost.cloudstream3.desktop.ui.screens.settings.appearance.SettingsPostersBadgesScreen(onNavigateToSubScreen)
 
@@ -30,6 +38,10 @@ fun SettingsDetailsSectionsScreen() =
 @Composable
 fun SettingsPosterEditorScreen(onBack: () -> Unit = {}) =
     com.lagradost.cloudstream3.desktop.ui.screens.settings.appearance.SettingsPosterEditorScreen(onBack)
+
+@Composable
+fun SettingsLayoutScreen(onNavigateToSubScreen: (SettingsSubScreen) -> Unit = {}) =
+    com.lagradost.cloudstream3.desktop.ui.screens.settings.appearance.SettingsLayoutScreen(onNavigateToSubScreen)
 
 // Backward compatibility aliases
 @Composable

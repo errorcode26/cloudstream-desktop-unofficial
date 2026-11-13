@@ -42,6 +42,7 @@ import com.lagradost.cloudstream3.desktop.ui.screens.ComposeDetailsScreen
 import com.lagradost.cloudstream3.desktop.ui.screens.ComposeHomeScreen
 import com.lagradost.cloudstream3.desktop.ui.screens.ComposeLibraryScreen
 import com.lagradost.cloudstream3.desktop.ui.screens.extensions.ComposeExtensionScreen
+import com.lagradost.common.storage.DesktopDataStore
 import com.lagradost.common.storage.WatchHistory
 import kotlinx.coroutines.launch
 
@@ -504,7 +505,7 @@ fun CloudstreamApp(rootComponent: RootComponent) {
                                                                                 subtitles = emptyList(),
                                                                                 startPositionMs = 0L,
                                                                                 history = WatchHistory(
-                                                                                    parentId = "offline_media",
+                                                                                    parentId = "p${DesktopDataStore.activeProfileId}_offline_${task.showName.hashCode()}",
                                                                                     showName = task.showName,
                                                                                     showUrl = task.filePath,
                                                                                     apiName = "Offline",

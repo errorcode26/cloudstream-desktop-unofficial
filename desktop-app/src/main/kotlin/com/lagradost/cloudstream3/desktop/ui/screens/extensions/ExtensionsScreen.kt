@@ -153,22 +153,6 @@ fun ComposeExtensionScreen(
                                     fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
                                     style = MaterialTheme.typography.bodyMedium,
                                 )
-
-                                if (isStremioTab) {
-                                    Surface(
-                                        shape = RoundedCornerShape(4.dp),
-                                        color = Color(0xFF00B4D8).copy(alpha = 0.15f),
-                                    ) {
-                                        Text(
-                                            text = "External",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = Color(0xFF00B4D8),
-                                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
-                                            fontSize = 10.sp,
-                                            fontWeight = FontWeight.Bold,
-                                        )
-                                    }
-                                }
                             }
                         }
                     }
@@ -270,7 +254,11 @@ fun ComposeExtensionScreen(
                             onNavigateToBrowse = { selectedTab = 0 },
                         )
                         2 -> RepositoriesTab(viewModel = viewModel)
-                        3 -> SettingsAddons(viewModel = viewModel)
+                        3 -> SettingsAddons(
+                            viewModel = viewModel,
+                            onNavigate = onNavigate,
+                            isInsideSettings = isInsideSettings,
+                        )
                         4 -> UpdateHistoryTab(viewModel = viewModel)
                     }
                 }

@@ -475,24 +475,7 @@ class DetailsViewModel(
     private fun handleDownloadEpisode(ep: Episode) {
         val data = uiState.value.response ?: return
         val patchedData = DetailsWatchCoordinator.patchEpisodeData(ep, data)
-        val isMovie = data is MovieLoadResponse
-        val history = WatchHistory(
-            parentId = data.url,
-            showName = data.name,
-            showUrl = data.url,
-            apiName = provider.name,
-            posterUrl = ep.posterUrl ?: data.posterUrl,
-            episodeThumbnailUrl = ep.posterUrl ?: data.posterUrl,
-            screenshotUrl = null,
-            episode = if (isMovie) null else ep.episode,
-            season = if (isMovie) null else ep.season,
-            episodeId = ep.data,
-            position = 0L,
-            duration = 0L,
-            updateTime = System.currentTimeMillis(),
-            episodeName = if (isMovie) null else ep.name,
-            episodeDescription = ep.description ?: data.plot,
-        )
+        val history = DetailsWatchCoordinator.buildWatchHistory(provider.name, ep, data)
         openLinksPanel(Triple(provider, patchedData, history))
     }
 

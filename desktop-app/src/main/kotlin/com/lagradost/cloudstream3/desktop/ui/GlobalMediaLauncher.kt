@@ -10,6 +10,7 @@ import com.lagradost.cloudstream3.desktop.utils.NativeFileDialog
 import com.lagradost.cloudstream3.utils.ExtractorLinkType
 import com.lagradost.cloudstream3.utils.Qualities
 import com.lagradost.cloudstream3.utils.newExtractorLink
+import com.lagradost.common.storage.DesktopDataStore
 import com.lagradost.common.storage.WatchHistory
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -61,7 +62,7 @@ object GlobalMediaLauncher {
                     subtitles = emptyList(),
                     startPositionMs = 0L,
                     history = WatchHistory(
-                        parentId = "local",
+                        parentId = "p${DesktopDataStore.activeProfileId}_local_${filePath.hashCode()}",
                         showName = file.name,
                         showUrl = filePath,
                         apiName = "Local",
@@ -70,7 +71,7 @@ object GlobalMediaLauncher {
                         screenshotUrl = null,
                         episode = null,
                         season = null,
-                        episodeId = "local",
+                        episodeId = filePath,
                         position = 0L,
                         duration = 0L,
                     ),
@@ -114,7 +115,7 @@ object GlobalMediaLauncher {
                     subtitles = emptyList(),
                     startPositionMs = 0L,
                     history = WatchHistory(
-                        parentId = "network",
+                        parentId = "p${DesktopDataStore.activeProfileId}_network_${trimmed.hashCode()}",
                         showName = streamName,
                         showUrl = trimmed,
                         apiName = "Network",
@@ -123,7 +124,7 @@ object GlobalMediaLauncher {
                         screenshotUrl = null,
                         episode = null,
                         season = null,
-                        episodeId = "network",
+                        episodeId = trimmed,
                         position = 0L,
                         duration = 0L,
                     ),

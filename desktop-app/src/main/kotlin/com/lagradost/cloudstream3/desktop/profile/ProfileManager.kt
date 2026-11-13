@@ -76,6 +76,7 @@ object ProfileManager {
             val activeId = DesktopDataStore.getKey<Int>(PREF_ACTIVE_ID) ?: 0
             val resolvedActive = validProfiles.find { it.id == activeId } ?: validProfiles.first()
             _activeProfile.value = resolvedActive
+            DesktopDataStore.activeProfileProvider = { activeProfileId }
 
             val autoSignInPref = DesktopDataStore.getKey<Boolean>(PREF_AUTO_SIGN_IN)
             val pickerPref = DesktopDataStore.getKey<Boolean>(PREF_SHOW_PICKER_STARTUP)
@@ -181,9 +182,16 @@ object ProfileManager {
         cleanupOldAvatarFile(target.customAvatarPath, null)
         _profiles.update { list -> list.filter { it.id != id } }
 
+        // Cascade delete profile data from SQLite database
+        scope.launch(Dispatchers.IO) {
+            DesktopDataStore.clearAllWatchHistory(profileId = id)
+            DesktopDataStore.clearAllBookmarks(profileId = id)
+        }
+
         if (_activeProfile.value.id == id) {
             _activeProfile.value = _profiles.value.first()
             DesktopDataStore.notifyHistoryChanged(force = true)
+            DesktopDataStore.notifyBookmarksChanged()
         }
         saveProfilesInternal()
         AppLogger.i("Deleted profile '${target.name}' (ID: $id)")
@@ -199,6 +207,7 @@ object ProfileManager {
         _activeProfile.value = target
         DesktopDataStore.setKey(PREF_ACTIVE_ID, target.id)
         DesktopDataStore.notifyHistoryChanged(force = true)
+        DesktopDataStore.notifyBookmarksChanged()
         com.lagradost.cloudstream3.desktop.ui.theme.AppearanceConfig.reloadFromDataStore()
         com.lagradost.cloudstream3.desktop.metadata.MetadataConfig.reloadFromDataStore()
         triggerWelcomeToast(target)

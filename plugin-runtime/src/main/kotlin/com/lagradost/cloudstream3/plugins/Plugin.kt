@@ -8,6 +8,16 @@ import com.lagradost.cloudstream3.actions.VideoClickActionHolder
 import kotlin.Throws
 
 abstract class Plugin : BasePlugin() {
+    companion object {
+        /**
+         * Jetpack Compose stability bitmask field.
+         * Plugins compiled against Android CloudStream with Compose compiler
+         * reference `Plugin.$stable` in their static class initializer (<clinit>).
+         */
+        @JvmField
+        val `$stable`: Int = 0
+    }
+
     /**
      * Called when your Plugin is loaded
      * @param context Context

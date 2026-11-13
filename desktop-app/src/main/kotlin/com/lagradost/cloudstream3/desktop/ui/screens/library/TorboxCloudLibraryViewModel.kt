@@ -227,7 +227,7 @@ class TorboxCloudLibraryViewModel : BaseMviViewModel<TorboxLibraryUiState, Torbo
         val targetFile = file ?: videoFiles.firstOrNull() ?: TorboxApiClient.selectBestVideoFile(item.files)
         val activeFileId = targetFile?.id ?: item.id
         val currentEpisodeId = activeFileId.toString()
-        val parentId = "torbox_${item.storageType.name.lowercase()}_${item.id}"
+        val parentId = "p${DesktopDataStore.activeProfileId}_torbox_${item.storageType.name.lowercase()}_${item.id}"
 
         updateState {
             copy(
@@ -360,7 +360,7 @@ class TorboxCloudLibraryViewModel : BaseMviViewModel<TorboxLibraryUiState, Torbo
         val itemsList = uiState.value.itemsList
         val prefix = "torbox_${selectedStorageType.name.lowercase()}_"
         val allHistory = DesktopDataStore.getAllWatchHistory()
-        val matching = allHistory.filter { it.parentId.startsWith(prefix) }
+        val matching = allHistory.filter { it.parentId.contains(prefix) }
             .filter { hist ->
                 val itemId = hist.parentId.substringAfter(prefix).toIntOrNull()
                 itemsList.any { it.id == itemId }

@@ -97,10 +97,16 @@ object DatabaseFactory {
 
         tryMigrate("ALTER TABLE Bookmarks ADD COLUMN watchType INTEGER DEFAULT 0;")
         tryMigrate("ALTER TABLE Bookmarks ADD COLUMN dateAdded INTEGER DEFAULT 0;")
+        tryMigrate("ALTER TABLE Bookmarks ADD COLUMN profileId INTEGER DEFAULT 0;")
         tryMigrate("ALTER TABLE WatchHistory ADD COLUMN episodeThumbnailUrl TEXT;")
         tryMigrate("ALTER TABLE WatchHistory ADD COLUMN screenshotUrl TEXT;")
         tryMigrate("ALTER TABLE WatchHistory ADD COLUMN episodeName TEXT;")
         tryMigrate("ALTER TABLE WatchHistory ADD COLUMN episodeDescription TEXT;")
+        tryMigrate("ALTER TABLE WatchHistory ADD COLUMN profileId INTEGER DEFAULT 0;")
+        tryMigrate("CREATE INDEX IF NOT EXISTS idx_bookmarks_profile ON Bookmarks(profileId);")
+        tryMigrate("CREATE INDEX IF NOT EXISTS idx_watchhistory_profile ON WatchHistory(profileId);")
+        tryMigrate("UPDATE Bookmarks SET profileId = CAST(SUBSTR(id, 2, INSTR(id, '_') - 2) AS INTEGER) WHERE id GLOB 'p[0-9]*_*' AND profileId = 0;")
+        tryMigrate("UPDATE WatchHistory SET profileId = CAST(SUBSTR(parentId, 2, INSTR(parentId, '_') - 2) AS INTEGER) WHERE parentId GLOB 'p[0-9]*_*' AND profileId = 0;")
 
         return DesktopDatabase(driver)
     }

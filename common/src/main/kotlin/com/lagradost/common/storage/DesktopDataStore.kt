@@ -80,8 +80,13 @@ object DesktopDataStore {
     }
 
     val historyUpdates = MutableStateFlow(0)
+    val bookmarkUpdates = MutableStateFlow(0)
     val pluginUpdatesFlow = MutableStateFlow(0)
     val keyUpdates = MutableSharedFlow<String>(extraBufferCapacity = 64)
+
+    fun notifyBookmarksChanged() {
+        bookmarkUpdates.value++
+    }
 
     @PublishedApi
     internal val dbLock = java.util.concurrent.locks.ReentrantLock()
@@ -124,7 +129,7 @@ object DesktopDataStore {
                                     try {
                                         val bookmarks: List<DesktopBookmark> = mapper.readValue(jsonStr, object : TypeReference<List<DesktopBookmark>>() {})
                                         bookmarks.forEach { b ->
-                                            db.cloudstreamDBQueries.insertBookmark(b.id, b.name, b.url, b.apiName, b.posterUrl, b.watchType.toLong(), b.dateAdded)
+                                            db.cloudstreamDBQueries.insertBookmark(b.id, b.name, b.url, b.apiName, b.posterUrl, b.watchType.toLong(), b.dateAdded, 0L)
                                         }
                                     } catch (e: Exception) {
                                         AppLogger.e("Failed to migrate bookmarks", e)
@@ -138,7 +143,7 @@ object DesktopDataStore {
                                                 h.parentId, h.episodeId ?: "", h.showName, h.showUrl, h.apiName, h.posterUrl,
                                                 h.episodeThumbnailUrl, h.screenshotUrl,
                                                 h.episode?.toLong(), h.season?.toLong(), h.position, h.duration, h.updateTime,
-                                                h.episodeName, h.episodeDescription,
+                                                h.episodeName, h.episodeDescription, 0L,
                                             )
                                         }
                                     } catch (e: Exception) {
@@ -395,14 +400,7 @@ object DesktopDataStore {
         val prefix = "p${profileId}_"
         return withDbLock {
             try {
-                DatabaseFactory.database.cloudstreamDBQueries.selectAllBookmarks().executeAsList()
-                    .filter {
-                        if (profileId == 0) {
-                            it.id.startsWith(prefix) || !it.id.startsWith("p")
-                        } else {
-                            it.id.startsWith(prefix)
-                        }
-                    }
+                DatabaseFactory.database.cloudstreamDBQueries.selectBookmarksByProfile(profileId.toLong()).executeAsList()
                     .map {
                         val cleanId = if (it.id.startsWith(prefix)) {
                             it.id.removePrefix(prefix)
@@ -413,8 +411,7 @@ object DesktopDataStore {
                         }
                         DesktopBookmark(cleanId, it.name, it.url, it.apiName, it.posterUrl, it.watchType?.toInt() ?: 0, it.dateAdded ?: 0L)
                     }.distinctBy { it.id }
-                    .filter { it.name.isNotBlank()
-                    }
+                    .filter { it.name.isNotBlank() }
             } catch (e: Exception) {
                 AppLogger.e("Failed to fetch bookmarks for profile $profileId", e)
                 emptyList()
@@ -439,11 +436,13 @@ object DesktopDataStore {
                             DatabaseFactory.database.cloudstreamDBQueries.deleteBookmark(cleanId)
                         }
                     },
+                    profileId.toLong(),
                 )
             } catch (e: Exception) {
                 AppLogger.e("Failed to insert bookmark $resolvedId", e)
             }
         }
+        notifyBookmarksChanged()
     }
 
     fun removeBookmark(id: String, profileId: Int = activeProfileId) {
@@ -459,6 +458,7 @@ object DesktopDataStore {
                 AppLogger.e("Failed to delete bookmark $resolvedId", e)
             }
         }
+        notifyBookmarksChanged()
     }
 
     fun isBookmarked(id: String, profileId: Int = activeProfileId): Boolean {
@@ -477,17 +477,9 @@ object DesktopDataStore {
     }
 
     fun getAllWatchHistory(profileId: Int = activeProfileId): List<WatchHistory> {
-        val prefix = "p${profileId}_"
         return withDbLock {
             try {
-                DatabaseFactory.database.cloudstreamDBQueries.selectAllWatchHistory().executeAsList()
-                    .filter {
-                        if (profileId == 0) {
-                            it.parentId.startsWith(prefix) || !it.parentId.startsWith("p")
-                        } else {
-                            it.parentId.startsWith(prefix)
-                        }
-                    }
+                DatabaseFactory.database.cloudstreamDBQueries.selectWatchHistoryByProfile(profileId.toLong()).executeAsList()
                     .filter {
                         it.showName.isNotBlank() &&
                             !it.showName.equals("Unknown Channel", ignoreCase = true) &&
@@ -531,19 +523,25 @@ object DesktopDataStore {
     }
 
     fun clearAllWatchHistory(profileId: Int = activeProfileId) {
-        val history = getAllWatchHistory(profileId)
         withDbLock {
             try {
-                DatabaseFactory.database.cloudstreamDBQueries.transaction {
-                    history.forEach {
-                        DatabaseFactory.database.cloudstreamDBQueries.deleteWatchHistoryByParent(it.parentId)
-                    }
-                }
+                DatabaseFactory.database.cloudstreamDBQueries.deleteWatchHistoryByProfile(profileId.toLong())
             } catch (e: Exception) {
-                AppLogger.e("Failed to clear all watch history", e)
+                AppLogger.e("Failed to clear all watch history for profile $profileId", e)
             }
         }
         notifyHistoryChanged(force = true)
+    }
+
+    fun clearAllBookmarks(profileId: Int = activeProfileId) {
+        withDbLock {
+            try {
+                DatabaseFactory.database.cloudstreamDBQueries.deleteBookmarksByProfile(profileId.toLong())
+            } catch (e: Exception) {
+                AppLogger.e("Failed to clear all bookmarks for profile $profileId", e)
+            }
+        }
+        notifyBookmarksChanged()
     }
 
     fun removeWatchHistory(parentId: String) {
@@ -710,6 +708,7 @@ object DesktopDataStore {
                             updateTime = row.updateTime,
                             episodeName = row.episodeName,
                             episodeDescription = row.episodeDescription,
+                            profileId = profileId.toLong(),
                         )
                     }
 
@@ -729,12 +728,14 @@ object DesktopDataStore {
                             newPosterUrl ?: existingBookmark.posterUrl,
                             existingBookmark.watchType ?: 0L,
                             existingBookmark.dateAdded ?: System.currentTimeMillis(),
+                            profileId.toLong(),
                         )
                         DatabaseFactory.database.cloudstreamDBQueries.deleteBookmark(oldResolvedBookmarkId)
                         DatabaseFactory.database.cloudstreamDBQueries.deleteBookmark(oldCleanBookmarkId)
                     }
                 }
                 notifyHistoryChanged(force = true)
+                notifyBookmarksChanged()
                 true
             } catch (e: Exception) {
                 AppLogger.e("Failed to migrate watch history and bookmark from $oldParentId to $newParentId", e)
@@ -758,6 +759,12 @@ object DesktopDataStore {
             return
         }
 
+        val resolvedProfileId = if (history.parentId.startsWith("p") && history.parentId.contains("_")) {
+            history.parentId.substringBefore("_").removePrefix("p").toLongOrNull() ?: activeProfileId.toLong()
+        } else {
+            activeProfileId.toLong()
+        }
+
         withDbLock {
             try {
                 DatabaseFactory.database.cloudstreamDBQueries.insertWatchHistory(
@@ -776,6 +783,7 @@ object DesktopDataStore {
                     updateTime = history.updateTime.takeIf { it > 0 } ?: System.currentTimeMillis(),
                     episodeName = history.episodeName,
                     episodeDescription = history.episodeDescription,
+                    profileId = resolvedProfileId,
                 )
             } catch (e: Exception) {
                 AppLogger.e("Failed to insert watch history for ${history.parentId}", e)
@@ -804,6 +812,12 @@ object DesktopDataStore {
                             history.position.coerceAtLeast(0)
                         }
 
+                        val resolvedProfileId = if (history.parentId.startsWith("p") && history.parentId.contains("_")) {
+                            history.parentId.substringBefore("_").removePrefix("p").toLongOrNull() ?: activeProfileId.toLong()
+                        } else {
+                            activeProfileId.toLong()
+                        }
+
                         DatabaseFactory.database.cloudstreamDBQueries.insertWatchHistory(
                             parentId = history.parentId,
                             episodeId = history.episodeId ?: "",
@@ -820,6 +834,7 @@ object DesktopDataStore {
                             updateTime = history.updateTime.takeIf { it > 0 } ?: System.currentTimeMillis(),
                             episodeName = history.episodeName,
                             episodeDescription = history.episodeDescription,
+                            profileId = resolvedProfileId,
                         )
                     }
                 }
