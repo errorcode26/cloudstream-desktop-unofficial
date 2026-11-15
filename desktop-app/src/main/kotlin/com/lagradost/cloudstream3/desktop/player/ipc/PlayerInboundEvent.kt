@@ -68,6 +68,7 @@ sealed interface PlayerInboundEvent {
     data class SetSubtitleBlur(val blur: String) : PlayerInboundEvent
     data class SetSubtitleBold(val bold: String) : PlayerInboundEvent
     data class SetSubtitleItalic(val italic: String) : PlayerInboundEvent
+    data class SetSubtitlePosition(val pos: Int) : PlayerInboundEvent
     data class SearchSubtitles(val query: String, val lang: String?, val season: Int?, val episode: Int?, val imdbId: String? = null) : PlayerInboundEvent
     data class DownloadSubtitle(val idPrefix: String, val data: String, val name: String, val lang: String, val source: String) : PlayerInboundEvent
     data class SetSubsourceApiKey(val apiKey: String) : PlayerInboundEvent
@@ -186,6 +187,7 @@ sealed interface PlayerInboundEvent {
                 "setSubtitleBlur" -> SetSubtitleBlur(eventValue)
                 "setSubtitleBold" -> SetSubtitleBold(eventValue)
                 "setSubtitleItalic" -> SetSubtitleItalic(eventValue)
+                "setSubtitlePosition" -> SetSubtitlePosition(eventValue.toIntOrNull() ?: 100)
 
                 "searchSubtitles" -> parseSearchSubtitles(rootNode, rawPayload)
                 "downloadSubtitle" -> parseDownloadSubtitle(rootNode, rawPayload)

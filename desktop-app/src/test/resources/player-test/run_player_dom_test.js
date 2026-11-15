@@ -43,6 +43,7 @@ function getOrCreateElement(id, tag = 'div') {
     const classes = new Set();
     const children = [];
     let text = '';
+    const listeners = {};
     const el = {
         tagName: tag.toUpperCase(),
         id: id || '',
@@ -75,7 +76,9 @@ function getOrCreateElement(id, tag = 'div') {
         set textContent(v) { text = String(v); },
         get innerHTML() { return text; },
         set innerHTML(v) { text = String(v); },
-        value: '',
+        value: '100',
+        min: '0',
+        max: '100',
         dataset: {},
         children,
         childNodes: children,
@@ -88,12 +91,36 @@ function getOrCreateElement(id, tag = 'div') {
         getAttribute: (k) => null,
         hasAttribute: (k) => false,
         removeAttribute: (k) => {},
-        addEventListener: () => {},
+        addEventListener: (evt, fn) => {
+            listeners[evt] = listeners[evt] || [];
+            listeners[evt].push(fn);
+        },
         removeEventListener: () => {},
+        dispatchEvent: (event) => {
+            const evtName = typeof event === 'string' ? event : (event && event.type) || 'click';
+            const fns = listeners[evtName] || [];
+            fns.forEach(fn => fn({ type: evtName, stopPropagation: () => {}, preventDefault: () => {}, target: el, currentTarget: el }));
+        },
+        click: () => {
+            el.dispatchEvent('click');
+        },
+        getContext: () => new Proxy({
+            canvas: el,
+            measureText: () => ({ width: 10 }),
+            createLinearGradient: () => ({ addColorStop: () => {} }),
+            createPattern: () => ({})
+        }, {
+            get: (t, prop) => {
+                if (prop in t) return t[prop];
+                return () => {};
+            },
+            set: () => true
+        }),
         appendChild: (child) => { children.push(child); return child; },
         removeChild: (child) => child,
         querySelector: () => null,
         querySelectorAll: () => [],
+        getBoundingClientRect: () => ({ left: 0, top: 0, right: 1920, bottom: 1080, width: 1920, height: 1080 }),
         closest: () => null,
         focus: () => {},
         blur: () => {}
@@ -126,6 +153,7 @@ const mockWindow = {
     parseFloat,
     isNaN,
     isFinite,
+    performance: (typeof performance !== 'undefined' ? performance : { now: () => Date.now() }),
     document: {
         readyState: 'complete',
         title: 'CloudStream Player',
@@ -231,6 +259,32 @@ try {
     });
     if (typeof mockWindow.__dismissProbingOverlay === 'function') {
         mockWindow.__dismissProbingOverlay();
+    }
+
+    // Verify showControls() and interactive button/slider event dispatch
+    if (typeof mockWindow.showControls === 'function') {
+        mockWindow.showControls();
+    }
+    const buttonsToTest = [
+        'playPauseBtn',
+        'muteBtn',
+        'speedBtn',
+        'settingsBtn',
+        'episodesBtn',
+        'audioSubsBtn',
+        'btnResetSubtitles',
+        'closeSettingsBtn',
+        'closeEpisodesBtn'
+    ];
+    for (const btnId of buttonsToTest) {
+        const el = domElements.get(btnId);
+        if (el && typeof el.click === 'function') {
+            el.click();
+        }
+    }
+    const subSlider = domElements.get('subPosSlider');
+    if (subSlider && typeof subSlider.dispatchEvent === 'function') {
+        subSlider.dispatchEvent('input');
     }
 } catch (err) {
     console.error('[FAIL] player.js threw unhandled error during message lifecycle:\n', err);

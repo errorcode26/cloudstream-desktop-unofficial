@@ -1390,12 +1390,14 @@ fun ComposeNativeWebPlayer(
                                 when (event.property) {
                                     "sub-color" -> com.lagradost.common.storage.DesktopDataStore.setKey(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_SUB_COLOR, event.value)
                                     "sub-font-size" -> com.lagradost.common.storage.DesktopDataStore.setKey(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_SUB_SIZE, event.value)
-                                    "sub-pos" -> com.lagradost.common.storage.DesktopDataStore.setKey(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_SUB_POS, event.value)
                                     "tone-mapping" -> com.lagradost.common.storage.DesktopDataStore.setKey(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_HDR_TONE_MAPPING, event.value)
                                     "hdr-compute-peak" -> com.lagradost.common.storage.DesktopDataStore.setKey(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_HDR_COMPUTE_PEAK, event.value == "yes")
                                     "dither" -> com.lagradost.common.storage.DesktopDataStore.setKey(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_DITHERING, event.value)
                                 }
                             }
+                        }
+                        is PlayerInboundEvent.SetSubtitlePosition -> {
+                            playerState?.setSubtitlePosition(event.pos)
                         }
                         is PlayerInboundEvent.UserInteraction -> {
                             scope.launch(kotlinx.coroutines.Dispatchers.Main) {

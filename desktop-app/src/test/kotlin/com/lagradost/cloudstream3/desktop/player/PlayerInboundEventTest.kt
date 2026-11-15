@@ -65,6 +65,14 @@ class PlayerInboundEventTest {
         assertEquals("ordered", event.value)
     }
 
+    @Test
+    fun testParse_SetSubtitlePosition() {
+        val json = """{"type":"setSubtitlePosition","value":"85"}"""
+        val event = parseEvent(json)
+        assertIs<PlayerInboundEvent.SetSubtitlePosition>(event)
+        assertEquals(85, event.pos)
+    }
+
     // --- 3. AppStateUpdatePayload Rendering Defaults ---
 
     @Test

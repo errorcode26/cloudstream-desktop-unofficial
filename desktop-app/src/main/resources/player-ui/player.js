@@ -906,7 +906,37 @@
         }, 500);
     };
 
-    // Auto-hide Controls
+    // Auto-hide Controls & Subtitle Clearance Engine
+    window.userBaseSubPos = 100;
+    window.currentAppliedSubPos = 100;
+
+    const updateSubtitleOffset = (controlsVisible) => {
+        const isAudio = (typeof isAudioStationActive !== 'undefined' && !!isAudioStationActive) ||
+                        (typeof isAudioActive !== 'undefined' && !!isAudioActive) ||
+                        (typeof isAudioMode !== 'undefined' && !!isAudioMode) ||
+                        (document.body && document.body.classList.contains('audio-mode-active')) ||
+                        (window.lastMeta && !!window.lastMeta.isAudioMode);
+        if (isAudio) {
+            return;
+        }
+        const basePos = (typeof window.userBaseSubPos === 'number' && !isNaN(window.userBaseSubPos)) ? window.userBaseSubPos : 100;
+        let targetSubPos = basePos;
+        if (controlsVisible) {
+            const bBar = document.getElementById('bottomBar');
+            const barHeight = (bBar && bBar.offsetHeight > 0) ? bBar.offsetHeight : 124;
+            const winH = (window.innerHeight > 0) ? window.innerHeight : 1080;
+            // Calculate proportional percentage lift needed to clear the bottom controls dock plus 12px breathing margin
+            const requiredLiftPx = barHeight + 12;
+            const offsetPct = Math.min(28, Math.max(6, Math.round((requiredLiftPx / winH) * 100)));
+            targetSubPos = Math.max(35, basePos - offsetPct);
+        }
+        if (window.currentAppliedSubPos !== targetSubPos) {
+            window.currentAppliedSubPos = targetSubPos;
+            send('setMpvProperty', 'sub-pos:' + targetSubPos);
+        }
+    };
+    window.updateSubtitleOffset = updateSubtitleOffset;
+
     let hideTimer;
     let lastMouseX = -1;
     let lastMouseY = -1;
@@ -938,6 +968,7 @@
         if (isProbing && !userDismissedProbing && !globalIsPlaying && currentPosMs <= 50) {
             clearTimeout(hideTimer);
             document.body.classList.remove('hidden-controls');
+            updateSubtitleOffset(true);
             return;
         }
         if (overlay.style.opacity === '0' && videoEndedOverlay.style.display !== 'flex') {
@@ -946,6 +977,7 @@
         overlay.classList.remove('hidden-controls');
         overlay.classList.remove('hide-main-ui');
         document.body.classList.remove('hidden-controls');
+        updateSubtitleOffset(true);
         const sBtn = document.getElementById('skipBtn');
         if (sBtn) {
             sBtn.classList.remove('idle-faded');
@@ -961,6 +993,7 @@
                 if (!isHoveringControls && !isSeeking && !isMenuOpen) {
                     overlay.classList.add('hidden-controls');
                     document.body.classList.add('hidden-controls');
+                    updateSubtitleOffset(false);
                 }
             }, 3500);
         }
@@ -3521,12 +3554,19 @@
 
         // Vertical Position Slider
         if (meta.activeSubtitlePos) {
+            const parsedPos = parseInt(meta.activeSubtitlePos, 10);
+            if (!isNaN(parsedPos)) {
+                window.userBaseSubPos = parsedPos;
+            }
             const slider = document.getElementById('subPosSlider');
             if (slider) {
                 slider.value = meta.activeSubtitlePos;
                 updateSliderFillHelper(slider);
                 const badge = document.getElementById('subPosVal');
                 if (badge) badge.innerText = `${meta.activeSubtitlePos}%`;
+            }
+            if (typeof updateSubtitleOffset === 'function') {
+                updateSubtitleOffset(!document.body.classList.contains('hidden-controls'));
             }
         }
 
@@ -4029,6 +4069,9 @@
                     overlay.classList.add('hidden-controls');
                 }
                 document.body.classList.add('hidden-controls');
+                if (typeof updateSubtitleOffset === 'function') {
+                    updateSubtitleOffset(false);
+                }
                 evaluateUIStates();
 
                 // Trigger maturity advisory on clean playback start
@@ -5952,8 +5995,13 @@
     if (subPosSlider && subPosVal) {
         subPosSlider.addEventListener('input', e => {
             e.stopPropagation();
-            subPosVal.innerText = `${e.target.value}%`;
-            send('setMpvProperty', `sub-pos:${e.target.value}`);
+            const val = parseInt(e.target.value, 10) || 100;
+            subPosVal.innerText = `${val}%`;
+            window.userBaseSubPos = val;
+            send('setSubtitlePosition', String(val));
+            if (typeof updateSubtitleOffset === 'function') {
+                updateSubtitleOffset(!document.body.classList.contains('hidden-controls'));
+            }
             window.updateSubtitlePreview();
         });
     }
@@ -6084,6 +6132,11 @@
                 subPosSlider.value = 100;
                 subPosVal.innerText = '100%';
                 updateDesktopSliderFill(subPosSlider);
+                window.userBaseSubPos = 100;
+                send('setSubtitlePosition', '100');
+                if (typeof updateSubtitleOffset === 'function') {
+                    updateSubtitleOffset(!document.body.classList.contains('hidden-controls'));
+                }
             }
             
             document.querySelectorAll('#subTextColorPalette .desktop-color-dot').forEach(d => d.classList.remove('active'));
@@ -7718,6 +7771,14 @@
                 if (file.path) {
                     send('loadLocalSubtitleFile', file.path);
                 }
+            }
+        }
+    });
+
+    window.addEventListener('resize', () => {
+        if (!document.body.classList.contains('hidden-controls')) {
+            if (typeof updateSubtitleOffset === 'function') {
+                updateSubtitleOffset(true);
             }
         }
     });
