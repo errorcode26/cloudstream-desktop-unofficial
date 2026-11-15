@@ -154,6 +154,10 @@ data class AppStateUpdatePayload(
     val showPauseCast: Boolean = true,
     val seekDurationMs: Long = 10000L,
     val fileSize: String? = null,
+    val hdrToneMapping: String = "spline",
+    val hdrComputePeak: Boolean = true,
+    val debandQuality: String = "off",
+    val dithering: String = "fruit",
 )
 
 data class P2pStatsUpdatePayload(

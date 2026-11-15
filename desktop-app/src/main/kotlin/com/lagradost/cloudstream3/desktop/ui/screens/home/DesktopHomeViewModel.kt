@@ -111,7 +111,7 @@ class DesktopHomeViewModel(
                         orderedMap[provKey] = ordered
                     }
                 }
-                updateState { copy(disabledCatalogs = disabledMap, orderedCatalogs = orderedMap) }
+                updateState { copy(disabledCatalogs = disabledCatalogs + disabledMap, orderedCatalogs = orderedCatalogs + orderedMap) }
             }
         }
 

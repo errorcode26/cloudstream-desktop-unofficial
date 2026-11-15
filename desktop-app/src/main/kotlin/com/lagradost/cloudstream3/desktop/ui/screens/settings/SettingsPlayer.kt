@@ -11,7 +11,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.lagradost.cloudstream3.desktop.player.PlayerConfig
+import com.lagradost.common.platform.PlatformPaths
 import com.lagradost.common.storage.DesktopDataStore
+import java.io.File
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 1. PLAYBACK & MEDIA CATEGORY HUB
@@ -27,7 +29,9 @@ fun SettingsPlayerHubScreen(
     // Live state computations for dynamic badges
     val hwdec = uiState.stringSettings[PlayerConfig.PREF_HWDEC] ?: "auto-safe"
     val gpuApi = uiState.stringSettings[PlayerConfig.PREF_GPU_API] ?: "d3d11"
+    val voDriver = uiState.stringSettings[PlayerConfig.PREF_VO_DRIVER] ?: "gpu"
     val hwdecBadge = when {
+        voDriver == "gpu-next" -> "libplacebo • GPU"
         gpuApi == "opengl" -> "OpenGL • GPU"
         hwdec == "auto-safe" -> "Auto-Safe GPU"
         hwdec == "auto-copy" -> "Auto-Copy GPU"
@@ -175,6 +179,21 @@ fun SettingsPlayerRenderingScreen(viewModel: SettingsViewModel) {
 
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
 
+            MviSettingsDropdown(
+                key = PlayerConfig.PREF_VO_DRIVER,
+                label = "Video Output Driver",
+                subtitle = "Underlying video presentation engine (switch to gpu-next for advanced gamut mapping and HDR)",
+                options = listOf(
+                    "gpu" to "Standard GPU (Direct3D 11 / OpenGL - Stable Default)",
+                    "gpu-next" to "Next-Gen libplacebo (Advanced Gamut & Native HDR Passthrough)",
+                ),
+                uiState = uiState,
+                onEvent = viewModel::onEvent,
+                defaultValue = "gpu",
+            )
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
             MviSettingsToggle(
                 key = PlayerConfig.PREF_INTERPOLATION,
                 label = "Smooth Video (Display Resample)",
@@ -182,6 +201,84 @@ fun SettingsPlayerRenderingScreen(viewModel: SettingsViewModel) {
                 uiState = uiState,
                 onEvent = viewModel::onEvent,
                 defaultValue = false,
+            )
+        }
+
+        SettingsGroupCard(title = "Image Scalers & Color Fidelity") {
+            MviSettingsDropdown(
+                key = PlayerConfig.PREF_VIDEO_QUALITY_PROFILE,
+                label = "Rendering Quality Profile",
+                subtitle = "Balancing upscaling algorithms between performance and image sharpness",
+                options = listOf(
+                    "balanced" to "Balanced (Spline36 - Clean Sharp Upscaling)",
+                    "high_quality" to "High Quality (EWA-Lanczos / GPU-HQ - Max Sharpness)",
+                    "fast" to "Fast (Bilinear - Low Resource Usage)",
+                ),
+                uiState = uiState,
+                onEvent = viewModel::onEvent,
+                defaultValue = "balanced",
+            )
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+            MviSettingsDropdown(
+                key = PlayerConfig.PREF_DITHERING,
+                label = "Dithering Engine",
+                subtitle = "Smooths out 10-bit to 8-bit color gradients to eliminate step-banding artifacts",
+                options = listOf(
+                    "fruit" to "Fruit (Error Diffusion - Recommended for 8-bit SDR)",
+                    "ordered" to "Ordered Dithering",
+                    "no" to "Off (Direct 10-bit / Native Output)",
+                ),
+                uiState = uiState,
+                onEvent = viewModel::onEvent,
+                defaultValue = "fruit",
+            )
+        }
+
+        SettingsGroupCard(title = "HDR Tone-Mapping & Banding Correction") {
+            MviSettingsDropdown(
+                key = PlayerConfig.PREF_HDR_TONE_MAPPING,
+                label = "HDR Tone-Mapping Curve",
+                subtitle = "Algorithm used to compress high-dynamic-range luminance into SDR color gamut",
+                options = listOf(
+                    "spline" to "Spline (Natural Contrast & Color Balance - Recommended)",
+                    "bt.2446a" to "BT.2446 Method A (Broad Dynamic Range)",
+                    "mobius" to "Mobius (Smooth Highlight Roll-off)",
+                    "clip" to "Direct Clip (Hard Highlight Cutoff)",
+                    "auto" to "Auto (MPV Engine Default)",
+                ),
+                uiState = uiState,
+                onEvent = viewModel::onEvent,
+                defaultValue = "spline",
+            )
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+            MviSettingsToggle(
+                key = PlayerConfig.PREF_HDR_COMPUTE_PEAK,
+                label = "Compute Dynamic Scene Peak",
+                subtitle = "Measures per-frame peak brightness to avoid washed-out grey tones on SDR desktop monitors",
+                uiState = uiState,
+                onEvent = viewModel::onEvent,
+                defaultValue = true,
+            )
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+            MviSettingsDropdown(
+                key = PlayerConfig.PREF_DEBAND_QUALITY,
+                label = "Debanding Filter",
+                subtitle = "Smoothes compression macroblocks and color banding across sky and gradient scenes",
+                options = listOf(
+                    "off" to "Disabled (Raw Stream Bitstream)",
+                    "light" to "Light (Fast - removes subtle banding)",
+                    "medium" to "Medium (Balanced - recommended for 1080p web streams)",
+                    "strong" to "Strong (Heavy smoothing for low-bitrate banding)",
+                ),
+                uiState = uiState,
+                onEvent = viewModel::onEvent,
+                defaultValue = "off",
             )
         }
 
@@ -312,6 +409,19 @@ fun SettingsPlayerRenderingScreen(viewModel: SettingsViewModel) {
                 uiState = uiState,
                 onEvent = viewModel::onEvent,
                 defaultValue = "bestvideo[height<=?1080]+bestaudio/best",
+            )
+        }
+
+        SettingsGroupCard(title = "Custom MPV Configuration") {
+            val mpvConfPath = remember { File(PlatformPaths.appDataDir, "mpv.conf").absolutePath }
+
+            MviSettingsToggle(
+                key = PlayerConfig.PREF_ENABLE_CUSTOM_MPV_CONF,
+                label = "Load Custom mpv.conf",
+                subtitle = "Applies advanced options from $mpvConfPath if the file exists",
+                uiState = uiState,
+                onEvent = viewModel::onEvent,
+                defaultValue = false,
             )
         }
     }

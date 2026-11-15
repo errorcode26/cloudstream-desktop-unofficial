@@ -4166,6 +4166,29 @@
             showPauseCast = !!s.showPauseCast;
         }
 
+        if (s.hdrToneMapping) {
+            document.querySelectorAll('#hdrToneChips .chip').forEach(c => {
+                c.classList.toggle('active', c.dataset.tone === s.hdrToneMapping);
+            });
+        }
+
+        if (s.hdrComputePeak !== undefined && s.hdrComputePeak !== null) {
+            const btn = document.getElementById('btnToggleHdrPeak');
+            if (btn) btn.classList.toggle('active', !!s.hdrComputePeak);
+        }
+
+        if (s.debandQuality) {
+            document.querySelectorAll('#debandChips .chip').forEach(c => {
+                c.classList.toggle('active', c.dataset.deband === s.debandQuality);
+            });
+        }
+
+        if (s.dithering) {
+            document.querySelectorAll('#ditherChips .chip').forEach(c => {
+                c.classList.toggle('active', c.dataset.dither === s.dithering);
+            });
+        }
+
         evaluateUIStates();
         evaluateResumeOverlay();
     };
@@ -6140,6 +6163,31 @@
         document.querySelectorAll('#scaleChips .chip').forEach(c => c.classList.remove('active'));
         document.querySelector('#scaleChips .chip[data-scale="spline36"]').classList.add('active');
         send('setMpvProperty', 'scale:spline36');
+
+        // Reset HDR Tone-Mapping
+        document.querySelectorAll('#hdrToneChips .chip').forEach(c => c.classList.remove('active'));
+        const defTone = document.querySelector('#hdrToneChips .chip[data-tone="spline"]');
+        if (defTone) defTone.classList.add('active');
+        send('setMpvProperty', 'tone-mapping:spline');
+
+        // Reset Dynamic Peak
+        const peakBtn = document.getElementById('btnToggleHdrPeak');
+        if (peakBtn) {
+            peakBtn.classList.add('active');
+            send('setMpvProperty', 'hdr-compute-peak:yes');
+        }
+
+        // Reset Deband
+        document.querySelectorAll('#debandChips .chip').forEach(c => c.classList.remove('active'));
+        const defDeband = document.querySelector('#debandChips .chip[data-deband="off"]');
+        if (defDeband) defDeband.classList.add('active');
+        send('setDebandQuality', 'off');
+
+        // Reset Dither
+        document.querySelectorAll('#ditherChips .chip').forEach(c => c.classList.remove('active'));
+        const defDither = document.querySelector('#ditherChips .chip[data-dither="fruit"]');
+        if (defDither) defDither.classList.add('active');
+        send('setMpvProperty', 'dither:fruit');
     });
 
     // Scale filter
@@ -6149,6 +6197,46 @@
             document.querySelectorAll('#scaleChips .chip').forEach(x => x.classList.remove('active'));
             c.classList.add('active');
             send('setMpvProperty', `scale:${c.dataset.scale}`);
+        });
+    });
+
+    // HDR Tone-mapping chips
+    document.querySelectorAll('#hdrToneChips .chip').forEach(c => {
+        c.addEventListener('click', e => {
+            e.stopPropagation();
+            document.querySelectorAll('#hdrToneChips .chip').forEach(x => x.classList.remove('active'));
+            c.classList.add('active');
+            send('setMpvProperty', `tone-mapping:${c.dataset.tone}`);
+        });
+    });
+
+    // HDR Dynamic Peak switch
+    const btnToggleHdrPeak = document.getElementById('btnToggleHdrPeak');
+    if (btnToggleHdrPeak) {
+        btnToggleHdrPeak.addEventListener('click', e => {
+            e.stopPropagation();
+            const isActive = btnToggleHdrPeak.classList.toggle('active');
+            send('setMpvProperty', `hdr-compute-peak:${isActive ? 'yes' : 'no'}`);
+        });
+    }
+
+    // Deband quality chips
+    document.querySelectorAll('#debandChips .chip').forEach(c => {
+        c.addEventListener('click', e => {
+            e.stopPropagation();
+            document.querySelectorAll('#debandChips .chip').forEach(x => x.classList.remove('active'));
+            c.classList.add('active');
+            send('setDebandQuality', c.dataset.deband);
+        });
+    });
+
+    // Dither chips
+    document.querySelectorAll('#ditherChips .chip').forEach(c => {
+        c.addEventListener('click', e => {
+            e.stopPropagation();
+            document.querySelectorAll('#ditherChips .chip').forEach(x => x.classList.remove('active'));
+            c.classList.add('active');
+            send('setMpvProperty', `dither:${c.dataset.dither}`);
         });
     });
 

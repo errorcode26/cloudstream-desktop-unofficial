@@ -27,6 +27,13 @@ object PlayerConfig {
     const val PREF_AUTO_PLAY_TIMEOUT = "player_auto_play_timeout"
     const val PREF_INTERPOLATION = "player_interpolation_enabled"
     const val PREF_DEBAND = "player_deband"
+    const val PREF_DEBAND_QUALITY = "player_deband_quality"
+    const val PREF_VO_DRIVER = "player_vo_driver"
+    const val PREF_VIDEO_QUALITY_PROFILE = "player_video_quality_profile"
+    const val PREF_HDR_TONE_MAPPING = "player_hdr_tone_mapping"
+    const val PREF_HDR_COMPUTE_PEAK = "player_hdr_compute_peak"
+    const val PREF_DITHERING = "player_dithering"
+    const val PREF_ENABLE_CUSTOM_MPV_CONF = "player_enable_custom_mpv_conf"
     const val PREF_ACTIVE_SHADER = "player_active_shader"
     const val PREF_SUB_FONT = "player_sub_font"
     const val PREF_SUB_BORDER_COLOR = "player_sub_border_color"
@@ -116,10 +123,46 @@ object PlayerConfig {
         val startSpeed = DesktopDataStore.getKey<Float>(PREF_PLAYBACK_SPEED) ?: 1f
         lib.mpv_set_option_string(handle, "speed", startSpeed.toString())
 
-        // Fast rendering profile to eliminate shader overhead in embedded presentation
-        lib.mpv_set_option_string(handle, "profile", "fast")
+        // Video Output Driver: gpu vs gpu-next (libplacebo)
+        val voDriver = DesktopDataStore.getKey<String>(PREF_VO_DRIVER) ?: "gpu"
+        lib.mpv_set_option_string(handle, "vo", voDriver)
+
+        // Rendering profile & scalers
+        val qualityProfile = DesktopDataStore.getKey<String>(PREF_VIDEO_QUALITY_PROFILE) ?: "balanced"
+        when (qualityProfile) {
+            "high_quality" -> {
+                lib.mpv_set_option_string(handle, "profile", "gpu-hq")
+                lib.mpv_set_option_string(handle, "scale", "ewa_lanczos")
+                lib.mpv_set_option_string(handle, "cscale", "spline36")
+                lib.mpv_set_option_string(handle, "dscale", "mitchell")
+            }
+            "fast" -> {
+                lib.mpv_set_option_string(handle, "profile", "fast")
+                lib.mpv_set_option_string(handle, "scale", "bilinear")
+                lib.mpv_set_option_string(handle, "cscale", "bilinear")
+            }
+            else -> { // "balanced"
+                lib.mpv_set_option_string(handle, "profile", "fast")
+                lib.mpv_set_option_string(handle, "scale", "spline36")
+                lib.mpv_set_option_string(handle, "cscale", "spline36")
+                lib.mpv_set_option_string(handle, "dscale", "mitchell")
+            }
+        }
         lib.mpv_set_option_string(handle, "framedrop", "vo")
         lib.mpv_set_option_string(handle, "hr-seek-framedrop", "yes")
+
+        // HDR Tone-Mapping & Peak Luminance
+        val hdrToneMapping = DesktopDataStore.getKey<String>(PREF_HDR_TONE_MAPPING) ?: "spline"
+        if (hdrToneMapping.isNotBlank()) {
+            lib.mpv_set_option_string(handle, "tone-mapping", hdrToneMapping)
+        }
+        val hdrComputePeak = DesktopDataStore.getKey<Boolean>(PREF_HDR_COMPUTE_PEAK) ?: true
+        lib.mpv_set_option_string(handle, "hdr-compute-peak", if (hdrComputePeak) "yes" else "no")
+
+        // Dithering Engine
+        val dithering = DesktopDataStore.getKey<String>(PREF_DITHERING) ?: "fruit"
+        lib.mpv_set_option_string(handle, "dither-depth", "auto")
+        lib.mpv_set_option_string(handle, "dither", dithering)
 
         // Network Timeout Protection (6 seconds)
         // Prevents MPV/FFmpeg demuxer from hanging indefinitely on stalled CDN or proxy connections
@@ -235,8 +278,34 @@ object PlayerConfig {
         }
 
         // Deband (Reduces color banding artifacts)
-        val deband = DesktopDataStore.getKey<Boolean>(PREF_DEBAND) ?: false
-        lib.mpv_set_option_string(handle, "deband", if (deband) "yes" else "no")
+        val debandQuality = DesktopDataStore.getKey<String>(PREF_DEBAND_QUALITY) ?: "off"
+        when (debandQuality) {
+            "light" -> {
+                lib.mpv_set_option_string(handle, "deband", "yes")
+                lib.mpv_set_option_string(handle, "deband-iterations", "1")
+                lib.mpv_set_option_string(handle, "deband-threshold", "32")
+                lib.mpv_set_option_string(handle, "deband-range", "16")
+                lib.mpv_set_option_string(handle, "deband-grain", "5")
+            }
+            "medium" -> {
+                lib.mpv_set_option_string(handle, "deband", "yes")
+                lib.mpv_set_option_string(handle, "deband-iterations", "2")
+                lib.mpv_set_option_string(handle, "deband-threshold", "48")
+                lib.mpv_set_option_string(handle, "deband-range", "16")
+                lib.mpv_set_option_string(handle, "deband-grain", "16")
+            }
+            "strong" -> {
+                lib.mpv_set_option_string(handle, "deband", "yes")
+                lib.mpv_set_option_string(handle, "deband-iterations", "4")
+                lib.mpv_set_option_string(handle, "deband-threshold", "64")
+                lib.mpv_set_option_string(handle, "deband-range", "24")
+                lib.mpv_set_option_string(handle, "deband-grain", "32")
+            }
+            else -> {
+                val deband = DesktopDataStore.getKey<Boolean>(PREF_DEBAND) ?: false
+                lib.mpv_set_option_string(handle, "deband", if (deband) "yes" else "no")
+            }
+        }
 
         // Custom Shaders (e.g. Anime4K)
         val activeShader = DesktopDataStore.getKey<String>(PREF_ACTIVE_SHADER)
@@ -260,6 +329,34 @@ object PlayerConfig {
         lib.mpv_set_option_string(handle, "screenshot-template", screenshotTemplate)
         lib.mpv_set_option_string(handle, "screenshot-png-compression", "7")
         lib.mpv_set_option_string(handle, "screenshot-jpeg-quality", "95")
+
+        // Custom mpv.conf file support
+        val enableCustomMpvConf = DesktopDataStore.getKey<Boolean>(PREF_ENABLE_CUSTOM_MPV_CONF) ?: false
+        if (enableCustomMpvConf) {
+            val mpvConfFile = java.io.File(com.lagradost.common.platform.PlatformPaths.appDataDir, "mpv.conf")
+            if (mpvConfFile.exists() && mpvConfFile.isFile) {
+                try {
+                    mpvConfFile.forEachLine { line ->
+                        val trimmed = line.trim()
+                        if (trimmed.isNotEmpty() && !trimmed.startsWith("#")) {
+                            val equalsIdx = trimmed.indexOf('=')
+                            if (equalsIdx > 0) {
+                                val key = trimmed.substring(0, equalsIdx).trim()
+                                val value = trimmed.substring(equalsIdx + 1).trim()
+                                if (key.isNotEmpty() && value.isNotEmpty()) {
+                                    lib.mpv_set_option_string(handle, key, value)
+                                }
+                            } else {
+                                lib.mpv_set_option_string(handle, trimmed, "yes")
+                            }
+                        }
+                    }
+                    com.lagradost.common.logging.AppLogger.i("PlayerConfig: Applied custom mpv.conf from ${mpvConfFile.absolutePath}")
+                } catch (e: Throwable) {
+                    com.lagradost.common.logging.AppLogger.e("PlayerConfig: Failed to load custom mpv.conf", e)
+                }
+            }
+        }
     }
 
     val GLOBAL_LANGUAGE_OPTIONS: List<Pair<String, String>> = listOf(

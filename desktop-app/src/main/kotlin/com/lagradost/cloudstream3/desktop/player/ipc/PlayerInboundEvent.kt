@@ -78,6 +78,7 @@ sealed interface PlayerInboundEvent {
     // Video Processing & Audio Enhancements
     data class ToggleInterpolation(val enabled: Boolean) : PlayerInboundEvent
     data class ToggleDeband(val enabled: Boolean) : PlayerInboundEvent
+    data class SetDebandQuality(val quality: String) : PlayerInboundEvent
     data class SetAudioNormalization(val enabled: Boolean) : PlayerInboundEvent
     data class SetAudioNormStrength(val strength: String) : PlayerInboundEvent
     data class SetAudioSpatial(val enabled: Boolean) : PlayerInboundEvent
@@ -195,6 +196,7 @@ sealed interface PlayerInboundEvent {
 
                 "toggleInterpolation" -> ToggleInterpolation(eventValue.toBoolean())
                 "toggleDeband" -> ToggleDeband(eventValue.toBoolean())
+                "setDebandQuality" -> SetDebandQuality(eventValue)
                 "setAudioNormalization" -> SetAudioNormalization(eventValue.toBoolean())
                 "setAudioNormStrength" -> SetAudioNormStrength(eventValue)
                 "setAudioSpatial" -> SetAudioSpatial(eventValue.toBoolean())

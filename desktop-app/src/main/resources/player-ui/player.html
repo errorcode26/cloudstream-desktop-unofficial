@@ -850,6 +850,50 @@
                     </button>
                 </div>
             </div>
+
+            <div class="settings-card">
+                <div class="settings-card-title">HDR Tone-Mapping & Peak Luminance</div>
+                <div class="settings-row-col">
+                    <span class="settings-label-text">Tone-Mapping Algorithm</span>
+                    <div class="chip-row" id="hdrToneChips" style="margin-top: 4px;">
+                        <div class="chip active" data-tone="spline">Spline</div>
+                        <div class="chip" data-tone="bt.2446a">BT.2446a</div>
+                        <div class="chip" data-tone="mobius">Mobius</div>
+                        <div class="chip" data-tone="clip">Clip</div>
+                        <div class="chip" data-tone="auto">Auto</div>
+                    </div>
+                </div>
+                <div class="settings-row" style="margin-top: 12px;">
+                    <div>
+                        <div class="settings-label-text">Dynamic Peak Luminance</div>
+                        <div class="settings-sublabel">Compute per-scene peak brightness to prevent highlight clipping</div>
+                    </div>
+                    <button class="desktop-switch active" id="btnToggleHdrPeak">
+                        <div class="desktop-switch-thumb"></div>
+                    </button>
+                </div>
+            </div>
+
+            <div class="settings-card">
+                <div class="settings-card-title">Banding Correction & Dithering</div>
+                <div class="settings-row-col">
+                    <span class="settings-label-text">Debanding Filter</span>
+                    <div class="chip-row" id="debandChips" style="margin-top: 4px;">
+                        <div class="chip active" data-deband="off">Off</div>
+                        <div class="chip" data-deband="light">Light</div>
+                        <div class="chip" data-deband="medium">Medium</div>
+                        <div class="chip" data-deband="strong">Strong</div>
+                    </div>
+                </div>
+                <div class="settings-row-col" style="margin-top: 12px;">
+                    <span class="settings-label-text">Dithering Engine</span>
+                    <div class="chip-row" id="ditherChips" style="margin-top: 4px;">
+                        <div class="chip active" data-dither="fruit">Fruit</div>
+                        <div class="chip" data-dither="ordered">Ordered</div>
+                        <div class="chip" data-dither="no">Off</div>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- Tab 2: Audio -->

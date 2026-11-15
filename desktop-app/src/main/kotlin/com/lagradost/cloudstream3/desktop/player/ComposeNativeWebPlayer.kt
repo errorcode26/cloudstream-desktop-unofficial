@@ -601,6 +601,10 @@ fun ComposeNativeWebPlayer(
             val pauseInfoMode = com.lagradost.common.storage.DesktopDataStore.getKey<String>(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_PAUSE_INFO_MODE) ?: "delay_5s"
             val showPauseCast = com.lagradost.common.storage.DesktopDataStore.getKey<Boolean>(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_PAUSE_SHOW_CAST) ?: true
             val seekDurationMs = (com.lagradost.cloudstream3.desktop.player.PlayerConfig.getSeekDurationSeconds() * 1000).toLong()
+            val hdrToneMapping = com.lagradost.common.storage.DesktopDataStore.getKey<String>(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_HDR_TONE_MAPPING) ?: "spline"
+            val hdrComputePeak = com.lagradost.common.storage.DesktopDataStore.getKey<Boolean>(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_HDR_COMPUTE_PEAK) ?: true
+            val debandQuality = com.lagradost.common.storage.DesktopDataStore.getKey<String>(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_DEBAND_QUALITY) ?: "off"
+            val dithering = com.lagradost.common.storage.DesktopDataStore.getKey<String>(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_DITHERING) ?: "fruit"
 
             val payload = AppStateUpdatePayload(
                 volume = vol,
@@ -619,6 +623,10 @@ fun ComposeNativeWebPlayer(
                 showPauseCast = showPauseCast,
                 seekDurationMs = seekDurationMs,
                 fileSize = (playerState?._fileSize?.value ?: 0L).takeIf { it > 0L }?.let { formatByteSize(it) },
+                hdrToneMapping = hdrToneMapping,
+                hdrComputePeak = hdrComputePeak,
+                debandQuality = debandQuality,
+                dithering = dithering,
             )
             NativePlayerBridge.postMessage(playerObjectMapper.writeValueAsString(payload))
         } catch (e: Throwable) {
@@ -665,7 +673,8 @@ fun ComposeNativeWebPlayer(
             val childHwnd = NativePlayerBridge.safeInitWebView(canvasWid, w, h)
             NativePlayerBridge.syncUiScale(globalUiScale)
             MpvLibrary.INSTANCE.mpv_set_option_string(handle, "wid", childHwnd.toString())
-            MpvLibrary.INSTANCE.mpv_set_option_string(handle, "vo", "gpu")
+            val voDriver = com.lagradost.common.storage.DesktopDataStore.getKey<String>(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_VO_DRIVER) ?: "gpu"
+            MpvLibrary.INSTANCE.mpv_set_option_string(handle, "vo", voDriver)
             val gpuApi = com.lagradost.common.storage.DesktopDataStore.getKey<String>(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_GPU_API) ?: "d3d11"
             MpvLibrary.INSTANCE.mpv_set_option_string(handle, "gpu-api", gpuApi)
 
@@ -1264,6 +1273,37 @@ fun ComposeNativeWebPlayer(
                                 playerState?.setMpvProperty("deband", if (event.enabled) "yes" else "no")
                             }
                         }
+                        is PlayerInboundEvent.SetDebandQuality -> {
+                            scope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                                com.lagradost.common.storage.DesktopDataStore.setKey(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_DEBAND_QUALITY, event.quality)
+                                when (event.quality) {
+                                    "light" -> {
+                                        playerState?.setMpvProperty("deband", "yes")
+                                        playerState?.setMpvProperty("deband-iterations", "1")
+                                        playerState?.setMpvProperty("deband-threshold", "32")
+                                        playerState?.setMpvProperty("deband-range", "8")
+                                        playerState?.setMpvProperty("deband-grain", "16")
+                                    }
+                                    "medium" -> {
+                                        playerState?.setMpvProperty("deband", "yes")
+                                        playerState?.setMpvProperty("deband-iterations", "2")
+                                        playerState?.setMpvProperty("deband-threshold", "48")
+                                        playerState?.setMpvProperty("deband-range", "16")
+                                        playerState?.setMpvProperty("deband-grain", "32")
+                                    }
+                                    "strong" -> {
+                                        playerState?.setMpvProperty("deband", "yes")
+                                        playerState?.setMpvProperty("deband-iterations", "4")
+                                        playerState?.setMpvProperty("deband-threshold", "64")
+                                        playerState?.setMpvProperty("deband-range", "24")
+                                        playerState?.setMpvProperty("deband-grain", "48")
+                                    }
+                                    else -> {
+                                        playerState?.setMpvProperty("deband", "no")
+                                    }
+                                }
+                            }
+                        }
                         is PlayerInboundEvent.SetAudioNormalization -> {
                             scope.launch(kotlinx.coroutines.Dispatchers.IO) {
                                 com.lagradost.common.storage.DesktopDataStore.setKey(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_AUDIO_NORMALIZATION, event.enabled)
@@ -1351,6 +1391,9 @@ fun ComposeNativeWebPlayer(
                                     "sub-color" -> com.lagradost.common.storage.DesktopDataStore.setKey(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_SUB_COLOR, event.value)
                                     "sub-font-size" -> com.lagradost.common.storage.DesktopDataStore.setKey(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_SUB_SIZE, event.value)
                                     "sub-pos" -> com.lagradost.common.storage.DesktopDataStore.setKey(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_SUB_POS, event.value)
+                                    "tone-mapping" -> com.lagradost.common.storage.DesktopDataStore.setKey(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_HDR_TONE_MAPPING, event.value)
+                                    "hdr-compute-peak" -> com.lagradost.common.storage.DesktopDataStore.setKey(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_HDR_COMPUTE_PEAK, event.value == "yes")
+                                    "dither" -> com.lagradost.common.storage.DesktopDataStore.setKey(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_DITHERING, event.value)
                                 }
                             }
                         }

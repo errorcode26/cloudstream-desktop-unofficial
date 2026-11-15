@@ -86,10 +86,7 @@ class DesktopMpvEngine(
             lib.mpv_set_option_string(handle, "osd-level", "0")
             lib.mpv_set_option_string(handle, "osd-bar", "no")
 
-            // VO: use battle-tested 'gpu' output
-            lib.mpv_set_option_string(handle, "vo", "gpu")
-
-            // Apply user preferences
+            // Apply user preferences (including VO driver, scalers, tone-mapping, and shaders)
             PlayerConfig.applyMpvSettings(handle, lib)
 
             lib.mpv_set_option_string(handle, "wid", canvasWid.toString())
