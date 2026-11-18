@@ -94,6 +94,12 @@ val ManropeFontFamily: FontFamily by lazy {
 val availableFonts: List<String>
     get() = CustomFontManager.getAvailableFonts()
 
+private val customFontFamilyCache = java.util.concurrent.ConcurrentHashMap<String, FontFamily>()
+
+fun invalidateCustomFontFamily(name: String) {
+    customFontFamilyCache.remove(name.lowercase())
+}
+
 fun getFontFamily(name: String): FontFamily {
     if (name.isBlank() || name.equals("Plus Jakarta Sans", ignoreCase = true)) return PlusJakartaSansFontFamily
 
@@ -109,20 +115,25 @@ fun getFontFamily(name: String): FontFamily {
     }
 
     // 2. User-installed custom font file from fonts directory
+    customFontFamilyCache[name.lowercase()]?.let { return it }
     val customFontFile = CustomFontManager.getFontFile(name)
-    if (customFontFile != null) {
+    if (customFontFile != null && customFontFile.exists()) {
         try {
-            return FontFamily(
-                androidx.compose.ui.text.platform.Font(customFontFile, weight = FontWeight.Normal),
-                androidx.compose.ui.text.platform.Font(customFontFile, weight = FontWeight.Medium),
-                androidx.compose.ui.text.platform.Font(customFontFile, weight = FontWeight.SemiBold),
-                androidx.compose.ui.text.platform.Font(customFontFile, weight = FontWeight.Bold),
-                androidx.compose.ui.text.platform.Font(customFontFile, weight = FontWeight.ExtraBold),
-                androidx.compose.ui.text.platform.Font(customFontFile, weight = FontWeight.Light),
-                androidx.compose.ui.text.platform.Font(customFontFile, weight = FontWeight.Thin),
-                androidx.compose.ui.text.platform.Font(customFontFile, weight = FontWeight.ExtraLight),
-                androidx.compose.ui.text.platform.Font(customFontFile, weight = FontWeight.Black),
+            val bytes = customFontFile.readBytes()
+            val fontId = customFontFile.nameWithoutExtension
+            val family = FontFamily(
+                androidx.compose.ui.text.platform.Font(identity = "$fontId-Normal", data = bytes, weight = FontWeight.Normal),
+                androidx.compose.ui.text.platform.Font(identity = "$fontId-Medium", data = bytes, weight = FontWeight.Medium),
+                androidx.compose.ui.text.platform.Font(identity = "$fontId-SemiBold", data = bytes, weight = FontWeight.SemiBold),
+                androidx.compose.ui.text.platform.Font(identity = "$fontId-Bold", data = bytes, weight = FontWeight.Bold),
+                androidx.compose.ui.text.platform.Font(identity = "$fontId-ExtraBold", data = bytes, weight = FontWeight.ExtraBold),
+                androidx.compose.ui.text.platform.Font(identity = "$fontId-Light", data = bytes, weight = FontWeight.Light),
+                androidx.compose.ui.text.platform.Font(identity = "$fontId-Thin", data = bytes, weight = FontWeight.Thin),
+                androidx.compose.ui.text.platform.Font(identity = "$fontId-ExtraLight", data = bytes, weight = FontWeight.ExtraLight),
+                androidx.compose.ui.text.platform.Font(identity = "$fontId-Black", data = bytes, weight = FontWeight.Black),
             )
+            customFontFamilyCache[name.lowercase()] = family
+            return family
         } catch (e: Exception) {
             com.lagradost.common.logging.AppLogger.e("Failed to load custom font: $name", e)
         }
