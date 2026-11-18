@@ -6734,16 +6734,28 @@
     function applyThemeDomLayout(themeId) {
         const leftGroup = document.querySelector('.controls-row > .ctrl-group');
         const centerGroup = document.getElementById('bottomCenterGroup');
+        const rightGroup = document.querySelector('.ctrl-group.right');
         const playBtn = document.getElementById('playPauseBtn');
         const skipBackBtn = document.getElementById('skipBackwardBtn');
         const skipFwdBtn = document.getElementById('skipForwardBtn');
+        const episodesBtn = document.getElementById('episodesBtn');
 
         if (!leftGroup || !centerGroup || !playBtn || !skipBackBtn || !skipFwdBtn) return;
 
         if (themeId === 'horizon_cinema') {
+            // Center group contains purely the playback cockpit
             centerGroup.appendChild(skipBackBtn);
             centerGroup.appendChild(playBtn);
             centerGroup.appendChild(skipFwdBtn);
+            // Move episodes button to the right group before the utility pill dock
+            if (episodesBtn && rightGroup) {
+                const utilityGroup = document.getElementById('bottomUtilityGroup');
+                if (utilityGroup) {
+                    rightGroup.insertBefore(episodesBtn, utilityGroup);
+                } else {
+                    rightGroup.prepend(episodesBtn);
+                }
+            }
         } else {
             const volGroup = leftGroup.querySelector('.vol-group');
             if (volGroup) {
@@ -6754,6 +6766,9 @@
                 leftGroup.prepend(skipFwdBtn);
                 leftGroup.prepend(skipBackBtn);
                 leftGroup.prepend(playBtn);
+            }
+            if (episodesBtn && centerGroup) {
+                centerGroup.appendChild(episodesBtn);
             }
         }
     }
