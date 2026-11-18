@@ -398,8 +398,8 @@ class DesktopMpvEngine(
                                             AppLogger.e("DesktopMpvEngine", "Stream ended before playing: $errDesc")
                                             onPlaybackError(errDesc)
                                         } else {
-                                            val hasExplicitError = lastStreamErrorReason != null
-                                            val isPremature = (lastDur > 0 && lastPos < lastDur * 0.85 && hasExplicitError) || (lastPos < 1.0 && lastDur > 0)
+                                            val isNearEnd = lastDur > 0 && (lastPos >= lastDur * 0.85 || lastPos >= lastDur - 10.0)
+                                            val isPremature = !isNearEnd
                                             if (isPremature) {
                                                 val errDesc = lastStreamErrorReason ?: "Stream ended prematurely at ${lastPos.toInt()}s"
                                                 AppLogger.w("DesktopMpvEngine", "Premature EOF at ${lastPos}s of ${lastDur}s: $errDesc")
@@ -579,9 +579,10 @@ class DesktopMpvEngine(
                                             "eof-reached" -> {
                                                 if (prop.format == 3) {
                                                     val isEof = propData.getInt(0) != 0
-                                                    if (isEof && hasEverPlayed && !hasFiredFinished && !waitingForTimePosReset) {
+                                                    val isNearEnd = lastDur > 0 && (lastPos >= lastDur * 0.85 || lastPos >= lastDur - 10.0)
+                                                    if (isEof && hasEverPlayed && !hasFiredFinished && !waitingForTimePosReset && isNearEnd) {
                                                         hasFiredFinished = true
-                                                        AppLogger.i("DesktopMpvEngine", "Stream reached EOF (property).")
+                                                        AppLogger.i("DesktopMpvEngine", "Stream reached genuine EOF (property) at ${lastPos}s of ${lastDur}s.")
                                                         onFinished()
                                                     } else if (!isEof && lastDur > 0 && lastPos < lastDur - 5.0) {
                                                         hasFiredFinished = false
@@ -648,9 +649,10 @@ class DesktopMpvEngine(
                                 }
                             }
                             val isEofPolled = MpvLibrary.getPropertyString(handle, "eof-reached") == "yes"
-                            if (isEofPolled && hasEverPlayed && !hasFiredFinished && !waitingForTimePosReset) {
+                            val isNearEnd = lastDur > 0 && (lastPos >= lastDur * 0.85 || lastPos >= lastDur - 10.0)
+                            if (isEofPolled && hasEverPlayed && !hasFiredFinished && !waitingForTimePosReset && isNearEnd) {
                                 hasFiredFinished = true
-                                AppLogger.i("DesktopMpvEngine", "Stream reached EOF (polled).")
+                                AppLogger.i("DesktopMpvEngine", "Stream reached genuine EOF (polled) at ${lastPos}s of ${lastDur}s.")
                                 onFinished()
                             } else if (!isEofPolled && lastDur > 0 && lastPos < lastDur - 5.0) {
                                 hasFiredFinished = false

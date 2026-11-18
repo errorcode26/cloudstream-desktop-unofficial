@@ -73,6 +73,24 @@ class PlayerInboundEventTest {
         assertEquals(85, event.pos)
     }
 
+    @Test
+    fun testParse_RequestSeekThumbnail() {
+        val json = """{"type":"requestSeekThumbnail","timeMs":45000}"""
+        val event = parseEvent(json)
+        assertIs<PlayerInboundEvent.RequestSeekThumbnail>(event)
+        assertEquals(45000L, event.timeMs)
+
+        val jsonValueFallback = """{"type":"requestSeekThumbnail","value":"12000"}"""
+        val eventFallback = parseEvent(jsonValueFallback)
+        assertIs<PlayerInboundEvent.RequestSeekThumbnail>(eventFallback)
+        assertEquals(12000L, eventFallback.timeMs)
+
+        val jsonDecimalValue = """{"type":"requestSeekThumbnail","value":"12000.85"}"""
+        val eventDecimal = parseEvent(jsonDecimalValue)
+        assertIs<PlayerInboundEvent.RequestSeekThumbnail>(eventDecimal)
+        assertEquals(12000L, eventDecimal.timeMs)
+    }
+
     // --- 3. AppStateUpdatePayload Rendering Defaults ---
 
     @Test

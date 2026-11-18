@@ -90,20 +90,32 @@ internal object TmdbEpisodeEnricher {
                         if (epVote != null && existingEp.score == null) existingEp.score = Score.from10(epVote)
                     }
                 } else {
-                    // Only synthesize if the episode is strictly in the future
-                    val isFuture = epReleaseDate?.let { dateStr ->
-                        try {
-                            val parsed = java.time.LocalDate.parse(dateStr.take(10))
-                            val now = java.time.LocalDate.now(java.time.ZoneOffset.UTC)
-                            parsed.isAfter(now)
-                        } catch (_: Exception) {
-                            false
-                        }
-                    } ?: false
+                    // Determine if the episode air date is in the future or past
+                    val parsedAirDate = epReleaseDate?.let { dateStr ->
+                        try { java.time.LocalDate.parse(dateStr.take(10)) } catch (_: Exception) { null }
+                    }
+                    val now = java.time.LocalDate.now(java.time.ZoneOffset.UTC)
+                    val isFuture = parsedAirDate?.isAfter(now) ?: false
+                    // Episode aired in the past but provider didn't return it — show placeholder
+                    val isPastAndMissing = parsedAirDate != null && !isFuture
 
                     if (isFuture) {
+                        // Upcoming episode not yet on any provider
                         val descWithDate = "||DATE:$epReleaseDate||${epOverview ?: ""}"
                         val synthetic = dummyApi.newEpisode("unreleased_s${seasonNum}_e$epNum") {
+                            this.name = epName ?: "Episode $epNum"
+                            this.season = seasonNum
+                            this.episode = epNum
+                            this.posterUrl = epPoster
+                            this.description = descWithDate
+                            this.runTime = epRuntime
+                            this.score = epVote?.let { Score.from10(it) }
+                        }
+                        newEpisodesToAdd.add(synthetic)
+                    } else if (isPastAndMissing) {
+                        // Episode has aired but this provider doesn't have it — show it as missing
+                        val descWithDate = if (epReleaseDate != null) "||DATE:$epReleaseDate||${epOverview ?: ""}" else (epOverview ?: "")
+                        val synthetic = dummyApi.newEpisode("synthetic_missing_s${seasonNum}_e$epNum") {
                             this.name = epName ?: "Episode $epNum"
                             this.season = seasonNum
                             this.episode = epNum

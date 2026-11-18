@@ -2,6 +2,9 @@ package com.lagradost.cloudstream3.desktop.ui.screens.details
 
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.TooltipArea
+import androidx.compose.foundation.TooltipPlacement
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -16,6 +19,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.input.pointer.PointerIcon
@@ -25,6 +29,7 @@ import coil3.request.crossfade
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.desktop.ui.badges.RatingBadgeUrlResolver
 import com.lagradost.cloudstream3.desktop.ui.components.CloudstreamAlertDialog
+import com.lagradost.cloudstream3.desktop.ui.components.LocalDesktopTheme
 import com.lagradost.cloudstream3.desktop.ui.screens.details.contract.DetailsUiEvent
 import com.lagradost.cloudstream3.desktop.ui.screens.details.contract.DetailsUiState
 import com.lagradost.cloudstream3.desktop.ui.screens.details.contract.EnrichmentPhase
@@ -34,6 +39,7 @@ import com.lagradost.cloudstream3.desktop.utils.TitleUtils
 import com.lagradost.common.storage.DesktopBookmark
 import com.lagradost.common.storage.DesktopWatchType
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun DetailsMetadataCompact(
     provider: MainAPI,
@@ -304,48 +310,71 @@ internal fun DetailsMetadataCompact(
             Box(modifier = Modifier.weight(1f)) {
                 heroAction(Modifier.fillMaxWidth())
             }
-            Surface(
-                onClick = { isEditingStatus = true },
-                shape = RoundedCornerShape(10.dp),
-                color = if (isInLibrary) MaterialTheme.colorScheme.primary.copy(alpha = 0.22f) else Color.White.copy(alpha = 0.12f),
-                border = BorderStroke(1.2.dp, if (isInLibrary) MaterialTheme.colorScheme.primary.copy(alpha = 0.65f) else Color.White.copy(alpha = 0.28f)),
-                modifier = if (isInLibrary) Modifier.height(44.dp).animateContentSize() else Modifier.size(44.dp),
-            ) {
-                if (isInLibrary) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center,
-                        modifier = Modifier.fillMaxHeight().padding(horizontal = 12.dp),
+            val theme = LocalDesktopTheme.current
+            val libraryTooltip = if (isInLibrary) "Change Library Status" else "Add to Library"
+            TooltipArea(
+                tooltip = {
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = theme.SurfaceElevated,
+                        border = BorderStroke(1.dp, theme.Divider),
+                        shadowElevation = 6.dp,
                     ) {
-                        Icon(
-                            imageVector = compactLibraryIcon,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(18.dp),
-                        )
-                        Spacer(Modifier.width(6.dp))
                         Text(
-                            text = activeWatchType.stringRes,
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 13.sp,
-                            maxLines = 1,
-                        )
-                        Spacer(Modifier.width(4.dp))
-                        Icon(
-                            imageVector = Icons.Default.KeyboardArrowDown,
-                            contentDescription = "Change Status",
-                            tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
-                            modifier = Modifier.size(16.dp),
+                            text = libraryTooltip,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = theme.TextPrimary,
+                            fontWeight = FontWeight.Medium,
                         )
                     }
-                } else Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                    Icon(
-                        imageVector = compactLibraryIcon,
-                        contentDescription = "Add to Library",
-                        tint = Color.White,
-                        modifier = Modifier.size(20.dp),
-                    )
+                },
+                delayMillis = 400,
+                tooltipPlacement = TooltipPlacement.CursorPoint(offset = DpOffset(0.dp, 16.dp)),
+            ) {
+                Surface(
+                    onClick = { isEditingStatus = true },
+                    shape = RoundedCornerShape(10.dp),
+                    color = if (isInLibrary) MaterialTheme.colorScheme.primary.copy(alpha = 0.22f) else Color.White.copy(alpha = 0.12f),
+                    border = BorderStroke(1.2.dp, if (isInLibrary) MaterialTheme.colorScheme.primary.copy(alpha = 0.65f) else Color.White.copy(alpha = 0.28f)),
+                    modifier = if (isInLibrary) Modifier.height(44.dp).animateContentSize() else Modifier.size(44.dp),
+                ) {
+                    if (isInLibrary) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center,
+                            modifier = Modifier.fillMaxHeight().padding(horizontal = 12.dp),
+                        ) {
+                            Icon(
+                                imageVector = compactLibraryIcon,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(18.dp),
+                            )
+                            Spacer(Modifier.width(6.dp))
+                            Text(
+                                text = activeWatchType.stringRes,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp,
+                                maxLines = 1,
+                            )
+                            Spacer(Modifier.width(4.dp))
+                            Icon(
+                                imageVector = Icons.Default.KeyboardArrowDown,
+                                contentDescription = "Change Status",
+                                tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
+                                modifier = Modifier.size(16.dp),
+                            )
+                        }
+                    } else Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                        Icon(
+                            imageVector = compactLibraryIcon,
+                            contentDescription = "Add to Library",
+                            tint = Color.White,
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
                 }
             }
             val fullWebUrl = remember(provider, data.url) {
@@ -356,20 +385,41 @@ internal fun DetailsMetadataCompact(
                 }
             }
             if (fullWebUrl != null) {
-                Surface(
-                    onClick = { ExternalLinkHandler.launchSystemBrowser(fullWebUrl) },
-                    shape = RoundedCornerShape(10.dp),
-                    color = Color.White.copy(alpha = 0.12f),
-                    border = BorderStroke(1.2.dp, Color.White.copy(alpha = 0.28f)),
-                    modifier = Modifier.size(44.dp).pointerHoverIcon(PointerIcon.Hand),
+                TooltipArea(
+                    tooltip = {
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = theme.SurfaceElevated,
+                            border = BorderStroke(1.dp, theme.Divider),
+                            shadowElevation = 6.dp,
+                        ) {
+                            Text(
+                                text = "Open source page in browser",
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = theme.TextPrimary,
+                                fontWeight = FontWeight.Medium,
+                            )
+                        }
+                    },
+                    delayMillis = 400,
+                    tooltipPlacement = TooltipPlacement.CursorPoint(offset = DpOffset(0.dp, 16.dp)),
                 ) {
-                    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                        Icon(
-                            imageVector = Icons.Default.Public,
-                            contentDescription = "Open in Browser (${provider.name})",
-                            tint = Color.White,
-                            modifier = Modifier.size(20.dp),
-                        )
+                    Surface(
+                        onClick = { ExternalLinkHandler.launchSystemBrowser(fullWebUrl) },
+                        shape = RoundedCornerShape(10.dp),
+                        color = Color.White.copy(alpha = 0.12f),
+                        border = BorderStroke(1.2.dp, Color.White.copy(alpha = 0.28f)),
+                        modifier = Modifier.size(44.dp).pointerHoverIcon(PointerIcon.Hand),
+                    ) {
+                        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                            Icon(
+                                imageVector = Icons.Default.Public,
+                                contentDescription = "Open in Browser (${provider.name})",
+                                tint = Color.White,
+                                modifier = Modifier.size(20.dp),
+                            )
+                        }
                     }
                 }
             }

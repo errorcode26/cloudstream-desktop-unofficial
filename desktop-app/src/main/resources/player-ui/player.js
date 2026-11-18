@@ -148,6 +148,27 @@
     window.autoPlayEnabled = true;
     let _cachedChapters = [];
     let _cachedSkipIntervals = [];
+    let _trickplayThumbCache = new Map();
+    let _lastSeekThumbReqTime = 0;
+    let _lastSeekThumbReqTimer = null;
+    let _lastHoverTimeMs = null;
+
+    function thumbCacheNearest(targetBucket, maxDistSec = 30) {
+        if (_trickplayThumbCache.has(targetBucket)) {
+            return _trickplayThumbCache.get(targetBucket);
+        }
+        let bestUri = null;
+        let bestDist = Infinity;
+        const maxDistMs = maxDistSec * 1000;
+        for (const [bTime, uri] of _trickplayThumbCache.entries()) {
+            const dist = Math.abs(bTime - targetBucket);
+            if (dist < bestDist && dist <= maxDistMs) {
+                bestDist = dist;
+                bestUri = uri;
+            }
+        }
+        return bestUri;
+    }
     let _activeChapterIndex = -1;
     let pauseInfoMode = 'delay_5s'; // 'delay_5s', 'delay_10s', 'delay_20s', 'immediate', 'off'
     let showPauseCast = true;
@@ -273,6 +294,12 @@
     const seekWrap      = document.getElementById('seekWrap');
     const seekChapters  = document.getElementById('seekChapters');
     const seekTooltip   = document.getElementById('seekTooltip');
+    const seekThumbCard = document.getElementById('seekThumbCard');
+    const seekThumbViewport = document.getElementById('seekThumbViewport');
+    const seekThumbImg  = document.getElementById('seekThumbImg');
+    const seekThumbSprite = document.getElementById('seekThumbSprite');
+    const seekThumbSkeleton = document.getElementById('seekThumbSkeleton');
+    const seekTooltipTime = document.getElementById('seekTooltipTime');
 
 
     // Zone references
@@ -1114,6 +1141,7 @@
         document.getElementById('qualityServerBtn')?.classList.remove('active');
         document.getElementById('audioSubsBtn')?.classList.remove('active');
         document.getElementById('speedBtn')?.classList.remove('active');
+        document.getElementById('aspectBtn')?.classList.remove('active');
         if (typeof switchToSubTracksView === 'function') switchToSubTracksView();
         isMenuOpen = false;
         document.body.classList.remove('panel-open');
@@ -1146,6 +1174,8 @@
                 document.getElementById('audioSubsBtn')?.classList.add('active');
             } else if (id === 'speedPanel') {
                 document.getElementById('speedBtn')?.classList.add('active');
+            } else if (id === 'aspectPanel') {
+                document.getElementById('aspectBtn')?.classList.add('active');
 
             } else if (id === 'episodesPanel') {
                 if (typeof renderFilteredEpisodes === 'function' && typeof currentSelectedSeason !== 'undefined') {
@@ -1363,11 +1393,18 @@
         timeDisplay.innerText = timeFormatted;
         const timeBadge = document.getElementById('seekingTimeBadge');
         if (timeBadge) {
-            timeBadge.innerText = timeFormatted;
+            const stepSec = Math.round(Math.abs(deltaMs) / 1000);
+            const arrow = deltaMs >= 0 ? '→' : '←';
+            timeBadge.innerText = `${arrow} ${stepSec}s  ·  ${timeFormatted}`;
         }
         const seekTooltip = document.getElementById('seekTooltip');
         if (seekTooltip && durationMs > 0) {
-            seekTooltip.innerText = timeFormatted;
+            const tipTime = document.getElementById('seekTooltipTime');
+            if (tipTime) {
+                tipTime.innerText = timeFormatted;
+            } else {
+                seekTooltip.innerText = timeFormatted;
+            }
             seekTooltip.style.left = `${pct}%`;
         }
         if (document.body.classList.contains('hidden-controls')) {
@@ -1481,7 +1518,7 @@
                     if (pipThumb && !window.isPipSeeking) pipThumb.style.left = `${pct}%`;
                     const epPanel = document.getElementById('episodesPanel');
                     if (epPanel && epPanel.classList.contains('open')) {
-                        const activeEpProg = epPanel.querySelector('.ep-card-desk.active .ep-card-prog-fill');
+                        const activeEpProg = epPanel.querySelector('.ep-row-desk.active .ep-row-prog-fill, .ep-card-desk.active .ep-card-prog-fill');
                         if (activeEpProg) {
                             activeEpProg.style.width = `${pct}%`;
                             if (pct < 90) {
@@ -1770,13 +1807,38 @@
                 const rawEffectiveSize = (activeLink && activeLink.size) || (activeLink && activeLink.isActive && window.currentFileSize) || window.currentFileSize || '';
                 const sizeVal = parseFloat(String(rawEffectiveSize || '').replace(/[^\d.]/g, ''));
                 const effectiveSize = (!isNaN(sizeVal) && sizeVal > 0) ? String(rawEffectiveSize).trim() : '';
-                const displayTextParts = [];
-                if (cleanSource) displayTextParts.push(cleanSource);
-                if (qualityStr) displayTextParts.push(qualityStr);
-                if (effectiveSize) displayTextParts.push(effectiveSize);
-                const displayText = displayTextParts.join(' • ');
 
-                if (serverQualityValue.innerText !== displayText) serverQualityValue.innerText = displayText;
+                // Extract HDR / DV tags for luminous gold chips
+                let hdrTag = '';
+                if (rawName) {
+                    if (/\b(dv|dolby[\s._-]?vision)\b/i.test(rawName)) {
+                        hdrTag = 'DV';
+                    } else if (/\b(hdr10\+|hdr10plus)\b/i.test(rawName)) {
+                        hdrTag = 'HDR10+';
+                    } else if (/\b(hdr10|hdr)\b/i.test(rawName)) {
+                        hdrTag = 'HDR';
+                    }
+                }
+
+                let chipsHtml = '';
+                if (cleanSource) {
+                    const escSource = cleanSource.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                    chipsHtml += `<span>${escSource}</span>`;
+                }
+                if (qualityStr && qualityStr !== 'Auto') {
+                    chipsHtml += `<span class="quality-badge-chip">${qualityStr}</span>`;
+                }
+                if (hdrTag) {
+                    chipsHtml += `<span class="quality-badge-chip quality-badge-gold">${hdrTag}</span>`;
+                }
+                if (effectiveSize) {
+                    chipsHtml += `<span style="opacity: 0.65;">• ${effectiveSize}</span>`;
+                }
+                if (!chipsHtml) {
+                    chipsHtml = `<span>Auto</span>`;
+                }
+
+                if (serverQualityValue.innerHTML !== chipsHtml) serverQualityValue.innerHTML = chipsHtml;
                 serverQualitySegment.style.display = 'inline-flex';
                 hasServer = true;
             } else if (serverQualitySegment) {
@@ -2067,7 +2129,7 @@
                 // Update active episode progress fill in-place without destroying DOM under hover cursor
                 const activeEp = episodesToRender.find(e => e.isActive);
                 if (activeEp) {
-                    const activeProgEl = listEl.querySelector('.ep-card-desk.active .ep-card-prog-fill');
+                    const activeProgEl = listEl.querySelector('.ep-row-desk.active .ep-row-prog-fill, .ep-card-desk.active .ep-card-prog-fill');
                     if (activeProgEl) {
                         let pct = 0;
                         if (typeof durationMs === 'number' && durationMs > 0 && typeof currentPosMs === 'number' && currentPosMs > 0) {
@@ -2078,7 +2140,7 @@
                         activeProgEl.style.width = `${pct}%`;
                         if (pct >= 90) {
                             activeProgEl.classList.add('completed');
-                            const activeCard = listEl.querySelector('.ep-card-desk.active');
+                            const activeCard = listEl.querySelector('.ep-row-desk.active, .ep-card-desk.active');
                             if (activeCard) activeCard.classList.add('watched');
                         }
                     }
@@ -2088,6 +2150,7 @@
             listEl._lastEpSignature = epSignature;
             listEl.innerHTML = episodesToRender.map((ep, i) => {
                 const num = ep.episode || (i + 1 + (currentSelectedChunk * EPISODE_CHUNK_SIZE));
+                const padNum = String(num).padStart(2, '0');
                 const epIdEncoded = encodeURIComponent(ep.id || '');
                 const epTitleEscaped = (ep.title || ('Episode ' + num)).replace(/</g, "&lt;").replace(/>/g, "&gt;");
                 const cleanDesc = (ep.description || '')
@@ -2095,16 +2158,8 @@
                     .trim();
                 const descEscaped = cleanDesc ? cleanDesc.replace(/</g, "&lt;").replace(/>/g, "&gt;") : '';
 
-                let metaText = '';
-                if (isAudioActive) {
-                    metaText = ep.runTime ? `${ep.runTime}m` : '';
-                } else {
-                    const sNum = (ep.season !== undefined && ep.season !== null) ? ep.season : 1;
-                    metaText = `S${sNum} E${num}${ep.runTime ? ' • ' + ep.runTime + 'm' : ''}`;
-                }
-
-                const thumbImg = ep.posterUrl 
-                    ? `<img src="${ep.posterUrl}" class="ep-card-desk-thumb" alt="${epTitleEscaped}" decoding="async" onerror="this.style.display='none'">` 
+                const thumbImg = ep.posterUrl
+                    ? `<img src="${ep.posterUrl}" class="ep-row-thumb" alt="${epTitleEscaped}" decoding="async" onerror="this.style.display='none'">`
                     : '';
 
                 let progressPercent = 0;
@@ -2134,53 +2189,41 @@
                     ? lockText
                     : `Episode is unreleased (${lockText})`;
 
-                let watchMeta = '';
-                if (ep.isActive) {
-                    if (progressPercent > 0) {
-                        watchMeta = ` • ${progressPercent}% watched`;
-                    }
-                } else if (isCompletedWatched) {
-                    watchMeta = ` • Watched`;
-                } else if (progressPercent > 0) {
-                    watchMeta = ` • ${progressPercent}% watched`;
-                }
-
                 const thumbOverlay = isLocked
                     ? `<div class="ep-card-locked-badge"><svg viewBox="0 0 24 24" width="11" height="11" fill="currentColor"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg> ${lockText}</div>`
                     : (!ep.isActive ? `<div class="ep-card-play-hover"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></div>` : '');
 
-                const watchedBadge = (isCompletedWatched && !ep.isActive && !isLocked)
-                    ? `<div class="ep-card-watched-badge"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> WATCHED</div>`
-                    : '';
-
-                const lockedBadge = isLocked
-                    ? `<div class="ep-card-locked-tag"><svg viewBox="0 0 24 24" width="10" height="10" fill="currentColor"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg> ${lockedTagText}</div>`
-                    : '';
-
                 const progBar = (!isLocked && (ep.isActive || progressPercent > 0 || isCompletedWatched))
-                    ? `<div class="ep-card-prog-bar"><div class="ep-card-prog-fill ${isCompletedWatched ? 'completed' : ''}" style="width: ${isCompletedWatched ? 100 : progressPercent}%;"></div></div>`
+                    ? `<div class="ep-row-prog-bar"><div class="ep-row-prog-fill ${isCompletedWatched ? 'completed' : ''}" style="width: ${isCompletedWatched ? 100 : progressPercent}%;"></div></div>`
                     : '';
 
                 const cardClickHandler = isLocked
                     ? `showHudToast('${toastMsg.replace(/'/g, "\\\'")}')`
                     : `send('loadEpisode', decodeURIComponent('${epIdEncoded}'));closeAllPanels();`;
 
-                const topStatusBadge = ep.isActive
-                    ? `<div class="ep-card-now-playing">NOW PLAYING</div>`
-                    : (isLocked ? lockedBadge : watchedBadge);
+                let metaRight = '';
+                if (ep.isActive) {
+                    metaRight = `<span class="ep-row-now-playing">NOW PLAYING</span>`;
+                } else if (isLocked) {
+                    metaRight = `<span class="ep-card-locked-tag"><svg viewBox="0 0 24 24" width="10" height="10" fill="currentColor"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg> ${lockedTagText}</span>`;
+                } else if (ep.runTime) {
+                    metaRight = `<span class="ep-row-duration">${ep.runTime} MIN</span>`;
+                }
 
-                return `<div class="ep-card-desk ${ep.isActive ? 'active' : ''} ${isCompletedWatched ? 'watched' : ''} ${isLocked ? 'locked' : ''}" onclick="${cardClickHandler}">
-                    <div class="ep-card-desk-thumb-wrap">
+                return `<div class="ep-row-desk ${ep.isActive ? 'active' : ''} ${isCompletedWatched ? 'watched' : ''} ${isLocked ? 'locked' : ''}" onclick="${cardClickHandler}">
+                    <div class="ep-row-num">${padNum}</div>
+                    <div class="ep-row-thumb-wrap">
                         <svg class="ep-card-desk-thumb-fallback" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
                         ${thumbImg}
                         ${thumbOverlay}
-                    </div>
-                    <div class="ep-card-desk-info">
-                        ${topStatusBadge}
-                        <div class="ep-card-desk-title">${epTitleEscaped}</div>
-                        <div class="ep-card-desk-meta">${metaText}${watchMeta}</div>
                         ${progBar}
-                        ${descEscaped ? `<div class="ep-card-desk-desc">${descEscaped}</div>` : ''}
+                    </div>
+                    <div class="ep-row-info">
+                        <div class="ep-row-title-line">
+                            <span class="ep-row-title">${epTitleEscaped}</span>
+                            ${metaRight}
+                        </div>
+                        ${descEscaped ? `<div class="ep-row-desc">${descEscaped}</div>` : ''}
                     </div>
                 </div>`;
             }).join('');
@@ -2188,7 +2231,7 @@
 
         if (shouldScroll) {
             setTimeout(() => {
-                const active = document.querySelector('#episodesList .ep-card-desk.active') || document.querySelector('#episodesList .ep-card.active');
+                const active = document.querySelector('#episodesList .ep-row-desk.active') || document.querySelector('#episodesList .ep-card-desk.active') || document.querySelector('#episodesList .ep-card.active');
                 if (active) active.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
             }, 80);
         }
@@ -2287,6 +2330,7 @@
             const isAlreadyPlaying = globalIsPlaying || currentPosMs > 50 || window.hasDismissedInitialProbing;
 
             if (isNewSession) {
+                _trickplayThumbCache.clear();
                 if (isAlreadyPlaying && isInitialSession) {
                     userDismissedProbing = true;
                     window.hasDismissedInitialProbing = true;
@@ -3190,6 +3234,24 @@
             if (epSeriesTitle) {
                 epSeriesTitle.innerText = showTitle || meta.title || '';
             }
+            const epDrawerHeaderLogo = document.getElementById('epDrawerHeaderLogo');
+            const epDrawerHeaderTitle = document.getElementById('epDrawerHeaderTitle');
+            if (epDrawerHeaderLogo && epDrawerHeaderTitle) {
+                if (meta.logoUrl && meta.logoUrl.trim().length > 0) {
+                    epDrawerHeaderLogo.onerror = () => {
+                        epDrawerHeaderLogo.style.display = 'none';
+                        epDrawerHeaderTitle.innerText = showTitle || meta.title || '';
+                        epDrawerHeaderTitle.style.display = 'block';
+                    };
+                    epDrawerHeaderLogo.src = meta.logoUrl;
+                    epDrawerHeaderLogo.style.display = 'block';
+                    epDrawerHeaderTitle.style.display = 'none';
+                } else {
+                    epDrawerHeaderLogo.style.display = 'none';
+                    epDrawerHeaderTitle.innerText = showTitle || meta.title || '';
+                    epDrawerHeaderTitle.style.display = 'block';
+                }
+            }
             const epPanelSub = document.getElementById('epPanelSub');
             if (epPanelSub) {
                 const countUnit = isAudiobookOrTrack ? (isParts ? 'parts' : 'chapters') : 'episodes';
@@ -3262,8 +3324,10 @@
             if (sChipsBar) {
                 const seasonsHtml = seasons.map(s => {
                     const isSActive = (s === currentSelectedSeason);
+                    const epCount = meta.episodes.filter(ep => (ep.season !== undefined && ep.season !== null ? ep.season : 1) === s).length;
                     return `<button class="ep-season-btn ${isSActive ? 'active' : ''}" data-season="${s}" onclick="onSeasonChipClick(${s})">
-                        <span>Season ${s}</span>
+                        <span class="ep-season-title">Season ${s}</span>
+                        <span class="ep-season-count">${epCount} EPS</span>
                     </button>`;
                 }).join('');
                 if (sChipsBar._lastSeasonsHtml !== seasonsHtml) {
@@ -3966,6 +4030,122 @@
         });
     };
 
+    // ── Seekbar Preview Thumbnails Engine ───────────────────
+    let _seekThumbnailCues = [];
+    window._seekThumbnailCues = _seekThumbnailCues;
+
+    function parseVttTimestampMs(text) {
+        if (!text) return null;
+        const clean = text.trim().split(/\s+/)[0];
+        if (!clean) return null;
+        const parts = clean.split(':');
+        if (parts.length < 2 || parts.length > 3) return null;
+        const nums = parts.map(Number);
+        if (nums.some(v => !Number.isFinite(v))) return null;
+        const seconds = parts.length === 3
+            ? nums[0] * 3600 + nums[1] * 60 + nums[2]
+            : nums[0] * 60 + nums[1];
+        return Math.round(seconds * 1000);
+    }
+
+    function parseVttTile(payload, baseUrl) {
+        if (!payload) return null;
+        const hashIdx = payload.lastIndexOf('#');
+        let url = (hashIdx >= 0 ? payload.slice(0, hashIdx) : payload).trim();
+        let x = 0, y = 0, w = 0, h = 0;
+        if (hashIdx >= 0) {
+            const fragment = payload.slice(hashIdx + 1);
+            if (fragment.startsWith('xywh=')) {
+                const coords = fragment.slice(5).split(',').map(Number);
+                if (coords.length === 4 && coords.every(Number.isFinite) && coords[2] > 0 && coords[3] > 0) {
+                    x = coords[0];
+                    y = coords[1];
+                    w = coords[2];
+                    h = coords[3];
+                }
+            }
+        }
+        if (baseUrl && !/^https?:\/\//i.test(url)) {
+            try {
+                const base = new URL(baseUrl);
+                base.search = '';
+                base.hash = '';
+                url = new URL(url, base).toString();
+            } catch (_) {}
+        }
+        return { url, x, y, w, h };
+    }
+
+    function loadSeekThumbnailsVtt(text, baseUrl) {
+        if (!text || typeof text !== 'string') {
+            _seekThumbnailCues = [];
+            window._seekThumbnailCues = [];
+            return;
+        }
+        const lines = text.replace(/^\uFEFF/, '').split(/\r?\n/);
+        const cues = [];
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i].trim();
+            const arrow = line.indexOf('-->');
+            if (arrow < 0) continue;
+            const startMs = parseVttTimestampMs(line.slice(0, arrow));
+            const endMs = parseVttTimestampMs(line.slice(arrow + 3));
+            if (startMs === null || endMs === null || endMs <= startMs) continue;
+            let payload = '';
+            for (let j = i + 1; j < lines.length; j++) {
+                const next = lines[j].trim();
+                if (!next) {
+                    if (payload) break;
+                    continue;
+                }
+                if (next.includes('-->')) break;
+                if (!payload) payload = next;
+            }
+            const tile = parseVttTile(payload, baseUrl);
+            if (tile && tile.url) {
+                cues.push({ startMs, endMs, tile });
+            }
+        }
+        cues.sort((a, b) => a.startMs - b.startMs);
+        _seekThumbnailCues = cues;
+        window._seekThumbnailCues = cues;
+    }
+    window.loadSeekThumbnailsVtt = loadSeekThumbnailsVtt;
+
+    function setSeekThumbnailTrack(url) {
+        if (!url) {
+            _seekThumbnailCues = [];
+            window._seekThumbnailCues = [];
+            return;
+        }
+        fetch(url)
+            .then(res => res.text())
+            .then(text => loadSeekThumbnailsVtt(text, url))
+            .catch(err => {
+                console.warn('[Seek Thumbnails] Failed to load VTT track:', err);
+            });
+    }
+    window.setSeekThumbnailTrack = setSeekThumbnailTrack;
+
+    function getSeekThumbnailTileAt(timeMs) {
+        if (!_seekThumbnailCues || _seekThumbnailCues.length === 0) return null;
+        let low = 0;
+        let high = _seekThumbnailCues.length - 1;
+        while (low <= high) {
+            const mid = (low + high) >> 1;
+            const cue = _seekThumbnailCues[mid];
+            if (timeMs >= cue.startMs && timeMs < cue.endMs) {
+                return cue.tile;
+            } else if (timeMs < cue.startMs) {
+                high = mid - 1;
+            } else {
+                low = mid + 1;
+            }
+        }
+        return null;
+    }
+    window.getSeekThumbnailTileAt = getSeekThumbnailTileAt;
+
     // Seekbar Hover Tooltip & Hover Highlight
     if (seekWrap && seekTooltip) {
         const seekHover = document.getElementById('seekHover');
@@ -3994,17 +4174,114 @@
                 }
             }
             
-            seekTooltip.innerHTML = `${fmt(hoverTimeMs)}${chapterText}`;
+            // Format time display
+            const timeLabel = fmt(hoverTimeMs);
+            if (seekTooltipTime) {
+                seekTooltipTime.innerHTML = `${timeLabel}${chapterText}`;
+            } else {
+                seekTooltip.innerHTML = `${timeLabel}${chapterText}`;
+            }
+
+            // Thumbnail evaluation (WebVTT sprite / Trickplay frame)
+            _lastHoverTimeMs = hoverTimeMs;
+            const tile = getSeekThumbnailTileAt(hoverTimeMs);
+            const trickplayBucket = Math.round(hoverTimeMs / 2000) * 2000;
+            const cachedTrickplayUri = thumbCacheNearest(trickplayBucket, 30);
+
+            if (seekThumbCard && seekThumbViewport && seekThumbImg && seekThumbSprite) {
+                if (tile) {
+                    seekThumbCard.style.display = 'block';
+                    seekTooltip.classList.add('has-thumb');
+                    const cardW = 160;
+
+                    if (tile.w > 0 && tile.h > 0) {
+                        // WebVTT Sprite Sheet
+                        const scale = cardW / tile.w;
+                        seekThumbSprite.style.display = 'none';
+                        seekThumbImg.style.display = 'block';
+                        seekThumbImg.style.position = 'absolute';
+                        seekThumbImg.style.left = `-${Math.round(tile.x * scale)}px`;
+                        seekThumbImg.style.top = `-${Math.round(tile.y * scale)}px`;
+                        seekThumbImg.style.transform = `scale(${scale})`;
+                        seekThumbImg.style.transformOrigin = 'top left';
+                        seekThumbImg.style.width = 'auto';
+                        seekThumbImg.style.height = 'auto';
+                        seekThumbImg.style.maxWidth = 'none';
+                        seekThumbImg.style.maxHeight = 'none';
+                        seekThumbImg.style.objectFit = 'none';
+                        if (seekThumbImg.src !== tile.url) {
+                            seekThumbImg.src = tile.url;
+                        }
+                    } else {
+                        // Direct single frame image URL
+                        seekThumbSprite.style.display = 'none';
+                        seekThumbImg.style.display = 'block';
+                        seekThumbImg.style.position = 'static';
+                        seekThumbImg.style.left = '0px';
+                        seekThumbImg.style.top = '0px';
+                        seekThumbImg.style.transform = 'none';
+                        seekThumbImg.style.width = '100%';
+                        seekThumbImg.style.height = '100%';
+                        seekThumbImg.style.objectFit = 'cover';
+                        if (seekThumbImg.src !== tile.url) {
+                            seekThumbImg.src = tile.url;
+                        }
+                    }
+                } else if (cachedTrickplayUri) {
+                    // Headless MPV Trickplay Thumbnail frame (nearest or exact)
+                    seekThumbCard.style.display = 'block';
+                    seekTooltip.classList.add('has-thumb');
+                    seekThumbSprite.style.display = 'none';
+                    if (seekThumbSkeleton) seekThumbSkeleton.style.display = 'none';
+                    seekThumbImg.style.display = 'block';
+                    seekThumbImg.style.position = 'static';
+                    seekThumbImg.style.left = '0px';
+                    seekThumbImg.style.top = '0px';
+                    seekThumbImg.style.transform = 'none';
+                    seekThumbImg.style.width = '100%';
+                    seekThumbImg.style.height = '100%';
+                    seekThumbImg.style.objectFit = 'cover';
+                    if (seekThumbImg.src !== cachedTrickplayUri) {
+                        seekThumbImg.src = cachedTrickplayUri;
+                    }
+                } else {
+                    // No frame ready yet: show skeleton shimmer, keep card dimensions stable
+                    seekThumbCard.style.display = 'block';
+                    seekTooltip.classList.add('has-thumb');
+                    seekThumbSprite.style.display = 'none';
+                    seekThumbImg.style.display = 'none';
+                    if (seekThumbSkeleton) seekThumbSkeleton.style.display = 'block';
+                }
+
+                // If not an exact bucket match, request frame from native engine
+                if (!tile && !_trickplayThumbCache.has(trickplayBucket)) {
+                    const now = Date.now();
+                    const roundedTimeMs = Math.round(hoverTimeMs);
+                    if (now - _lastSeekThumbReqTime > 80) {
+                        _lastSeekThumbReqTime = now;
+                        send('requestSeekThumbnail', roundedTimeMs);
+                    } else {
+                        clearTimeout(_lastSeekThumbReqTimer);
+                        _lastSeekThumbReqTimer = setTimeout(() => {
+                            _lastSeekThumbReqTime = Date.now();
+                            send('requestSeekThumbnail', roundedTimeMs);
+                        }, 70);
+                    }
+                }
+            }
             
-            const tipWidth = seekTooltip.offsetWidth || 50;
-            const layoutWidth = rect.width > 0 ? (rect.width / 1.15) : 1;
-            const halfTipPct = Math.min(48, ((tipWidth / 2 + 6) / layoutWidth) * 100);
+            const isThumb = seekTooltip.classList.contains('has-thumb');
+            const tipWidth = seekTooltip.offsetWidth || (isThumb ? 172 : 60);
+            const layoutWidth = rect.width > 0 ? rect.width : 1;
+            const halfTipPct = Math.min(48, ((tipWidth / 2 + 8) / layoutWidth) * 100);
             const clampedPct = Math.max(halfTipPct, Math.min(100 - halfTipPct, pct * 100));
             seekTooltip.style.left = `${clampedPct.toFixed(2)}%`;
             seekTooltip.classList.add('visible');
         });
         
         seekWrap.addEventListener('mouseleave', () => {
+            _lastHoverTimeMs = null;
+            clearTimeout(_lastSeekThumbReqTimer);
             seekTooltip.classList.remove('visible');
             if (seekHover) {
                 seekHover.style.width = '0%';
@@ -4166,26 +4443,14 @@
         if (s.showEndTime !== undefined) {
             const btn = document.getElementById('btnToggleEndTime');
             if (btn) {
-                if (s.showEndTime === true) {
-                    btn.classList.add('active');
-                    btn.innerText = 'On';
-                } else {
-                    btn.classList.remove('active');
-                    btn.innerText = 'Off';
-                }
+                btn.classList.toggle('active', !!s.showEndTime);
             }
         }
 
         if (s.showClock !== undefined) {
             const btn = document.getElementById('btnToggleClock');
             if (btn) {
-                if (s.showClock === true) {
-                    btn.classList.add('active');
-                    btn.innerText = 'On';
-                } else {
-                    btn.classList.remove('active');
-                    btn.innerText = 'Off';
-                }
+                btn.classList.toggle('active', !!s.showClock);
             }
         }
 
@@ -4429,6 +4694,36 @@
             else if (p.type === 'show_inactivity_prompt') showInactivityPrompt();
             else if (p.type === 'hide_inactivity_prompt') hideInactivityPrompt();
             else if (p.type === 'sync_sleep_timer') syncSleepTimerUI(p.value);
+            else if (p.type === 'seek_thumbnail_response') {
+                if (p.dataUri && typeof p.timeMs === 'number') {
+                    const bucket = Math.round(p.timeMs / 2000) * 2000;
+                    _trickplayThumbCache.set(bucket, p.dataUri);
+                    if (_trickplayThumbCache.size > 256) {
+                        const oldest = _trickplayThumbCache.keys().next().value;
+                        _trickplayThumbCache.delete(oldest);
+                    }
+                    if (_lastHoverTimeMs !== null && Math.abs(_lastHoverTimeMs - p.timeMs) <= 30000) {
+                        const sCard = document.getElementById('seekThumbCard');
+                        const sImg = document.getElementById('seekThumbImg');
+                        const sSkeleton = document.getElementById('seekThumbSkeleton');
+                        const sSprite = document.getElementById('seekThumbSprite');
+                        const sTip = document.getElementById('seekTooltip');
+                        if (sCard && sImg && sTip) {
+                            if (sSprite) sSprite.style.display = 'none';
+                            if (sSkeleton) sSkeleton.style.display = 'none';
+                            sImg.style.display = 'block';
+                            sImg.style.position = 'static';
+                            sImg.style.transform = 'none';
+                            sImg.style.width = '100%';
+                            sImg.style.height = '100%';
+                            sImg.style.objectFit = 'cover';
+                            sImg.src = p.dataUri;
+                            sCard.style.display = 'block';
+                            sTip.classList.add('has-thumb');
+                        }
+                    }
+                }
+            }
             else if (p.type === 'cancel_countdown') {
                 if (endCountdownTimer) {
                     clearInterval(endCountdownTimer);
@@ -6170,47 +6465,189 @@
         });
     }
 
-    // Video Aspect & Zoom
-    document.querySelectorAll('#aspectChips .chip').forEach(c => {
-        c.addEventListener('click', e => {
-            e.stopPropagation();
-            document.querySelectorAll('#aspectChips .chip').forEach(x => x.classList.remove('active'));
-            c.classList.add('active');
-            const aspect = c.dataset.aspect;
-            if (aspect === 'original') {
-                send('setMpvProperty', 'keepaspect:yes');
-                send('setMpvProperty', 'video-aspect-override:no');
-            } else if (aspect === '16:9') {
-                send('setMpvProperty', 'keepaspect:yes');
-                send('setMpvProperty', 'video-aspect-override:16:9');
-            } else if (aspect === '4:3') {
-                send('setMpvProperty', 'keepaspect:yes');
-                send('setMpvProperty', 'video-aspect-override:4:3');
-            } else if (aspect === 'stretch') {
-                send('setMpvProperty', 'keepaspect:no');
-                send('setMpvProperty', 'video-aspect-override:no');
+    // Video Aspect & Zoom Manager
+    let currentAspect = 'original';
+    let currentZoom = 0;
+
+    const applyAspect = (mode, notify = false) => {
+        currentAspect = mode || 'original';
+        if (currentAspect === 'original') {
+            send('setMpvProperty', 'keepaspect:yes');
+            send('setMpvProperty', 'video-aspect-override:no');
+            send('setMpvProperty', 'panscan:0.0');
+            if (notify) showHudToast('Aspect: Original (Fit)');
+        } else if (currentAspect === 'fill') {
+            send('setMpvProperty', 'keepaspect:yes');
+            send('setMpvProperty', 'video-aspect-override:no');
+            send('setMpvProperty', 'panscan:1.0');
+            if (notify) showHudToast('Aspect: Fill (Crop)');
+        } else if (currentAspect === 'stretch') {
+            send('setMpvProperty', 'keepaspect:no');
+            send('setMpvProperty', 'video-aspect-override:no');
+            send('setMpvProperty', 'panscan:0.0');
+            if (notify) showHudToast('Aspect: Stretch to Window');
+        } else if (currentAspect === '16:9') {
+            send('setMpvProperty', 'keepaspect:yes');
+            send('setMpvProperty', 'video-aspect-override:16:9');
+            send('setMpvProperty', 'panscan:0.0');
+            if (notify) showHudToast('Aspect: 16:9 Widescreen');
+        } else if (currentAspect === '4:3') {
+            send('setMpvProperty', 'keepaspect:yes');
+            send('setMpvProperty', 'video-aspect-override:4:3');
+            send('setMpvProperty', 'panscan:0.0');
+            if (notify) showHudToast('Aspect: 4:3 Standard');
+        }
+        syncAspectZoomUI();
+    };
+    window.applyAspect = applyAspect;
+
+    const applyZoom = (val, notify = false) => {
+        const clamped = Math.max(0, Math.min(3.0, Math.round(val * 100) / 100));
+        currentZoom = clamped;
+        send('setMpvProperty', `video-zoom:${clamped}`);
+        if (notify) showHudToast(`Zoom: ${(1 + clamped).toFixed(2)}x`);
+        syncAspectZoomUI();
+    };
+    window.applyZoom = applyZoom;
+
+    const syncAspectZoomUI = () => {
+        // 1. Hero text readout in popover
+        const hero = document.getElementById('aspectHeroDisplay');
+        const aspectLabels = {
+            'original': 'Fit (Original)',
+            'fill': 'Fill (Crop)',
+            'stretch': 'Stretch to Window',
+            '16:9': '16:9 Widescreen',
+            '4:3': '4:3 Standard'
+        };
+        if (hero) {
+            if (currentZoom > 0) {
+                hero.innerText = `${(1 + currentZoom).toFixed(2)}x Zoom`;
+            } else {
+                hero.innerText = aspectLabels[currentAspect] || 'Fit (Original)';
+            }
+        }
+
+        // 2. Control bar button and badge
+        const aspectBtn = document.getElementById('aspectBtn');
+        const aspectBadge = document.getElementById('aspectBadge');
+        const isDefault = currentAspect === 'original' && currentZoom === 0;
+
+        if (aspectBtn && aspectBadge) {
+            if (isDefault) {
+                aspectBadge.style.display = 'none';
+                aspectBtn.classList.remove('aspect-custom');
+                aspectBtn.title = 'Aspect Ratio & Zoom';
+            } else {
+                let badgeText = 'Fit';
+                if (currentZoom > 0) {
+                    badgeText = `${(1 + currentZoom).toFixed(1)}x`;
+                } else if (currentAspect === 'fill') {
+                    badgeText = 'Fill';
+                } else if (currentAspect === 'stretch') {
+                    badgeText = 'Stretch';
+                } else if (currentAspect === '16:9') {
+                    badgeText = '16:9';
+                } else if (currentAspect === '4:3') {
+                    badgeText = '4:3';
+                }
+                aspectBadge.innerText = badgeText;
+                aspectBadge.style.display = 'inline-flex';
+                aspectBtn.classList.add('aspect-custom');
+                aspectBtn.title = `Aspect & Zoom (${hero ? hero.innerText : badgeText})`;
+            }
+        }
+
+        // 3. Aspect pills (in popover and settings modal)
+        document.querySelectorAll('#aspectPillsRow .speed-compact-pill, #aspectChips .chip').forEach(el => {
+            if (el.dataset.aspect === currentAspect) {
+                el.classList.add('active');
+            } else {
+                el.classList.remove('active');
             }
         });
+
+        // 4. Zoom pills (in popover)
+        document.querySelectorAll('#zoomPillsRow .speed-compact-pill').forEach(el => {
+            const z = parseFloat(el.dataset.zoom);
+            if (!isNaN(z) && Math.abs(currentZoom - z) < 0.05) {
+                el.classList.add('active');
+            } else {
+                el.classList.remove('active');
+            }
+        });
+
+        // 5. Sliders (popover and settings modal)
+        const popSlider = document.getElementById('popoverZoomSlider');
+        if (popSlider) {
+            popSlider.value = currentZoom;
+            const pct = Math.max(0, Math.min(100, (currentZoom / 3.0) * 100));
+            popSlider.style.setProperty('--slider-pct', `${pct}%`);
+        }
+        const settingsSlider = document.getElementById('zoomSlider');
+        if (settingsSlider) {
+            settingsSlider.value = currentZoom;
+        }
+        const zoomVal = document.getElementById('zoomVal');
+        if (zoomVal) {
+            zoomVal.innerText = currentZoom.toString();
+        }
+    };
+    window.syncAspectZoomUI = syncAspectZoomUI;
+
+    // Aspect preset clicks (popover + settings modal)
+    document.querySelectorAll('#aspectPillsRow .speed-compact-pill, #aspectChips .chip').forEach(c => {
+        c.addEventListener('click', e => {
+            e.stopPropagation();
+            const aspect = c.dataset.aspect;
+            if (aspect) applyAspect(aspect);
+        });
     });
-    document.getElementById('zoomSlider').addEventListener('input', e => {
+
+    // Zoom preset clicks (popover)
+    document.querySelectorAll('#zoomPillsRow .speed-compact-pill').forEach(c => {
+        c.addEventListener('click', e => {
+            e.stopPropagation();
+            const z = parseFloat(c.dataset.zoom);
+            if (!isNaN(z)) applyZoom(z);
+        });
+    });
+
+    // Zoom steppers and sliders
+    document.getElementById('zoomDecBtn')?.addEventListener('click', e => {
         e.stopPropagation();
-        document.getElementById('zoomVal').innerText = e.target.value;
-        send('setMpvProperty', `video-zoom:${e.target.value}`);
+        applyZoom(currentZoom - 0.1);
+    });
+    document.getElementById('zoomIncBtn')?.addEventListener('click', e => {
+        e.stopPropagation();
+        applyZoom(currentZoom + 0.1);
+    });
+    document.getElementById('popoverZoomSlider')?.addEventListener('input', e => {
+        e.stopPropagation();
+        applyZoom(parseFloat(e.target.value));
+    });
+    document.getElementById('zoomSlider')?.addEventListener('input', e => {
+        e.stopPropagation();
+        applyZoom(parseFloat(e.target.value));
+    });
+
+    // Resets
+    const resetAspectAndZoom = () => {
+        applyAspect('original');
+        applyZoom(0);
+    };
+    document.getElementById('aspectHeroDisplay')?.addEventListener('click', e => {
+        e.stopPropagation();
+        resetAspectAndZoom();
+    });
+    document.getElementById('btnResetAspectZoom')?.addEventListener('click', e => {
+        e.stopPropagation();
+        resetAspectAndZoom();
     });
 
     document.getElementById('btnResetVideo').addEventListener('click', e => {
         e.stopPropagation();
-        // Reset Aspect
-        document.querySelectorAll('#aspectChips .chip').forEach(c => c.classList.remove('active'));
-        document.querySelector('#aspectChips .chip[data-aspect="original"]').classList.add('active');
-        send('setMpvProperty', 'keepaspect:yes');
-        send('setMpvProperty', 'video-aspect-override:no');
-        
-        // Reset Zoom
-        document.getElementById('zoomSlider').value = 0;
-        document.getElementById('zoomSlider').dispatchEvent(new Event('input'));
-        document.getElementById('zoomVal').innerText = '0';
-        send('setMpvProperty', 'video-zoom:0');
+        resetAspectAndZoom();
         
         // Reset Scale
         document.querySelectorAll('#scaleChips .chip').forEach(c => c.classList.remove('active'));
@@ -6608,28 +7045,31 @@
             html += `
                 <div class="ctx-divider"></div>
                 <div class="ctx-sub-header">Aspect Ratio</div>
-                <div class="ctx-sub-item" onclick="send('setMpvProperty','keepaspect:yes');send('setMpvProperty','video-aspect-override:no');showHudToast('Aspect: Original');closeContextMenu();">
-                    <span>Original (Auto)</span><span class="ctx-sub-check"></span>
+                <div class="ctx-sub-item ${currentAspect === 'original' ? 'active' : ''}" onclick="applyAspect('original', true);closeContextMenu();">
+                    <span>Original (Fit)</span><span class="ctx-sub-check">${currentAspect === 'original' ? SVGS.check : ''}</span>
                 </div>
-                <div class="ctx-sub-item" onclick="send('setMpvProperty','keepaspect:yes');send('setMpvProperty','video-aspect-override:16:9');showHudToast('Aspect: 16:9');closeContextMenu();">
-                    <span>16:9 Widescreen</span><span class="ctx-sub-check"></span>
+                <div class="ctx-sub-item ${currentAspect === 'fill' ? 'active' : ''}" onclick="applyAspect('fill', true);closeContextMenu();">
+                    <span>Fill (Crop)</span><span class="ctx-sub-check">${currentAspect === 'fill' ? SVGS.check : ''}</span>
                 </div>
-                <div class="ctx-sub-item" onclick="send('setMpvProperty','keepaspect:yes');send('setMpvProperty','video-aspect-override:4:3');showHudToast('Aspect: 4:3');closeContextMenu();">
-                    <span>4:3 Standard</span><span class="ctx-sub-check"></span>
+                <div class="ctx-sub-item ${currentAspect === 'stretch' ? 'active' : ''}" onclick="applyAspect('stretch', true);closeContextMenu();">
+                    <span>Stretch to Fill</span><span class="ctx-sub-check">${currentAspect === 'stretch' ? SVGS.check : ''}</span>
                 </div>
-                <div class="ctx-sub-item" onclick="send('setMpvProperty','keepaspect:no');send('setMpvProperty','video-aspect-override:no');showHudToast('Aspect: Fill Window');closeContextMenu();">
-                    <span>Stretch to Fill</span><span class="ctx-sub-check"></span>
+                <div class="ctx-sub-item ${currentAspect === '16:9' ? 'active' : ''}" onclick="applyAspect('16:9', true);closeContextMenu();">
+                    <span>16:9 Widescreen</span><span class="ctx-sub-check">${currentAspect === '16:9' ? SVGS.check : ''}</span>
+                </div>
+                <div class="ctx-sub-item ${currentAspect === '4:3' ? 'active' : ''}" onclick="applyAspect('4:3', true);closeContextMenu();">
+                    <span>4:3 Standard</span><span class="ctx-sub-check">${currentAspect === '4:3' ? SVGS.check : ''}</span>
                 </div>
                 <div class="ctx-divider"></div>
                 <div class="ctx-sub-header">Video Zoom</div>
-                <div class="ctx-sub-item" onclick="send('setMpvProperty','video-zoom:0');showHudToast('Zoom: 100% (Fit)');closeContextMenu();">
-                    <span>Fit (100%)</span><span class="ctx-sub-check"></span>
+                <div class="ctx-sub-item ${currentZoom === 0 ? 'active' : ''}" onclick="applyZoom(0, true);closeContextMenu();">
+                    <span>Fit (100%)</span><span class="ctx-sub-check">${currentZoom === 0 ? SVGS.check : ''}</span>
                 </div>
-                <div class="ctx-sub-item" onclick="send('setMpvProperty','video-zoom:0.25');showHudToast('Zoom: +25%');closeContextMenu();">
-                    <span>Zoom In (+25%)</span><span class="ctx-sub-check"></span>
+                <div class="ctx-sub-item ${Math.abs(currentZoom - 0.25) < 0.05 ? 'active' : ''}" onclick="applyZoom(0.25, true);closeContextMenu();">
+                    <span>Zoom In (+25%)</span><span class="ctx-sub-check">${Math.abs(currentZoom - 0.25) < 0.05 ? SVGS.check : ''}</span>
                 </div>
-                <div class="ctx-sub-item" onclick="send('setMpvProperty','video-zoom:0.5');showHudToast('Zoom: +50%');closeContextMenu();">
-                    <span>Zoom In (+50%)</span><span class="ctx-sub-check"></span>
+                <div class="ctx-sub-item ${Math.abs(currentZoom - 0.5) < 0.05 ? 'active' : ''}" onclick="applyZoom(0.5, true);closeContextMenu();">
+                    <span>Zoom In (+50%)</span><span class="ctx-sub-check">${Math.abs(currentZoom - 0.5) < 0.05 ? SVGS.check : ''}</span>
                 </div>
             `;
 

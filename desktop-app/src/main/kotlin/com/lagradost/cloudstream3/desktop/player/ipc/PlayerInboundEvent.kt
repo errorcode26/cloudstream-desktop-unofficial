@@ -99,6 +99,7 @@ sealed interface PlayerInboundEvent {
     data object SkipScraping : PlayerInboundEvent
     data object RetryPlayback : PlayerInboundEvent
     data class CopyDiagnostics(val text: String) : PlayerInboundEvent
+    data class RequestSeekThumbnail(val timeMs: Long) : PlayerInboundEvent
     data class ClientError(val message: String) : PlayerInboundEvent
     data class ClientLog(val message: String) : PlayerInboundEvent
 
@@ -195,6 +196,12 @@ sealed interface PlayerInboundEvent {
                 "openLocalSubtitlePicker" -> OpenLocalSubtitlePicker
                 "loadLocalSubtitleFile" -> LoadLocalSubtitleFile(eventValue)
                 "screenshot" -> Screenshot
+                "requestSeekThumbnail" -> {
+                    val rawMs = rootNode.get("timeMs")?.asLong()
+                        ?: eventValue.toDoubleOrNull()?.toLong()
+                        ?: 0L
+                    RequestSeekThumbnail(rawMs)
+                }
 
                 "toggleInterpolation" -> ToggleInterpolation(eventValue.toBoolean())
                 "toggleDeband" -> ToggleDeband(eventValue.toBoolean())

@@ -99,7 +99,9 @@ function getOrCreateElement(id, tag = 'div') {
         dispatchEvent: (event) => {
             const evtName = typeof event === 'string' ? event : (event && event.type) || 'click';
             const fns = listeners[evtName] || [];
-            fns.forEach(fn => fn({ type: evtName, stopPropagation: () => {}, preventDefault: () => {}, target: el, currentTarget: el }));
+            const baseEvt = typeof event === 'object' && event !== null ? event : {};
+            const evtObj = Object.assign({ type: evtName, stopPropagation: () => {}, preventDefault: () => {}, target: el, currentTarget: el }, baseEvt);
+            fns.forEach(fn => fn(evtObj));
         },
         click: () => {
             el.dispatchEvent('click');
@@ -285,6 +287,55 @@ try {
     const subSlider = domElements.get('subPosSlider');
     if (subSlider && typeof subSlider.dispatchEvent === 'function') {
         subSlider.dispatchEvent('input');
+    }
+
+    // ── Test Seek Preview Thumbnails Engine ──
+    const sampleVtt = `WEBVTT
+
+00:00:00.000 --> 01:00:00.000
+sprite.jpg#xywh=0,0,160,90
+
+01:00:00.000 --> 02:00:00.000
+sprite.jpg#xywh=160,0,160,90
+`;
+    mockWindow.loadSeekThumbnailsVtt(sampleVtt, 'https://example.com/thumbnails/');
+    if (!mockWindow._seekThumbnailCues || mockWindow._seekThumbnailCues.length !== 2) {
+        throw new Error('VTT cues length mismatch: expected 2, got ' + (mockWindow._seekThumbnailCues && mockWindow._seekThumbnailCues.length));
+    }
+    const tile = mockWindow.getSeekThumbnailTileAt(5000);
+    if (!tile || tile.x !== 0 || tile.y !== 0 || tile.w !== 160 || tile.h !== 90) {
+        throw new Error('Tile lookup mismatch at 5000ms: ' + JSON.stringify(tile));
+    }
+    const tileHour = mockWindow.getSeekThumbnailTileAt(3600000);
+    if (!tileHour || tileHour.x !== 160 || tileHour.y !== 0 || tileHour.w !== 160 || tileHour.h !== 90) {
+        throw new Error('Tile lookup mismatch at 3600000ms: ' + JSON.stringify(tileHour));
+    }
+
+    const seekWrap = domElements.get('seekWrap');
+    const seekTooltip = domElements.get('seekTooltip');
+    const seekThumbCard = domElements.get('seekThumbCard');
+    if (seekWrap && seekTooltip) {
+        seekWrap.dispatchEvent({ type: 'mousemove', clientX: 960, stopPropagation: () => {}, preventDefault: () => {} });
+        if (!seekTooltip.classList.contains('visible')) {
+            throw new Error('seekTooltip missing visible class after mousemove');
+        }
+        if (!seekTooltip.classList.contains('has-thumb')) {
+            throw new Error('seekTooltip missing has-thumb class when thumbnail is present');
+        }
+        if (seekThumbCard.style.display !== 'block') {
+            throw new Error('seekThumbCard display is not block: ' + seekThumbCard.style.display);
+        }
+        seekWrap.dispatchEvent({ type: 'mouseleave', stopPropagation: () => {}, preventDefault: () => {} });
+        if (seekTooltip.classList.contains('visible')) {
+            throw new Error('seekTooltip retained visible class after mouseleave');
+        }
+
+        // Test Trickplay Thumbnail Response
+        mockWindow.playerUpdate(JSON.stringify({
+            type: 'seek_thumbnail_response',
+            timeMs: 3600000,
+            dataUri: 'data:image/jpeg;base64,/9j/fakejpegdata'
+        }));
     }
 } catch (err) {
     console.error('[FAIL] player.js threw unhandled error during message lifecycle:\n', err);

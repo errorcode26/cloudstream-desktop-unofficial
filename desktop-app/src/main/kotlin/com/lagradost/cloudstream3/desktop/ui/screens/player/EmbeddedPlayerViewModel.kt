@@ -411,13 +411,18 @@ class EmbeddedPlayerViewModel(
         }
 
         // Detect premature stream terminations (e.g. ad redirects or corrupt streams reaching EOF before playing)
-        if (durSec <= 0L || (posSec < 5L && (durSec <= 0L || durSec > 60L))) {
+        val isPremature = durSec <= 0L || (durSec > 0L && posSec < (durSec * 0.85f).toLong())
+        if (isPremature) {
             if (currentUrl != null) {
                 val candidateLinks = state.nextEpisodeLinks.ifEmpty { state.launchData?.links ?: emptyList() }
                 val remainingCandidates = candidateLinks.filter { it.url != currentUrl && it.url !in state.failedLinks }
                 if (remainingCandidates.isNotEmpty()) {
                     AppLogger.w("EmbeddedPlayerViewModel", "Premature stream termination at ${posSec}s (dur=${durSec}s). Failing over to remaining candidate streams...")
-                    handlePlaybackError(currentUrl, "Stream ended prematurely")
+                    handlePlaybackError(currentUrl, "Stream ended prematurely at ${posSec}s")
+                    return
+                } else {
+                    AppLogger.e("EmbeddedPlayerViewModel", "Stream terminated prematurely at ${posSec}s of ${durSec}s with no candidate streams remaining.")
+                    handlePlaybackError(currentUrl, "Stream interrupted prematurely (${posSec}s / ${durSec}s)")
                     return
                 }
             }

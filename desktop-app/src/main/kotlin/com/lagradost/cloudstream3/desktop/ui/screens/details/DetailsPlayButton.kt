@@ -1,6 +1,9 @@
 package com.lagradost.cloudstream3.desktop.ui.screens.details
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.TooltipArea
+import androidx.compose.foundation.TooltipPlacement
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -12,6 +15,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -20,8 +24,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.lagradost.cloudstream3.desktop.ui.components.LocalDesktopTheme
 import com.lagradost.cloudstream3.LoadResponse
 import com.lagradost.cloudstream3.MainAPI
 import com.lagradost.cloudstream3.desktop.ui.PremiumIcons
@@ -236,6 +242,7 @@ fun DetailsPlayButton(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun DetailsDownloadButton(
     modifier: Modifier = Modifier,
@@ -296,25 +303,47 @@ fun DetailsDownloadButton(
 
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
+    val theme = LocalDesktopTheme.current
 
-    Surface(
-        onClick = { targetActionEp?.let { onDownload(it) } },
-        modifier = modifier.size(52.dp),
-        shape = RoundedCornerShape(12.dp),
-        color = if (isHovered) Color.White.copy(alpha = 0.22f) else Color.White.copy(alpha = 0.12f),
-        border = BorderStroke(1.2.dp, if (isHovered) Color.White.copy(alpha = 0.50f) else Color.White.copy(alpha = 0.28f)),
-        interactionSource = interactionSource,
+    TooltipArea(
+        tooltip = {
+            Surface(
+                shape = RoundedCornerShape(6.dp),
+                color = theme.SurfaceElevated,
+                border = BorderStroke(1.dp, theme.Divider),
+                shadowElevation = 6.dp,
+            ) {
+                Text(
+                    text = "Download",
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = theme.TextPrimary,
+                    fontWeight = FontWeight.Medium,
+                )
+            }
+        },
+        delayMillis = 400,
+        tooltipPlacement = TooltipPlacement.CursorPoint(offset = DpOffset(0.dp, 16.dp)),
     ) {
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center,
+        Surface(
+            onClick = { targetActionEp?.let { onDownload(it) } },
+            modifier = modifier.size(52.dp),
+            shape = RoundedCornerShape(12.dp),
+            color = if (isHovered) Color.White.copy(alpha = 0.22f) else Color.White.copy(alpha = 0.12f),
+            border = BorderStroke(1.2.dp, if (isHovered) Color.White.copy(alpha = 0.50f) else Color.White.copy(alpha = 0.28f)),
+            interactionSource = interactionSource,
         ) {
-            Icon(
-                PremiumIcons.Downloads,
-                contentDescription = "Download",
-                tint = Color.White,
-                modifier = Modifier.size(22.dp),
-            )
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    PremiumIcons.Downloads,
+                    contentDescription = "Download",
+                    tint = Color.White,
+                    modifier = Modifier.size(22.dp),
+                )
+            }
         }
     }
 }

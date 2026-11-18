@@ -1,6 +1,9 @@
 package com.lagradost.cloudstream3.desktop.ui.screens.details
 
 import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.TooltipArea
+import androidx.compose.foundation.TooltipPlacement
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -46,6 +49,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
@@ -998,6 +1002,7 @@ private fun DetailsHeroTrailerButton(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun DetailsHeroLibraryButton(
     modifier: Modifier = Modifier,
@@ -1019,61 +1024,84 @@ private fun DetailsHeroLibraryButton(
     } else {
         Icons.Outlined.BookmarkAdd
     }
-    Surface(
-        onClick = onEditStatus,
-        modifier = if (isInLibrary) {
-            modifier.height(if (isButtonsNarrow) 44.dp else 52.dp).animateContentSize()
-        } else {
-            modifier.size(if (isButtonsNarrow) 44.dp else 52.dp)
-        },
-        shape = RoundedCornerShape(if (isButtonsNarrow) 10.dp else 12.dp),
-        color = Color.White.copy(alpha = 0.12f),
-        border = androidx.compose.foundation.BorderStroke(
-            1.2.dp,
-            Color.White.copy(alpha = 0.28f),
-        ),
-    ) {
-        if (isInLibrary) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center,
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .padding(horizontal = if (isButtonsNarrow) 12.dp else 16.dp),
+    val tooltipText = if (isInLibrary) "Change Library Status" else "Add to Library"
+    val theme = LocalDesktopTheme.current
+    TooltipArea(
+        tooltip = {
+            Surface(
+                shape = RoundedCornerShape(6.dp),
+                color = theme.SurfaceElevated,
+                border = androidx.compose.foundation.BorderStroke(1.dp, theme.Divider),
+                shadowElevation = 6.dp,
             ) {
-                Icon(
-                    imageVector = libraryIcon,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(if (isButtonsNarrow) 18.dp else 20.dp),
-                )
-                Spacer(Modifier.width(if (isButtonsNarrow) 6.dp else 8.dp))
                 Text(
-                    text = activeWatchType.stringRes,
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = if (isButtonsNarrow) 13.sp else 14.sp,
-                    maxLines = 1,
-                )
-                Spacer(Modifier.width(4.dp))
-                Icon(
-                    imageVector = Icons.Default.KeyboardArrowDown,
-                    contentDescription = "Change Status",
-                    tint = Color.White.copy(alpha = 0.8f),
-                    modifier = Modifier.size(if (isButtonsNarrow) 16.dp else 18.dp),
+                    text = tooltipText,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = theme.TextPrimary,
+                    fontWeight = FontWeight.Medium,
                 )
             }
-        } else {
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier.fillMaxSize(),
-            ) {
-                Icon(
-                    imageVector = libraryIcon,
-                    contentDescription = "Add to Library",
-                    tint = Color.White,
-                    modifier = Modifier.size(if (isButtonsNarrow) 22.dp else 26.dp),
-                )
+        },
+        delayMillis = 400,
+        tooltipPlacement = TooltipPlacement.CursorPoint(offset = DpOffset(0.dp, 16.dp)),
+    ) {
+        Surface(
+            onClick = onEditStatus,
+            modifier = if (isInLibrary) {
+                modifier.height(if (isButtonsNarrow) 44.dp else 52.dp).animateContentSize()
+            } else {
+                modifier.size(if (isButtonsNarrow) 44.dp else 52.dp)
+            },
+            shape = RoundedCornerShape(if (isButtonsNarrow) 10.dp else 12.dp),
+            color = Color.White.copy(alpha = 0.12f),
+            border = androidx.compose.foundation.BorderStroke(
+                1.2.dp,
+                Color.White.copy(alpha = 0.28f),
+            ),
+        ) {
+            if (isInLibrary) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center,
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .padding(horizontal = if (isButtonsNarrow) 12.dp else 16.dp),
+                ) {
+                    Icon(
+                        imageVector = libraryIcon,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(if (isButtonsNarrow) 18.dp else 20.dp),
+                    )
+                    Spacer(Modifier.width(if (isButtonsNarrow) 6.dp else 8.dp))
+                    Text(
+                        text = activeWatchType.stringRes,
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = if (isButtonsNarrow) 13.sp else 14.sp,
+                        maxLines = 1,
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Icon(
+                        imageVector = Icons.Default.KeyboardArrowDown,
+                        contentDescription = "Change Status",
+                        tint = Color.White.copy(alpha = 0.8f),
+                        modifier = Modifier.size(if (isButtonsNarrow) 16.dp else 18.dp),
+                    )
+                }
+            } else {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier.fillMaxSize(),
+                ) {
+                    Icon(
+                        imageVector = libraryIcon,
+                        contentDescription = "Add to Library",
+                        tint = Color.White,
+                        modifier = Modifier.size(if (isButtonsNarrow) 22.dp else 26.dp),
+                    )
+                }
             }
         }
     }
@@ -1125,6 +1153,7 @@ private fun InfoRowItem(
 }
 
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun DetailsHeroWebButton(
     modifier: Modifier = Modifier,
@@ -1142,27 +1171,49 @@ private fun DetailsHeroWebButton(
 
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
+    val theme = LocalDesktopTheme.current
 
-    Surface(
-        onClick = { ExternalLinkHandler.launchSystemBrowser(fullWebUrl) },
-        modifier = modifier
-            .size(if (isButtonsNarrow) 44.dp else 52.dp)
-            .pointerHoverIcon(PointerIcon.Hand),
-        shape = RoundedCornerShape(if (isButtonsNarrow) 10.dp else 12.dp),
-        color = if (isHovered) Color.White.copy(alpha = 0.22f) else Color.White.copy(alpha = 0.12f),
-        border = androidx.compose.foundation.BorderStroke(
-            1.2.dp,
-            if (isHovered) Color.White.copy(alpha = 0.50f) else Color.White.copy(alpha = 0.28f),
-        ),
-        interactionSource = interactionSource,
+    TooltipArea(
+        tooltip = {
+            Surface(
+                shape = RoundedCornerShape(6.dp),
+                color = theme.SurfaceElevated,
+                border = androidx.compose.foundation.BorderStroke(1.dp, theme.Divider),
+                shadowElevation = 6.dp,
+            ) {
+                Text(
+                    text = "Open source page in browser",
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = theme.TextPrimary,
+                    fontWeight = FontWeight.Medium,
+                )
+            }
+        },
+        delayMillis = 400,
+        tooltipPlacement = TooltipPlacement.CursorPoint(offset = DpOffset(0.dp, 16.dp)),
     ) {
-        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-            Icon(
-                imageVector = Icons.Default.Public,
-                contentDescription = "Open in Browser (${provider.name})",
-                tint = Color.White,
-                modifier = Modifier.size(if (isButtonsNarrow) 18.dp else 20.dp),
-            )
+        Surface(
+            onClick = { ExternalLinkHandler.launchSystemBrowser(fullWebUrl) },
+            modifier = modifier
+                .size(if (isButtonsNarrow) 44.dp else 52.dp)
+                .pointerHoverIcon(PointerIcon.Hand),
+            shape = RoundedCornerShape(if (isButtonsNarrow) 10.dp else 12.dp),
+            color = if (isHovered) Color.White.copy(alpha = 0.22f) else Color.White.copy(alpha = 0.12f),
+            border = androidx.compose.foundation.BorderStroke(
+                1.2.dp,
+                if (isHovered) Color.White.copy(alpha = 0.50f) else Color.White.copy(alpha = 0.28f),
+            ),
+            interactionSource = interactionSource,
+        ) {
+            Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                Icon(
+                    imageVector = Icons.Default.Public,
+                    contentDescription = "Open in Browser (${provider.name})",
+                    tint = Color.White,
+                    modifier = Modifier.size(if (isButtonsNarrow) 18.dp else 20.dp),
+                )
+            }
         }
     }
 }

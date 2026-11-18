@@ -243,6 +243,28 @@ fun ComposeNativeWebPlayer(
 
     var hasAutoSelectedQuality by remember(link) { mutableStateOf(false) }
 
+    val trickplayEngine = remember(link) {
+        if (link != null) {
+            runCatching {
+                DesktopTrickplayEngine(scope).apply {
+                    val validated = com.lagradost.player.impl.PlayerLinkHandler.validate(link, title).getOrNull()
+                    val targetUrl = validated?.url ?: link.url
+                    val targetHeaders = validated?.headers ?: link.headers
+                    start(targetUrl, targetHeaders)
+                }
+            }.getOrNull()
+        } else {
+            null
+        }
+    }
+    val currentTrickplayEngine by rememberUpdatedState(trickplayEngine)
+
+    DisposableEffect(trickplayEngine) {
+        onDispose {
+            trickplayEngine?.stop()
+        }
+    }
+
     val resolvedImdbId = remember(parentId, currentEpisodeId) {
         parentId?.takeIf { it.startsWith("tt", ignoreCase = true) }
             ?: currentEpisodeId?.takeIf { it.startsWith("tt", ignoreCase = true) }?.substringBefore(":")
@@ -1417,6 +1439,20 @@ fun ComposeNativeWebPlayer(
                         is PlayerInboundEvent.SkipScraping -> {
                             scope.launch(kotlinx.coroutines.Dispatchers.Main) {
                                 onSkipScraping?.invoke()
+                            }
+                        }
+                        is PlayerInboundEvent.RequestSeekThumbnail -> {
+                            scope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                                val activeEngine = currentTrickplayEngine
+                                val dataUri = activeEngine?.requestThumbnail(event.timeMs)
+                                if (dataUri != null) {
+                                    val payload = mapOf(
+                                        "type" to "seek_thumbnail_response",
+                                        "timeMs" to event.timeMs,
+                                        "dataUri" to dataUri,
+                                    )
+                                    NativePlayerBridge.safePostMessage(playerObjectMapper.writeValueAsString(payload))
+                                }
                             }
                         }
                         is PlayerInboundEvent.Unknown -> {

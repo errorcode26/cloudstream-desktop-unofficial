@@ -82,9 +82,10 @@ interface MpvLibrary : Library {
     companion object {
         fun getPropertyString(ctx: Pointer, name: String): String? {
             return try {
-                val ptr = INSTANCE.mpv_get_property_string(ctx, name) ?: return null
+                val lib = instanceOrNull ?: return null
+                val ptr = lib.mpv_get_property_string(ctx, name) ?: return null
                 val str = ptr.getString(0)
-                INSTANCE.mpv_free(ptr)
+                lib.mpv_free(ptr)
                 str
             } catch (t: Throwable) {
                 null
@@ -101,21 +102,77 @@ interface MpvLibrary : Library {
             }
         }
 
-        val INSTANCE: MpvLibrary by lazy {
+        val instanceOrNull: MpvLibrary? by lazy {
+            val candidateDirs = listOfNotNull(
+                java.io.File("appResources/windows/mpv"),
+                java.io.File("desktop-app/appResources/windows/mpv"),
+                System.getProperty("user.dir")?.let { java.io.File(it, "desktop-app/appResources/windows/mpv") },
+                System.getProperty("user.dir")?.let { java.io.File(it, "appResources/windows/mpv") },
+                System.getProperty("compose.application.resources.dir")?.let { java.io.File(it, "windows/mpv") },
+                System.getProperty("compose.application.resources.dir")?.let { java.io.File(it, "mpv") },
+            ).filter { it.isDirectory }
+
             val targets = listOf("libmpv-2", "mpv-2", "mpv-1", "mpv", "libmpv", "libmpv.so.1", "libmpv.so.2", "mpv-3.dll")
-            var loaded: MpvLibrary? = null
-            for (target in targets) {
-                try {
-                    loaded = com.sun.jna.Native.load(target, MpvLibrary::class.java) as MpvLibrary
-                    AppLogger.i("Player:MPV", "Successfully loaded native mpv library: $target")
-                    break
-                } catch (e: UnsatisfiedLinkError) {
-                    AppLogger.e("Player:MPV", "Failed to load native mpv library $target: ${e.message}")
-                } catch (e: IllegalArgumentException) {
-                    AppLogger.e("Player:MPV", "Illegal arg for native mpv library $target: ${e.message}")
+
+            // Register search paths with JNA
+            for (dir in candidateDirs) {
+                for (target in targets) {
+                    try {
+                        com.sun.jna.NativeLibrary.addSearchPath(target, dir.absolutePath)
+                    } catch (_: Throwable) {}
                 }
             }
-            loaded ?: throw RuntimeException("Failed to load native MPV library. Please ensure mpv is installed and in your system PATH.")
+
+            var loaded: MpvLibrary? = null
+
+            // Direct file probe first
+            for (dir in candidateDirs) {
+                val directFiles = listOf(
+                    java.io.File(dir, "libmpv-2.dll"),
+                    java.io.File(dir, "mpv-2.dll"),
+                    java.io.File(dir, "mpv-1.dll"),
+                    java.io.File(dir, "libmpv.so.2"),
+                    java.io.File(dir, "libmpv.dylib"),
+                )
+                for (f in directFiles) {
+                    if (f.isFile && f.exists()) {
+                        try {
+                            loaded = com.sun.jna.Native.load(f.absolutePath, MpvLibrary::class.java) as MpvLibrary
+                            AppLogger.i("Player:MPV", "Successfully loaded native mpv library directly: ${f.absolutePath}")
+                            break
+                        } catch (e: UnsatisfiedLinkError) {
+                            AppLogger.d("Player:MPV", "Direct load failed for ${f.name}: ${e.message}")
+                        } catch (e: Throwable) {
+                            AppLogger.d("Player:MPV", "Direct load error for ${f.name}: ${e.message}")
+                        }
+                    }
+                }
+                if (loaded != null) break
+            }
+
+            // Fallback to JNA target name resolution
+            if (loaded == null) {
+                for (target in targets) {
+                    try {
+                        loaded = com.sun.jna.Native.load(target, MpvLibrary::class.java) as MpvLibrary
+                        AppLogger.i("Player:MPV", "Successfully loaded native mpv library: $target")
+                        break
+                    } catch (e: UnsatisfiedLinkError) {
+                        AppLogger.d("Player:MPV", "Failed to load native mpv library $target: ${e.message}")
+                    } catch (e: IllegalArgumentException) {
+                        AppLogger.d("Player:MPV", "Illegal arg for native mpv library $target: ${e.message}")
+                    } catch (e: Throwable) {
+                        AppLogger.d("Player:MPV", "Error loading native mpv library $target: ${e.message}")
+                    }
+                }
+            }
+            loaded
         }
+
+        val isAvailable: Boolean
+            get() = instanceOrNull != null
+
+        val INSTANCE: MpvLibrary
+            get() = instanceOrNull ?: throw RuntimeException("Failed to load native MPV library. Please ensure mpv is installed and in your system PATH.")
     }
 }

@@ -274,13 +274,14 @@
 <!-- ── Episodes Full-Screen Drawer ───────────────────────────────────── -->
 <div id="episodesPanel" class="panel ep-fullscreen-drawer">
     <div class="ep-drawer-header">
+        <div class="ep-drawer-title-group">
+            <img id="epDrawerHeaderLogo" alt="Show Logo">
+            <div id="epDrawerHeaderTitle"></div>
+        </div>
         <div class="ep-drawer-header-actions">
             <!-- Autoplay Next Episode Toggle Button -->
             <div class="ep-autoplay-btn" id="epAutoPlayBtn" title="Auto play next episode">
-                <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor">
-                    <path d="M16 18h2V6h-2zm-8-1.5 7-4.5-7-4.5z"/>
-                </svg>
-                <span>Auto play</span>
+                <span>Auto next</span>
                 <div class="ep-toggle-switch active" id="epAutoPlaySwitch">
                     <div class="ep-toggle-slider"></div>
                 </div>
@@ -289,16 +290,17 @@
         </div>
     </div>
     <div class="ep-drawer-body">
-        <!-- Left Sidebar: Show Identity & Vertical Seasons -->
+        <!-- Left Sidebar: Vertical Seasons -->
         <div class="ep-drawer-sidebar" id="seasonSelectWrap">
-            <div class="ep-show-identity" id="epShowIdentity">
+            <!-- Legacy fallback containers preserved hidden to prevent JS null errors -->
+            <div class="ep-show-identity" id="epShowIdentity" style="display: none;">
                 <img id="epDrawerLogo" class="ep-drawer-logo" alt="Show Logo" style="display: none;">
-                <div id="epDrawerTitleFallback" class="ep-drawer-fallback-title"></div>
+                <div id="epDrawerTitleFallback" class="ep-drawer-fallback-title" style="display: none;"></div>
                 <div id="epDrawerMetaRow" class="ep-drawer-meta-row" style="display: none;"></div>
                 <div id="epDrawerPlot" class="ep-drawer-plot" style="display: none;"></div>
             </div>
-            <div class="ep-sidebar-divider" id="epSidebarDivider"></div>
-            <div class="ep-seasons-header" id="epSeasonsHeader">Seasons</div>
+            <div class="ep-sidebar-divider" id="epSidebarDivider" style="display: none;"></div>
+            <div class="ep-seasons-header" id="epSeasonsHeader" style="display: none;">Seasons</div>
             <div class="ep-seasons-list" id="seasonChipsBar"></div>
         </div>
         <!-- Right Content: Episodes Stream -->
@@ -701,20 +703,23 @@
 </div>
 
 <!-- ── Playback Settings Panel ─────────────────────────────────────────── -->
-<div id="settingsPanel" class="panel">
-    <div class="panel-header" style="flex-direction: column; align-items: stretch; gap: 10px;">
-        <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
-            <h2>Playback Settings</h2>
-            <button class="close-btn" id="closeSettingsBtn">✕</button>
+<div id="settingsPanel" class="panel settings-modal">
+    <div class="panel-header settings-modal-header">
+        <div class="settings-modal-title-row">
+            <div>
+                <h2>Playback Settings</h2>
+                <div class="settings-modal-subtitle">Configure video rendering, audio processing, and player behavior</div>
+            </div>
+            <button class="close-btn" id="closeSettingsBtn" title="Close Settings (Esc)">✕</button>
         </div>
         <div class="settings-tab-header">
             <button class="settings-tab-btn active" data-tab-target="set-general">General</button>
             <button class="settings-tab-btn" data-tab-target="set-video">Video</button>
             <button class="settings-tab-btn" data-tab-target="set-audio">Audio</button>
-            <button class="settings-tab-btn" data-tab-target="set-shaders">Shaders</button>
+            <button class="settings-tab-btn" data-tab-target="set-shaders">Custom Filters</button>
         </div>
     </div>
-    <div class="panel-body" style="padding: 12px 16px;">
+    <div class="panel-body settings-panel-body">
         <!-- Tab 1: General (Display & Behavior) -->
         <div class="settings-tab-content active" id="set-general">
             <div class="settings-card">
@@ -749,18 +754,18 @@
             </div>
 
             <div class="settings-card">
-                <div class="settings-card-title">On-Screen Display</div>
-                <div class="settings-row">
+                <div class="settings-card-title">Display & Controls</div>
+                <div class="settings-row-col">
                     <div>
-                        <div class="settings-label-text">Player UI Layout</div>
-                        <div class="settings-sublabel" style="margin-bottom: 6px;">Choose control dock layout</div>
-                        <div class="chip-row" id="playerThemeChips" style="margin-bottom: 12px;">
-                            <div class="chip active" data-theme="modern_default">Modern Baseline</div>
-                            <div class="chip" data-theme="horizon_cinema">Horizon Cinema</div>
-                        </div>
+                        <div class="settings-label-text">Player Style</div>
+                        <div class="settings-sublabel" style="margin-bottom: 8px;">Choose your preferred control layout</div>
+                    </div>
+                    <div class="chip-row" id="playerThemeChips">
+                        <div class="chip active" data-theme="modern_default">Standard</div>
+                        <div class="chip" data-theme="horizon_cinema">Horizon Cinema</div>
                     </div>
                 </div>
-                <div class="settings-row" style="margin-top: 10px;">
+                <div class="settings-row">
                     <div>
                         <div class="settings-label-text">Show End Time</div>
                         <div class="settings-sublabel">Display estimated time when video will end</div>
@@ -769,7 +774,7 @@
                         <div class="desktop-switch-thumb"></div>
                     </button>
                 </div>
-                <div class="settings-row" style="margin-top: 10px;">
+                <div class="settings-row">
                     <div>
                         <div class="settings-label-text">Show Current Clock</div>
                         <div class="settings-sublabel">Show system clock in top player bar</div>
@@ -778,7 +783,7 @@
                         <div class="desktop-switch-thumb"></div>
                     </button>
                 </div>
-                <div class="settings-row" style="margin-top: 10px;">
+                <div class="settings-row">
                     <div>
                         <div class="settings-label-text">Show Server & Quality</div>
                         <div class="settings-sublabel">Display active server and stream quality in top bar</div>
@@ -801,6 +806,7 @@
                     <span class="settings-label-text">Aspect Ratio</span>
                     <div class="chip-row" id="aspectChips" style="margin-top: 4px;">
                         <div class="chip active" data-aspect="original">Original</div>
+                        <div class="chip" data-aspect="fill">Fill</div>
                         <div class="chip" data-aspect="16:9">16:9</div>
                         <div class="chip" data-aspect="4:3">4:3</div>
                         <div class="chip" data-aspect="stretch">Stretch</div>
@@ -821,20 +827,20 @@
             </div>
 
             <div class="settings-card">
-                <div class="settings-card-title">Video Quality & Rendering</div>
+                <div class="settings-card-title">Picture Quality</div>
                 <div class="settings-row-col">
-                    <span class="settings-label-text">Upscale Scaling Filter</span>
+                    <span class="settings-label-text">Sharpness Mode</span>
                     <div class="chip-row" id="scaleChips" style="margin-top: 4px;">
-                        <div class="chip active" data-scale="spline36">Spline36</div>
-                        <div class="chip" data-scale="lanczos">Lanczos</div>
-                        <div class="chip" data-scale="bicubic">Bicubic</div>
-                        <div class="chip" data-scale="bilinear">Bilinear</div>
+                        <div class="chip active" data-scale="spline36">Sharp (Best)</div>
+                        <div class="chip" data-scale="lanczos">Sharp</div>
+                        <div class="chip" data-scale="bicubic">Smooth</div>
+                        <div class="chip" data-scale="bilinear">Fast</div>
                     </div>
                 </div>
                 <div class="settings-row" style="margin-top: 12px;">
                     <div>
                         <div class="settings-label-text">Smooth Video (60fps)</div>
-                        <div class="settings-sublabel">Motion interpolation for high refresh displays</div>
+                        <div class="settings-sublabel">Makes motion appear smoother on high-refresh screens</div>
                     </div>
                     <button class="desktop-switch" id="btnToggleInterpolation">
                         <div class="desktop-switch-thumb"></div>
@@ -842,8 +848,8 @@
                 </div>
                 <div class="settings-row" style="margin-top: 10px;">
                     <div>
-                        <div class="settings-label-text">Playback Diagnostics (HUD)</div>
-                        <div class="settings-sublabel">Real-time codec, resolution, hardware decode & buffer metrics</div>
+                        <div class="settings-label-text">Show Stats Overlay</div>
+                        <div class="settings-sublabel">Show technical playback stats on screen</div>
                     </div>
                     <button class="desktop-switch" id="btnToggleStats">
                         <div class="desktop-switch-thumb"></div>
@@ -852,21 +858,21 @@
             </div>
 
             <div class="settings-card">
-                <div class="settings-card-title">HDR Tone-Mapping & Peak Luminance</div>
+                <div class="settings-card-title">HDR Display Settings</div>
                 <div class="settings-row-col">
-                    <span class="settings-label-text">Tone-Mapping Algorithm</span>
+                    <span class="settings-label-text">HDR Style</span>
                     <div class="chip-row" id="hdrToneChips" style="margin-top: 4px;">
-                        <div class="chip active" data-tone="spline">Spline</div>
-                        <div class="chip" data-tone="bt.2446a">BT.2446a</div>
-                        <div class="chip" data-tone="mobius">Mobius</div>
-                        <div class="chip" data-tone="clip">Clip</div>
                         <div class="chip" data-tone="auto">Auto</div>
+                        <div class="chip active" data-tone="spline">Balanced</div>
+                        <div class="chip" data-tone="bt.2446a">Standard</div>
+                        <div class="chip" data-tone="mobius">Soft</div>
+                        <div class="chip" data-tone="clip">Precise</div>
                     </div>
                 </div>
                 <div class="settings-row" style="margin-top: 12px;">
                     <div>
-                        <div class="settings-label-text">Dynamic Peak Luminance</div>
-                        <div class="settings-sublabel">Compute per-scene peak brightness to prevent highlight clipping</div>
+                        <div class="settings-label-text">Auto Brightness</div>
+                        <div class="settings-sublabel">Adjusts brightness per scene for better highlights</div>
                     </div>
                     <button class="desktop-switch active" id="btnToggleHdrPeak">
                         <div class="desktop-switch-thumb"></div>
@@ -875,9 +881,9 @@
             </div>
 
             <div class="settings-card">
-                <div class="settings-card-title">Banding Correction & Dithering</div>
+                <div class="settings-card-title">Gradient Smoothing</div>
                 <div class="settings-row-col">
-                    <span class="settings-label-text">Debanding Filter</span>
+                    <span class="settings-label-text">Fix Color Banding</span>
                     <div class="chip-row" id="debandChips" style="margin-top: 4px;">
                         <div class="chip active" data-deband="off">Off</div>
                         <div class="chip" data-deband="light">Light</div>
@@ -886,10 +892,10 @@
                     </div>
                 </div>
                 <div class="settings-row-col" style="margin-top: 12px;">
-                    <span class="settings-label-text">Dithering Engine</span>
+                    <span class="settings-label-text">Smoothing Method</span>
                     <div class="chip-row" id="ditherChips" style="margin-top: 4px;">
-                        <div class="chip active" data-dither="fruit">Fruit</div>
-                        <div class="chip" data-dither="ordered">Ordered</div>
+                        <div class="chip active" data-dither="fruit">Balanced (Default)</div>
+                        <div class="chip" data-dither="ordered">Uniform</div>
                         <div class="chip" data-dither="no">Off</div>
                     </div>
                 </div>
@@ -899,10 +905,10 @@
         <!-- Tab 2: Audio -->
         <div class="settings-tab-content" id="set-audio">
             <div class="settings-card">
-                <div class="settings-card-title">Volume & Dynamic Range</div>
+                <div class="settings-card-title">Volume & Loudness</div>
                 <div class="settings-row">
                     <div>
-                        <div class="settings-label-text">Volume Normalization</div>
+                        <div class="settings-label-text">Volume Leveling</div>
                         <div class="settings-sublabel">Boost quiet whispers and compress explosions</div>
                     </div>
                     <button class="desktop-switch" id="btnToggleAudioNorm">
@@ -910,11 +916,11 @@
                     </button>
                 </div>
                 <div class="settings-row-col" style="margin-top: 10px;">
-                    <span class="settings-label-text">Normalization Strength</span>
+                    <span class="settings-label-text">Leveling Strength</span>
                     <div class="chip-row" id="audioNormChips" style="margin-top: 4px;">
                         <div class="chip" data-val="Low">Low</div>
                         <div class="chip active" data-val="Medium">Medium</div>
-                        <div class="chip" data-val="Aggressive">Aggressive</div>
+                        <div class="chip" data-val="Aggressive">High</div>
                     </div>
                 </div>
                 <div class="settings-row" style="margin-top: 12px;">
@@ -929,9 +935,9 @@
             </div>
 
             <div class="settings-card">
-                <div class="settings-card-title">Equalizer & Surround</div>
+                <div class="settings-card-title">Sound Profile</div>
                 <div class="settings-row-col">
-                    <span class="settings-label-text">Equalizer Preset</span>
+                    <span class="settings-label-text">Sound Preset</span>
                     <div class="chip-row" id="audioEqChips" style="margin-top: 4px;">
                         <div class="chip active" data-val="Flat">Flat</div>
                         <div class="chip" data-val="Bass Boost">Bass</div>
@@ -941,7 +947,7 @@
                 </div>
                 <div class="settings-row" style="margin-top: 12px;">
                     <div>
-                        <div class="settings-label-text">Spatial Audio (3D)</div>
+                        <div class="settings-label-text">Surround Sound Effect</div>
                         <div class="settings-sublabel">Virtual surround sound for stereo headphones</div>
                     </div>
                     <button class="desktop-switch" id="btnToggleAudioSpatial">
@@ -961,7 +967,7 @@
         <!-- Tab 3: Shaders -->
         <div class="settings-tab-content" id="set-shaders">
             <div class="settings-card">
-                <div class="settings-card-title">Custom GLSL Shaders</div>
+                <div class="settings-card-title">Custom Visual Filters</div>
                 <div id="shaderList" style="display: flex; flex-direction: column; gap: 4px; margin-top: 6px;">
                     <!-- Populated via JS -->
                 </div>
@@ -1002,6 +1008,45 @@
         </div>
 
         <button id="btnResetSpeed" class="speed-compact-reset-btn" title="Reset playback speed to 1.0x">Reset to Normal (1.0x)</button>
+    </div>
+</div>
+
+<!-- ── Aspect Ratio & Zoom Popover (Compact & Fast) ──────────────────── -->
+<div id="aspectPanel" class="panel speed-compact-popover">
+    <div class="speed-compact-header">
+        <span>Aspect & Zoom</span>
+        <button class="speed-compact-close" id="closeAspectBtn" title="Close (Esc)">✕</button>
+    </div>
+    <div class="speed-compact-body">
+        <div class="speed-compact-val" id="aspectHeroDisplay" title="Click to reset to Fit">Fit (Original)</div>
+        
+        <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; color: rgba(255,255,255,0.45); font-weight: 600; margin-top: 2px;">Aspect Ratio</div>
+        <div class="speed-compact-pills-row" id="aspectPillsRow" style="gap: 4px;">
+            <button class="speed-compact-pill active" data-aspect="original">Fit</button>
+            <button class="speed-compact-pill" data-aspect="fill">Fill</button>
+            <button class="speed-compact-pill" data-aspect="stretch">Stretch</button>
+            <button class="speed-compact-pill" data-aspect="16:9">16:9</button>
+            <button class="speed-compact-pill" data-aspect="4:3">4:3</button>
+        </div>
+
+        <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; color: rgba(255,255,255,0.45); font-weight: 600; margin-top: 6px;">Zoom Level</div>
+        <div class="speed-compact-slider-row">
+            <button id="zoomDecBtn" class="speed-compact-step-btn" title="Decrease (−0.1x)">−</button>
+            <div class="speed-compact-slider-wrap">
+                <input type="range" class="speed-compact-slider" id="popoverZoomSlider" min="0" max="3" step="0.1" value="0">
+            </div>
+            <button id="zoomIncBtn" class="speed-compact-step-btn" title="Increase (+0.1x)">+</button>
+        </div>
+
+        <div class="speed-compact-pills-row" id="zoomPillsRow" style="gap: 4px;">
+            <button class="speed-compact-pill active" data-zoom="0">1.0x</button>
+            <button class="speed-compact-pill" data-zoom="0.25">1.25x</button>
+            <button class="speed-compact-pill" data-zoom="0.5">1.5x</button>
+            <button class="speed-compact-pill" data-zoom="1.0">2.0x</button>
+            <button class="speed-compact-pill" data-zoom="2.0">3.0x</button>
+        </div>
+
+        <button id="btnResetAspectZoom" class="speed-compact-reset-btn" title="Reset to Original Fit">Reset to Normal (Fit)</button>
     </div>
 </div>
 
@@ -1095,7 +1140,7 @@
 
 
     <!-- Top Bar Area -->
-    <div style="display: flex; justify-content: space-between; align-items: flex-start; width: 100%; pointer-events: none; z-index: var(--z-player-controls);">
+    <div class="top-scrim-bar" style="display: flex; justify-content: space-between; align-items: flex-start; width: 100%; pointer-events: none; z-index: var(--z-player-controls);">
         
         <div class="top-bar" style="pointer-events: auto;">
             <button class="back-btn" id="backBtn">
@@ -1207,7 +1252,16 @@
                 <div class="seek-fill" id="seekFill"></div>
                 <div class="seek-chapters" id="seekChapters"></div>
                 <input type="range" id="seekBar" class="seek-slider" min="0" max="1000" value="0" step="0.1">
-                <div class="seek-tooltip" id="seekTooltip">0:00</div>
+                <div class="seek-tooltip" id="seekTooltip">
+                    <div class="seek-thumb-card" id="seekThumbCard" style="display: none;">
+                        <div class="seek-thumb-viewport" id="seekThumbViewport">
+                            <div id="seekThumbSkeleton" class="seek-thumb-skeleton"></div>
+                            <img id="seekThumbImg" class="seek-thumb-img" alt="">
+                            <div id="seekThumbSprite" class="seek-thumb-sprite"></div>
+                        </div>
+                    </div>
+                    <div class="seek-tooltip-time" id="seekTooltipTime">0:00</div>
+                </div>
             </div>
         </div>
 
@@ -1254,17 +1308,21 @@
                 <span id="timeDisplay" style="margin-left: 12px; font-variant-numeric: tabular-nums; font-weight: 500;">0:00 / 0:00</span>
             </div>
 
-            <!-- Center: Subtitle Clearance -->
-            <div class="ctrl-group center" id="bottomCenterGroup"></div>
-
-            <!-- Right: utility buttons (Episodes, PiP, Speed, Settings, Fullscreen) -->
-            <div class="ctrl-group right">
-                <div id="bottomUtilityGroup" class="ctrl-pill-group">
-                    <button id="episodesBtn" class="icon-btn hidden" title="Browse Episodes (Hotkey: E)">
-                        <svg viewBox="0 0 24 24" fill="currentColor">
+            <!-- Center: Episodes Navigation -->
+            <div class="ctrl-group center" id="bottomCenterGroup">
+                <button id="episodesBtn" class="ctrl-capsule-btn episodes-center-btn hidden" title="Browse Episodes (Hotkey: E)">
+                    <span class="capsule-icon">
+                        <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
                             <path d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H8V4h12v12z"/>
                         </svg>
-                    </button>
+                    </span>
+                    <span class="capsule-title">Episodes</span>
+                </button>
+            </div>
+
+            <!-- Right: utility buttons (PiP, Speed, Settings, Fullscreen) -->
+            <div class="ctrl-group right">
+                <div id="bottomUtilityGroup" class="ctrl-pill-group">
                     <button id="pipBtn" class="icon-btn" title="Picture-in-Picture (Hotkey: P)">
                         <svg viewBox="0 0 24 24" fill="currentColor">
                             <path d="M19 11h-8v6h8v-6zm4 8V4.98C23 3.88 22.1 3 21 3H3c-1.1 0-2 .88-2 1.98V19c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2zm-2 .02H3V4.97h18v14.05z"/>
@@ -1275,6 +1333,12 @@
                             <path d="M20.38 8.57l-1.23 1.85a8 8 0 0 1-.22 7.58H5.07A8 8 0 0 1 15.58 6.85l1.85-1.23A10 10 0 0 0 3.35 19a2 2 0 0 0 1.72 1h13.85a2 2 0 0 0 1.74-1 10 10 0 0 0-.28-10.43zM10.59 15.41a2 2 0 0 0 2.83 0l5.66-8.49-8.49 5.66a2 2 0 0 0 0 2.83z"/>
                         </svg>
                         <span id="speedBadge" class="speed-pill-badge" style="display: none;">1×</span>
+                    </button>
+                    <button id="aspectBtn" class="icon-btn aspect-btn" title="Aspect Ratio & Zoom">
+                        <svg viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M19 12h-2v3h-3v2h5v-5zM7 9h3V7H5v5h2V9zm14-6H3c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16.01H3V4.99h18v14.02z"/>
+                        </svg>
+                        <span id="aspectBadge" class="speed-pill-badge" style="display: none;">Fit</span>
                     </button>
                     <button id="settingsBtn" class="icon-btn" title="Playback Settings">
                         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
