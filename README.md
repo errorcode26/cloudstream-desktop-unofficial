@@ -1,8 +1,9 @@
-# CloudStream Desktop
+# CloudStream Desktop Unofficial
 
 [![Discord](https://img.shields.io/badge/Discord-Join%20Community-5865F2?logo=discord&logoColor=white)](https://discord.gg/cgy9GZcdAH)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
-[![Platform](https://img.shields.io/badge/Platform-Windows%2010%2F11-0078D4?logo=windows&logoColor=white)](https://github.com/errorcode26/CS3-desktop-client-unofficial/releases)
+[![Platform](https://img.shields.io/badge/Platform-Windows%2010%2F11-0078D4?logo=windows&logoColor=white)](https://github.com/errorcode26/cloudstream-desktop-unofficial/releases)
+[![Unofficial](https://img.shields.io/badge/Status-Unofficial%20Fork-orange)](https://github.com/errorcode26/cloudstream-desktop-unofficial)
 
 A dedicated, unaffiliated desktop-native fork (Windows only) of the original [CloudStream-3](https://github.com/Lagradost/CloudStream-3) project. Built with **Compose Multiplatform** and native **MPV**, featuring a dual runtime architecture that supports both Android **CloudStream extensions** (executed on a desktop JVM without emulators) and native **Stremio addons**.
 
@@ -18,7 +19,7 @@ A dedicated, unaffiliated desktop-native fork (Windows only) of the original [Cl
 
 ## Install (Windows)
 
-Download the latest release from the [**Releases Page**](https://github.com/errorcode26/CS3-desktop-client-unofficial/releases).
+Download the latest release from the [**Releases Page**](https://github.com/errorcode26/cloudstream-desktop-unofficial/releases).
 
 | Package | Description |
 | :--- | :--- |
@@ -35,7 +36,7 @@ Download the latest release from the [**Releases Page**](https://github.com/erro
 
 Before opening an issue:
 
-1. Check if the issue already exists in [Issues](https://github.com/errorcode26/CS3-desktop-client-unofficial/issues).
+1. Check if the issue already exists in [Issues](https://github.com/errorcode26/cloudstream-desktop-unofficial/issues).
 2. Reproduce with the latest release if possible.
 3. Open a new issue and include:
    - App version (shown in Settings)
@@ -74,8 +75,8 @@ There is no formal contributor agreement. All contributions fall under the proje
 ### 1. Clone with Submodules
 
 ```bash
-git clone --recursive https://github.com/errorcode26/CS3-desktop-client-unofficial.git
-cd CS3-desktop-client-unofficial
+git clone --recursive https://github.com/errorcode26/cloudstream-desktop-unofficial.git
+cd cloudstream-desktop-unofficial
 ```
 
 ### 2. Download MPV Core
@@ -177,4 +178,4 @@ Full credit, recognition, and deep gratitude go to the original creators and con
 
 ### Forks & References
 
-This repository is open source under GPLv3. Forks and derivative works must comply with GPLv3 terms. If you use this project as a reference, base, or starting point — even partially — a credit back to [`errorcode26/CS3-desktop-client-unofficial`](https://github.com/errorcode26/CS3-desktop-client-unofficial) is appreciated. It takes minimal effort and means a lot to the people who built this.
+This repository is open source under GPLv3. Forks and derivative works must comply with GPLv3 terms. If you use this project as a reference, base, or starting point — even partially — a credit back to [`errorcode26/cloudstream-desktop-unofficial`](https://github.com/errorcode26/cloudstream-desktop-unofficial) is appreciated. It takes minimal effort and means a lot to the people who built this.
