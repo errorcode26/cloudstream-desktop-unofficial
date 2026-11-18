@@ -150,8 +150,11 @@ fun SettingsTypographyScreen() {
                                 IconButton(
                                     onClick = {
                                         coroutineScope.launch(Dispatchers.IO) {
-                                            CustomFontManager.deleteFont(fontName)
-                                            if (selectedFont == fontName) AppearanceConfig.setSelectedFont("Inter")
+                                            if (selectedFont == fontName) {
+                                                AppearanceConfig.setSelectedFont("Plus Jakarta Sans")
+                                            }
+                                            val success = CustomFontManager.deleteFont(fontName)
+                                            fontInstallFeedback = if (success) "Removed font: $fontName" else "Could not delete font file (in use)"
                                         }
                                     },
                                 ) {

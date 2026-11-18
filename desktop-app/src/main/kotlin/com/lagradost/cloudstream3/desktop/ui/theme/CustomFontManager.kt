@@ -113,7 +113,7 @@ object CustomFontManager {
                 fontFileCache[file.nameWithoutExtension.lowercase()] = file
             } else {
                 try {
-                    val family = java.awt.Font.createFont(java.awt.Font.TRUETYPE_FONT, file).family
+                    val family = file.inputStream().use { java.awt.Font.createFont(java.awt.Font.TRUETYPE_FONT, it).family }
                     fontFileCache[family.lowercase()] = file
                     fontFileCache[file.name.lowercase()] = file
                     fontFileCache[file.nameWithoutExtension.lowercase()] = file
@@ -205,7 +205,7 @@ object CustomFontManager {
         val sb = StringBuilder()
         for (file in files) {
             val family = BUNDLED_FONT_MAP[file.name.lowercase()] ?: try {
-                java.awt.Font.createFont(java.awt.Font.TRUETYPE_FONT, file).family
+                file.inputStream().use { java.awt.Font.createFont(java.awt.Font.TRUETYPE_FONT, it).family }
             } catch (e: Exception) {
                 file.nameWithoutExtension
             }
@@ -243,7 +243,7 @@ object CustomFontManager {
 
             // Extract family name
             val familyName = try {
-                java.awt.Font.createFont(java.awt.Font.TRUETYPE_FONT, targetFile).family
+                targetFile.inputStream().use { java.awt.Font.createFont(java.awt.Font.TRUETYPE_FONT, it).family }
             } catch (e: Exception) {
                 targetFile.nameWithoutExtension
             }
@@ -259,8 +259,17 @@ object CustomFontManager {
     fun deleteFont(fontName: String): Boolean {
         if (fontName in BUILT_IN_FONTS) return false
         val file = getFontFile(fontName) ?: return false
-        val deleted = file.delete()
+        fontFileCache.remove(fontName.lowercase())
+        fontFileCache.remove(file.name.lowercase())
+        fontFileCache.remove(file.nameWithoutExtension.lowercase())
+        val deleted = try {
+            java.nio.file.Files.deleteIfExists(file.toPath())
+        } catch (e: Exception) {
+            com.lagradost.common.logging.AppLogger.e("CustomFontManager: Failed to delete font file ${file.name}", e)
+            file.delete().also { if (!it) file.deleteOnExit() }
+        }
         refreshCache()
+        invalidateCustomFontFamily(fontName)
         return deleted
     }
 
