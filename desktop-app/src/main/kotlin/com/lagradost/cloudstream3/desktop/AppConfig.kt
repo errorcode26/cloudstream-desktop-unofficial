@@ -16,5 +16,5 @@ object AppConfig {
         }
     }
 
-    const val GITHUB_REPO = "errorcode26/CS3-desktop-client-unofficial"
+    const val GITHUB_REPO = "errorcode26/cloudstream-desktop-unofficial"
 }

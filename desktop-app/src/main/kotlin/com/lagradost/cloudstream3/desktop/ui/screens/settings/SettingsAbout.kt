@@ -123,7 +123,7 @@ fun SettingsAbout() {
             SettingsNavigationItem(
                 label = "Desktop Source Code",
                 subtitle = "View repository, report desktop issues, and inspect release builds.",
-                onClick = { openUrl("https://github.com/errorcode26/CS3-desktop-client-unofficial") },
+                onClick = { openUrl("https://github.com/${AppConfig.GITHUB_REPO}") },
             )
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
             SettingsNavigationItem(
