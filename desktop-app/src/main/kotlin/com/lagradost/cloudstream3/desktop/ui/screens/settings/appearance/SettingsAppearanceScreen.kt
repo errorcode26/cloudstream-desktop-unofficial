@@ -77,7 +77,7 @@ fun SettingsAppearanceScreen(onNavigateToSubScreen: (SettingsSubScreen) -> Unit 
         SettingsHubCard(
             icon = Icons.Default.Dashboard,
             title = "Posters & Cards",
-            subtitle = "Clean mode, provider badges, title auto-cleaning, quality tags, card shadows, and Poster Workshop Studio.",
+            subtitle = "Clean mode, provider badges, title auto-cleaning, quality tags, card shadows, and Poster Studio.",
             badge = providerBadgeDisplayMode.label,
             onClick = { onNavigateToSubScreen(SettingsSubScreen.APPEARANCE_POSTERS_BADGES) },
         )
