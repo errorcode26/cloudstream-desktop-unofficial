@@ -128,7 +128,7 @@ fun SettingsPostersBadgesScreen(onNavigateToSubScreen: (SettingsSubScreen) -> Un
             }
         }
 
-        // Poster Workshop Studio Quick Launcher Card (Direct Top Placement)
+        // Poster Studio quick launcher card
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
@@ -163,13 +163,13 @@ fun SettingsPostersBadgesScreen(onNavigateToSubScreen: (SettingsSubScreen) -> Un
                     }
                     Column {
                         Text(
-                            text = "Poster Workshop Studio (Live Preview)",
+                            text = "Poster Studio",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface,
                         )
                         Text(
-                            text = "Adjust card dimensions, corner radius, and spacing with live movie rows in real time",
+                            text = "Design poster sizing, spacing, typography, and badges with a live preview",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -339,47 +339,6 @@ fun SettingsPostersBadgesScreen(onNavigateToSubScreen: (SettingsSubScreen) -> Un
                 checked = posterDepthEffectEnabled,
                 onCheckedChange = { AppearanceConfig.setPosterDepthEffectEnabled(it) },
             )
-        }
-
-        // ── Poster Workshop Studio shortcut ───────────────────────────────
-        Surface(
-            onClick = { onNavigateToSubScreen(SettingsSubScreen.POSTER_EDITOR) },
-            shape = androidx.compose.foundation.shape.RoundedCornerShape(14.dp),
-            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.22f)),
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(14.dp),
-            ) {
-                Icon(
-                    Icons.Default.AutoAwesome,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(22.dp),
-                )
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        "Open Poster Workshop Studio",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                    Text(
-                        "Interactive live preview canvas — drag sliders and see card changes in real time",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                Icon(
-                    Icons.Default.Tune,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                    modifier = Modifier.size(16.dp),
-                )
-            }
         }
     }
 }

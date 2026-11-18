@@ -73,7 +73,7 @@ enum class SettingsSubScreen(val title: String) {
     APPEARANCE_HOME_FEED("Home Screen"),
     EXPLORE_CATALOGS("Explore & Catalog Shelves"),
     DETAILS_LAYOUT("Details Page Layout & Sections"),
-    POSTER_EDITOR("Poster Workshop Studio"),
+    POSTER_EDITOR("Poster Studio"),
     PLAYER_RENDERING_ENGINE("Video & Hardware Engine"),
     PLAYER_AUDIO_EQ("Audio Processing & Equalizer"),
     PLAYER_AUTOPLAY_SKIP("Auto-Play & Skip Automation"),

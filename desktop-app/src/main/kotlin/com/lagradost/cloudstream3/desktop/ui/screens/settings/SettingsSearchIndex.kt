@@ -26,7 +26,7 @@ object SettingsSearchIndex {
         SettingsSearchEntry("Continue Watching Card Style", LeafTab.APPEARANCE, listOf("continue watching", "style", "wide", "classic", "thumbnail", "card"), uiLabel = "Continue Watching Card Style", subScreen = SettingsSubScreen.APPEARANCE_POSTERS_BADGES),
         SettingsSearchEntry("UI Element Drop Shadows", LeafTab.APPEARANCE, listOf("shadow", "drop shadow", "depth", "elevation", "cards"), uiLabel = "UI Element Drop Shadows", subScreen = SettingsSubScreen.APPEARANCE_POSTERS_BADGES),
         SettingsSearchEntry("Text Legibility Shadows", LeafTab.APPEARANCE, listOf("text shadow", "legibility", "readability", "titles"), uiLabel = "Text Legibility Shadows", subScreen = SettingsSubScreen.APPEARANCE_POSTERS_BADGES),
-        SettingsSearchEntry("Poster Visual Editor", LeafTab.APPEARANCE, listOf("poster", "editor", "preview", "customize", "width", "spacing", "rounding", "workshop"), uiLabel = "Poster Visual Editor", subScreen = SettingsSubScreen.POSTER_EDITOR),
+        SettingsSearchEntry("Poster Studio", LeafTab.APPEARANCE, listOf("poster", "studio", "editor", "preview", "customize", "width", "spacing", "rounding", "workshop"), uiLabel = "Poster Studio", subScreen = SettingsSubScreen.POSTER_EDITOR),
 
         SettingsSearchEntry("Accent Color", LeafTab.APPEARANCE, listOf("accent", "theme", "color", "purple", "blue", "green", "red", "orange", "hex", "custom"), uiLabel = "Theme & Colors", subScreen = SettingsSubScreen.APPEARANCE_THEME_WALLPAPER),
         SettingsSearchEntry("Light Theme", LeafTab.APPEARANCE, listOf("light", "white", "day", "bright", "theme", "mode"), uiLabel = "Light Theme", subScreen = SettingsSubScreen.APPEARANCE_THEME_WALLPAPER),

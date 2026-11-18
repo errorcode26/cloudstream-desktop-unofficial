@@ -8,16 +8,22 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.lagradost.cloudstream3.MainAPI
+import com.lagradost.cloudstream3.SearchResponse
 import com.lagradost.cloudstream3.desktop.ui.badges.CardMetadataConfig
 import com.lagradost.cloudstream3.desktop.ui.components.CategoryRowWithHeader
 import com.lagradost.cloudstream3.desktop.ui.components.LocalDesktopTheme
@@ -31,13 +37,21 @@ import com.lagradost.cloudstream3.desktop.ui.theme.PosterMetadataPosition
 import com.lagradost.cloudstream3.desktop.ui.theme.PosterTextAlignment
 import com.lagradost.cloudstream3.desktop.ui.theme.PosterTitlePosition
 import com.lagradost.cloudstream3.desktop.ui.theme.ProviderBadgeDisplayMode
+import com.lagradost.common.storage.WatchHistory
+import kotlin.math.roundToInt
 
+/**
+ * Poster Studio: a persistent split-pane editor with grouped controls on the left and a live
+ * preview of the home shelves on the right. Every change is applied and persisted immediately.
+ */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SettingsPosterEditorScreen(
     onBack: () -> Unit = {},
     viewModel: PosterEditorViewModel = remember { PosterEditorViewModel() },
 ) {
     val theme = LocalDesktopTheme.current
+
     val posterWidthDp by AppearanceConfig.posterWidthDp.collectAsState()
     val homeSpacingDp by AppearanceConfig.homeSpacingDp.collectAsState()
     val homeVerticalSpacingDp by AppearanceConfig.homeVerticalSpacingDp.collectAsState()
@@ -55,76 +69,556 @@ fun SettingsPosterEditorScreen(
     val autoDetectQuality by CardMetadataConfig.autoDetectQuality.collectAsState()
     val showRatingBadges by CardMetadataConfig.showRatingBadges.collectAsState()
 
-    var isInspectorOpen by remember { mutableStateOf(false) }
-    var activeControlTab by remember { mutableStateOf(0) }
-
     val uiState by viewModel.uiState.collectAsState()
-    val liveMovies = uiState.liveMovies
-    val liveSeries = uiState.liveSeries
-    val activeProvider = uiState.activeProvider
-    val displayHistory = uiState.displayHistory
+    var showResetDialog by remember { mutableStateOf(false) }
 
-    val currentSpacing = homeSpacingDp.dp
-    val currentWidth = posterWidthDp.dp
-    val currentVerticalSpacing = homeVerticalSpacingDp.dp
+    val cinematicPresetSelected = posterTextAlignment == PosterTextAlignment.LEFT &&
+        posterMetadataPosition == PosterMetadataPosition.BELOW_POSTER &&
+        posterTitlePosition == PosterTitlePosition.BELOW &&
+        posterTitleMaxLines == 2 &&
+        posterRoundingDp == 10 &&
+        autoCleanTitles
+    val centeredPresetSelected = posterTextAlignment == PosterTextAlignment.CENTER &&
+        posterMetadataPosition == PosterMetadataPosition.BELOW_POSTER &&
+        posterTitlePosition == PosterTitlePosition.BELOW
+    val onPosterPresetSelected = posterMetadataPosition == PosterMetadataPosition.ON_POSTER
+    val compactPresetSelected = posterTextAlignment == PosterTextAlignment.LEFT &&
+        posterMetadataPosition == PosterMetadataPosition.BELOW_POSTER &&
+        posterTitlePosition == PosterTitlePosition.BELOW &&
+        posterTitleMaxLines == 1 &&
+        posterWidthDp == 135
 
-    val dockPosition by AppearanceConfig.dockPosition.collectAsState()
-    val paddingStart = 16.dp
-    val paddingEnd = 16.dp
+    fun applyCinematicPreset() {
+        AppearanceConfig.setPosterTextAlignment(PosterTextAlignment.LEFT)
+        AppearanceConfig.setPosterMetadataPosition(PosterMetadataPosition.BELOW_POSTER)
+        AppearanceConfig.setPosterTitlePosition(PosterTitlePosition.BELOW)
+        AppearanceConfig.setPosterTitleMaxLines(2)
+        AppearanceConfig.setPosterRoundingDp(10)
+        CardMetadataConfig.setAutoCleanTitles(true)
+    }
+
+    fun applyCenteredPreset() {
+        AppearanceConfig.setPosterTextAlignment(PosterTextAlignment.CENTER)
+        AppearanceConfig.setPosterMetadataPosition(PosterMetadataPosition.BELOW_POSTER)
+        AppearanceConfig.setPosterTitlePosition(PosterTitlePosition.BELOW)
+    }
+
+    fun applyOnPosterPreset() {
+        AppearanceConfig.setPosterMetadataPosition(PosterMetadataPosition.ON_POSTER)
+        AppearanceConfig.setPosterTitlePosition(PosterTitlePosition.BELOW)
+    }
+
+    fun applyCompactPreset() {
+        AppearanceConfig.setPosterTextAlignment(PosterTextAlignment.LEFT)
+        AppearanceConfig.setPosterTitleMaxLines(1)
+        AppearanceConfig.setPosterMetadataPosition(PosterMetadataPosition.BELOW_POSTER)
+        AppearanceConfig.setPosterTitlePosition(PosterTitlePosition.BELOW)
+        AppearanceConfig.setPosterWidthDp(135)
+    }
+
+    fun applyDefaults() {
+        AppearanceConfig.setPosterWidthDp(160)
+        AppearanceConfig.setHomeSpacingDp(12)
+        AppearanceConfig.setHomeVerticalSpacingDp(16)
+        AppearanceConfig.setPosterRoundingDp(12)
+        AppearanceConfig.setPosterTitlePosition(PosterTitlePosition.BELOW)
+        AppearanceConfig.setPosterMetadataPosition(PosterMetadataPosition.BELOW_POSTER)
+        AppearanceConfig.setPosterTextAlignment(PosterTextAlignment.LEFT)
+        AppearanceConfig.setPosterTitleMaxLines(2)
+        AppearanceConfig.setContinueWatchingStyle(ContinueWatchingStyle.PREMIUM)
+        AppearanceConfig.setProviderBadgeDisplayMode(ProviderBadgeDisplayMode.HIDDEN)
+        AppearanceConfig.setPosterHoverGlowEnabled(true)
+        CardMetadataConfig.setAutoCleanTitles(true)
+        CardMetadataConfig.setAutoDetectSubDub(true)
+        CardMetadataConfig.setAutoDetectQuality(true)
+        CardMetadataConfig.setShowRatingBadges(true)
+    }
 
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-        val availableWidth = this.maxWidth
-        val isCompact = availableWidth < 600.dp
-        val effectivePaddingStart = if (isCompact) 8.dp else paddingStart
-        val effectivePaddingEnd = if (isCompact) 8.dp else paddingEnd
-        val spacingDp = if (isCompact) 8.dp else currentSpacing
+        val panelWidth = if (maxWidth < 900.dp) 320.dp else 380.dp
+
+        Column(modifier = Modifier.fillMaxSize()) {
+            PosterStudioTopBar(
+                onBack = onBack,
+                onReset = { showResetDialog = true },
+            )
+            HorizontalDivider(color = theme.Divider.copy(alpha = 0.5f))
+
+            Row(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                Surface(
+                    modifier = Modifier.width(panelWidth).fillMaxHeight(),
+                    color = theme.SurfaceElevated.copy(alpha = 0.35f),
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .verticalScroll(rememberScrollState())
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(18.dp),
+                    ) {
+                        StudioSection(
+                            title = "Presets",
+                            subtitle = "Curated starting points. Fine-tune anything below.",
+                        ) {
+                            FlowRow(
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp),
+                            ) {
+                                StudioPresetChip("Cinematic", cinematicPresetSelected) { applyCinematicPreset() }
+                                StudioPresetChip("Centered", centeredPresetSelected) { applyCenteredPreset() }
+                                StudioPresetChip("Badges on Card", onPosterPresetSelected) { applyOnPosterPreset() }
+                                StudioPresetChip("Ultra Compact", compactPresetSelected) { applyCompactPreset() }
+                            }
+                        }
+
+                        StudioSection(
+                            title = "Layout & Sizing",
+                            subtitle = "Card dimensions and the gaps between them.",
+                        ) {
+                            StudioSliderControl(
+                                label = "Poster Width",
+                                valueText = "$posterWidthDp dp",
+                                value = posterWidthDp.toFloat(),
+                                valueRange = 100f..250f,
+                                step = 5f,
+                                onValueChange = { AppearanceConfig.setPosterWidthDp(it.roundToInt()) },
+                            )
+                            StudioDivider()
+                            StudioSliderControl(
+                                label = "Card Spacing",
+                                valueText = "$homeSpacingDp dp",
+                                value = homeSpacingDp.toFloat(),
+                                valueRange = 0f..32f,
+                                step = 2f,
+                                onValueChange = { AppearanceConfig.setHomeSpacingDp(it.roundToInt()) },
+                            )
+                            StudioDivider()
+                            StudioSliderControl(
+                                label = "Row Spacing",
+                                valueText = "$homeVerticalSpacingDp dp",
+                                value = homeVerticalSpacingDp.toFloat(),
+                                valueRange = 0f..64f,
+                                step = 4f,
+                                onValueChange = { AppearanceConfig.setHomeVerticalSpacingDp(it.roundToInt()) },
+                            )
+                            StudioDivider()
+                            StudioSliderControl(
+                                label = "Corner Radius",
+                                valueText = "$posterRoundingDp dp",
+                                value = posterRoundingDp.toFloat(),
+                                valueRange = 0f..24f,
+                                step = 2f,
+                                onValueChange = { AppearanceConfig.setPosterRoundingDp(it.roundToInt()) },
+                            )
+                        }
+
+                        StudioSection(
+                            title = "Typography & Placement",
+                            subtitle = "Where titles and metadata sit on each card.",
+                        ) {
+                            StudioChoiceControl(
+                                label = "Title Position",
+                                options = listOf(
+                                    PosterTitlePosition.BELOW to "Below",
+                                    PosterTitlePosition.INSIDE to "On hover",
+                                    PosterTitlePosition.HIDDEN to "Hidden",
+                                ),
+                                selected = posterTitlePosition,
+                                onSelect = { AppearanceConfig.setPosterTitlePosition(it) },
+                            )
+                            StudioDivider()
+                            StudioChoiceControl(
+                                label = "Metadata Position",
+                                options = listOf(
+                                    PosterMetadataPosition.BELOW_POSTER to "Below",
+                                    PosterMetadataPosition.ON_POSTER to "On card",
+                                    PosterMetadataPosition.HYBRID to "Hybrid",
+                                    PosterMetadataPosition.STEALTH_HOVER to "Hover",
+                                ),
+                                selected = posterMetadataPosition,
+                                onSelect = { AppearanceConfig.setPosterMetadataPosition(it) },
+                            )
+                            StudioDivider()
+                            StudioChoiceControl(
+                                label = "Alignment",
+                                options = listOf(
+                                    PosterTextAlignment.LEFT to "Left",
+                                    PosterTextAlignment.CENTER to "Center",
+                                ),
+                                selected = posterTextAlignment,
+                                onSelect = { AppearanceConfig.setPosterTextAlignment(it) },
+                            )
+                            StudioDivider()
+                            StudioChoiceControl(
+                                label = "Title Lines",
+                                options = listOf(
+                                    1 to "1 line",
+                                    2 to "2 lines",
+                                    3 to "3 lines",
+                                ),
+                                selected = posterTitleMaxLines,
+                                onSelect = { AppearanceConfig.setPosterTitleMaxLines(it) },
+                            )
+                        }
+
+                        StudioSection(
+                            title = "Continue Watching",
+                            subtitle = "Choose the shelf style used on the home screen.",
+                        ) {
+                            StudioChoiceControl(
+                                label = "Shelf Style",
+                                options = listOf(
+                                    ContinueWatchingStyle.PREMIUM to "Wide",
+                                    ContinueWatchingStyle.DETAILED to "Detailed",
+                                    ContinueWatchingStyle.THUMBNAIL to "Classic",
+                                ),
+                                selected = continueWatchingStyle,
+                                onSelect = { AppearanceConfig.setContinueWatchingStyle(it) },
+                            )
+                        }
+
+                        StudioSection(
+                            title = "Badges & Metadata",
+                            subtitle = "Control which tags and labels appear on cards.",
+                        ) {
+                            StudioToggleControl(
+                                label = "Clean Titles",
+                                subtitle = "Strips release tags and codec noise from titles",
+                                checked = autoCleanTitles,
+                                onCheckedChange = { CardMetadataConfig.setAutoCleanTitles(it) },
+                            )
+                            StudioDivider()
+                            StudioToggleControl(
+                                label = "Rating Badges",
+                                subtitle = "Shows the score pill when a rating is available",
+                                checked = showRatingBadges,
+                                onCheckedChange = { CardMetadataConfig.setShowRatingBadges(it) },
+                            )
+                            StudioDivider()
+                            StudioToggleControl(
+                                label = "Quality Badges",
+                                subtitle = "Displays resolution tags such as 4K and 1080p",
+                                checked = autoDetectQuality,
+                                onCheckedChange = { CardMetadataConfig.setAutoDetectQuality(it) },
+                            )
+                            StudioDivider()
+                            StudioToggleControl(
+                                label = "SUB / DUB Badges",
+                                subtitle = "Flags subtitle and dubbed audio tracks",
+                                checked = autoDetectSubDub,
+                                onCheckedChange = { CardMetadataConfig.setAutoDetectSubDub(it) },
+                            )
+                            StudioDivider()
+                            StudioChoiceControl(
+                                label = "Provider Badges",
+                                options = listOf(
+                                    ProviderBadgeDisplayMode.HIDDEN to "Hidden",
+                                    ProviderBadgeDisplayMode.ICON_ONLY to "Icon only",
+                                    ProviderBadgeDisplayMode.FULL_BADGE to "Full",
+                                ),
+                                selected = providerBadgeDisplayMode,
+                                onSelect = { AppearanceConfig.setProviderBadgeDisplayMode(it) },
+                            )
+                        }
+
+                        StudioSection(
+                            title = "Card Effects",
+                            subtitle = "Subtle depth and motion cues.",
+                        ) {
+                            StudioToggleControl(
+                                label = "Hover Glow",
+                                subtitle = "Ambient light beneath cards on hover",
+                                checked = posterHoverGlowEnabled,
+                                onCheckedChange = { AppearanceConfig.setPosterHoverGlowEnabled(it) },
+                            )
+                        }
+
+                        Text(
+                            text = "Changes apply instantly and are saved automatically.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = theme.TextMuted,
+                            modifier = Modifier.padding(top = 2.dp, bottom = 8.dp),
+                        )
+                    }
+                }
+
+                VerticalDivider(color = theme.Divider.copy(alpha = 0.5f))
+
+                Column(modifier = Modifier.weight(1f).fillMaxHeight()) {
+                    PreviewHeader(
+                        isLoading = uiState.isLoading,
+                        onRefresh = { viewModel.onEvent(PosterEditorUiEvent.RefreshPreviews) },
+                    )
+                    HorizontalDivider(color = theme.Divider.copy(alpha = 0.4f))
+                    PosterStudioPreview(
+                        movies = uiState.liveMovies,
+                        series = uiState.liveSeries,
+                        history = uiState.displayHistory,
+                        provider = uiState.activeProvider,
+                        posterWidth = posterWidthDp.dp,
+                        cardSpacing = homeSpacingDp.dp,
+                        rowSpacing = homeVerticalSpacingDp.dp,
+                        continueWatchingStyle = continueWatchingStyle,
+                        modifier = Modifier.weight(1f).fillMaxWidth(),
+                    )
+                }
+            }
+        }
+    }
+
+    if (showResetDialog) {
+        AlertDialog(
+            onDismissRequest = { showResetDialog = false },
+            icon = { Icon(Icons.Default.RestartAlt, contentDescription = null) },
+            title = { Text("Reset Poster Studio?") },
+            text = {
+                Text(
+                    "This restores poster size, spacing, typography, badge, and effect settings " +
+                        "to their defaults. Your library and watch history are not affected.",
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        applyDefaults()
+                        showResetDialog = false
+                    },
+                ) {
+                    Text("Reset defaults")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showResetDialog = false }) {
+                    Text("Cancel")
+                }
+            },
+        )
+    }
+}
+
+@Composable
+private fun PosterStudioTopBar(
+    onBack: () -> Unit,
+    onReset: () -> Unit,
+) {
+    val theme = LocalDesktopTheme.current
+
+    Surface(color = theme.SurfaceElevated.copy(alpha = 0.9f)) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            IconButton(onClick = onBack, modifier = Modifier.size(34.dp)) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Back to appearance settings",
+                    tint = theme.TextPrimary,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
+            Spacer(modifier = Modifier.width(6.dp))
+            Surface(
+                modifier = Modifier.size(36.dp),
+                shape = RoundedCornerShape(10.dp),
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f),
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Default.Palette,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(19.dp),
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.width(10.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text(
+                        text = "Poster Studio",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = theme.TextPrimary,
+                    )
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                    ) {
+                        Text(
+                            text = "Live",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                        )
+                    }
+                }
+                Text(
+                    text = "Design poster cards, badges, and home shelves with a real-time preview.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = theme.TextMuted,
+                )
+            }
+            Spacer(modifier = Modifier.width(12.dp))
+            OutlinedButton(
+                onClick = onReset,
+                shape = RoundedCornerShape(10.dp),
+                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Default.RestartAlt,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("Reset", style = MaterialTheme.typography.labelMedium)
+            }
+        }
+    }
+}
+
+@Composable
+private fun PreviewHeader(
+    isLoading: Boolean,
+    onRefresh: () -> Unit,
+) {
+    val theme = LocalDesktopTheme.current
+
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    text = "Live Preview",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = theme.TextPrimary,
+                )
+                Surface(
+                    shape = RoundedCornerShape(6.dp),
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                ) {
+                    Text(
+                        text = "Updates live",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                    )
+                }
+            }
+            Text(
+                text = "Adjust any control and watch the shelves respond instantly.",
+                style = MaterialTheme.typography.bodySmall,
+                color = theme.TextMuted,
+            )
+        }
+        if (isLoading) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(16.dp),
+                strokeWidth = 2.dp,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+        }
+        IconButton(onClick = onRefresh, modifier = Modifier.size(32.dp)) {
+            Icon(
+                imageVector = Icons.Default.Refresh,
+                contentDescription = "Reload preview content",
+                tint = theme.TextMuted,
+                modifier = Modifier.size(18.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun PosterStudioPreview(
+    movies: List<SearchResponse>,
+    series: List<SearchResponse>,
+    history: List<WatchHistory>,
+    provider: MainAPI?,
+    posterWidth: Dp,
+    cardSpacing: Dp,
+    rowSpacing: Dp,
+    continueWatchingStyle: ContinueWatchingStyle,
+    modifier: Modifier = Modifier,
+) {
+    BoxWithConstraints(modifier = modifier) {
+        val isCompact = maxWidth < 600.dp
+        val horizontalPadding = if (isCompact) 8.dp else 16.dp
+        val spacingDp = if (isCompact) 8.dp else cardSpacing
+        val effectiveRowSpacing = if (isCompact) 8.dp else rowSpacing
 
         val optimalItemWidth = if (isCompact) {
             115.dp
         } else {
-            val baseWidth = currentWidth
-            val netWidth = availableWidth - effectivePaddingStart - effectivePaddingEnd - 20.dp
-            val exactColumns = (netWidth + spacingDp) / (baseWidth + spacingDp)
+            val netWidth = maxWidth - horizontalPadding * 2 - 20.dp
+            val exactColumns = (netWidth + spacingDp) / (posterWidth + spacingDp)
             val columns = exactColumns.toInt().coerceAtLeast(1)
             ((netWidth + spacingDp) / columns) - spacingDp
         }
 
-        // 1. Full-Width Scrollable Canvas
+        if (history.isEmpty() && movies.isEmpty() && series.isEmpty()) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = "No preview content available",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Install a content provider or retry loading the preview.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            return@BoxWithConstraints
+        }
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(top = 70.dp, bottom = 48.dp)
-                .padding(start = effectivePaddingStart, end = effectivePaddingEnd),
-            verticalArrangement = Arrangement.spacedBy(currentVerticalSpacing),
+                .padding(horizontal = horizontalPadding, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(effectiveRowSpacing),
         ) {
-            // Row 1: Continue Watching Shelf
-            if (displayHistory.isNotEmpty()) {
+            if (history.isNotEmpty()) {
                 CategoryRowWithHeader(
                     title = "Continue Watching",
-                    itemCount = displayHistory.size,
+                    itemCount = history.size,
                     rowContentPadding = PaddingValues(
-                        horizontal = if (isCompact) 4.dp else 10.dp,
-                        vertical = if (isCompact) 4.dp else (4.dp + (homeVerticalSpacingDp * 0.25f).dp),
+                        horizontal = 10.dp,
+                        vertical = if (isCompact) 4.dp else (4.dp + (rowSpacing * 0.25f)),
                     ),
                     headerPadding = PaddingValues(
                         start = 10.dp,
                         end = 10.dp,
-                        top = (4.dp + (homeVerticalSpacingDp * 0.35f).dp),
+                        top = 4.dp + (rowSpacing * 0.35f),
                         bottom = 4.dp,
                     ),
                     itemSpacing = spacingDp,
                 ) {
-                    items(displayHistory.size) { index ->
-                        val history = displayHistory[index]
+                    items(history.size) { index ->
+                        val entry = history[index]
                         when (continueWatchingStyle) {
                             ContinueWatchingStyle.PREMIUM -> {
                                 val cardWidth = if (isCompact) 280.dp else 340.dp
                                 val cardHeight = if (isCompact) 125.dp else 140.dp
                                 WatchHistoryCardWide(
                                     modifier = Modifier.width(cardWidth).height(cardHeight),
-                                    history = history,
-                                    provider = activeProvider,
+                                    history = entry,
+                                    provider = provider,
                                     onRemove = {},
                                     onClick = {},
                                     onPlayClick = {},
@@ -135,8 +629,8 @@ fun SettingsPosterEditorScreen(
                                 val cardHeight = if (isCompact) 105.dp else 115.dp
                                 WatchHistoryCardDetailed(
                                     modifier = Modifier.width(cardWidth).height(cardHeight),
-                                    history = history,
-                                    provider = activeProvider,
+                                    history = entry,
+                                    provider = provider,
                                     onRemove = {},
                                     onClick = {},
                                     onPlayClick = {},
@@ -147,8 +641,8 @@ fun SettingsPosterEditorScreen(
                                 val cardHeight = cardWidth * 9f / 16f
                                 WatchHistoryCard(
                                     modifier = Modifier.width(cardWidth).height(cardHeight),
-                                    history = history,
-                                    provider = activeProvider,
+                                    history = entry,
+                                    provider = provider,
                                     onRemove = {},
                                     onClick = {},
                                     onPlayClick = {},
@@ -159,28 +653,27 @@ fun SettingsPosterEditorScreen(
                 }
             }
 
-            // Row 2: Trending / Popular Shelves
-            if (liveMovies.isNotEmpty()) {
+            if (movies.isNotEmpty()) {
                 CategoryRowWithHeader(
                     modifier = Modifier.fillMaxWidth(),
-                    title = if (activeProvider != null) "Featured from ${activeProvider.name}" else "Trending Content",
-                    itemCount = liveMovies.size,
+                    title = if (provider != null) "Featured from ${provider.name}" else "Trending Content",
+                    itemCount = movies.size,
                     rowContentPadding = PaddingValues(
-                        horizontal = if (isCompact) 4.dp else 10.dp,
-                        vertical = if (isCompact) 4.dp else (4.dp + (homeVerticalSpacingDp * 0.25f).dp),
+                        horizontal = 10.dp,
+                        vertical = if (isCompact) 4.dp else (4.dp + (rowSpacing * 0.25f)),
                     ),
                     headerPadding = PaddingValues(
                         start = 10.dp,
                         end = 10.dp,
-                        top = (4.dp + (homeVerticalSpacingDp * 0.35f).dp),
+                        top = 4.dp + (rowSpacing * 0.35f),
                         bottom = 4.dp,
                     ),
                     itemSpacing = spacingDp,
                 ) {
-                    items(liveMovies.size) { index ->
+                    items(movies.size) { index ->
                         PosterCard(
-                            item = liveMovies[index],
-                            provider = activeProvider,
+                            item = movies[index],
+                            provider = provider,
                             itemWidth = optimalItemWidth,
                             onClick = {},
                             onPlayClick = {},
@@ -189,688 +682,282 @@ fun SettingsPosterEditorScreen(
                 }
             }
 
-            if (liveSeries.isNotEmpty()) {
+            if (series.isNotEmpty()) {
                 CategoryRowWithHeader(
                     modifier = Modifier.fillMaxWidth(),
                     title = "Popular Series & Shows",
-                    itemCount = liveSeries.size,
+                    itemCount = series.size,
                     rowContentPadding = PaddingValues(
-                        horizontal = if (isCompact) 4.dp else 10.dp,
-                        vertical = if (isCompact) 4.dp else (4.dp + (homeVerticalSpacingDp * 0.25f).dp),
+                        horizontal = 10.dp,
+                        vertical = if (isCompact) 4.dp else (4.dp + (rowSpacing * 0.25f)),
                     ),
                     headerPadding = PaddingValues(
                         start = 10.dp,
                         end = 10.dp,
-                        top = (4.dp + (homeVerticalSpacingDp * 0.35f).dp),
+                        top = 4.dp + (rowSpacing * 0.35f),
                         bottom = 4.dp,
                     ),
                     itemSpacing = spacingDp,
                 ) {
-                    items(liveSeries.size) { index ->
+                    items(series.size) { index ->
                         PosterCard(
-                            item = liveSeries[index],
-                            provider = activeProvider,
+                            item = series[index],
+                            provider = provider,
                             itemWidth = optimalItemWidth,
                             onClick = {},
                             onPlayClick = {},
                         )
-                    }
-                }
-            }
-        }
-
-        // 2. Top Floating Glass Header (Presets & Fast Controls)
-        Surface(
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .padding(
-                    start = effectivePaddingStart + 10.dp,
-                    end = effectivePaddingEnd + 10.dp,
-                    top = 10.dp,
-                )
-                .fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            color = theme.SurfaceElevated.copy(alpha = 0.94f),
-            border = BorderStroke(1.dp, theme.Divider.copy(alpha = 0.6f)),
-            shadowElevation = 12.dp,
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 14.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Surface(
-                    shape = RoundedCornerShape(10.dp),
-                    color = theme.SurfaceCard.copy(alpha = 0.7f),
-                    border = BorderStroke(1.dp, theme.Divider.copy(alpha = 0.5f)),
-                    modifier = Modifier.clickable { onBack() },
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back",
-                            tint = theme.TextPrimary,
-                            modifier = Modifier.size(16.dp),
-                        )
-                        Text(
-                            "Back",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = theme.TextPrimary,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.width(14.dp))
-
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    Icon(
-                        Icons.Default.Palette,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(17.dp),
-                    )
-                    Text(
-                        "Poster Workshop Studio",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = theme.TextPrimary,
-                    )
-                    Surface(
-                        shape = RoundedCornerShape(6.dp),
-                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
-                    ) {
-                        Text(
-                            "Live",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                            fontWeight = FontWeight.Bold,
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.width(14.dp))
-                VerticalDivider(modifier = Modifier.height(20.dp), color = theme.Divider.copy(alpha = 0.4f))
-                Spacer(modifier = Modifier.width(12.dp))
-
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    FilterChip(
-                        selected = posterTextAlignment == PosterTextAlignment.LEFT &&
-                            posterMetadataPosition == PosterMetadataPosition.BELOW_POSTER &&
-                            posterTitleMaxLines == 2,
-                        onClick = {
-                            AppearanceConfig.setPosterTextAlignment(PosterTextAlignment.LEFT)
-                            AppearanceConfig.setPosterMetadataPosition(PosterMetadataPosition.BELOW_POSTER)
-                            AppearanceConfig.setPosterTitlePosition(PosterTitlePosition.BELOW)
-                            AppearanceConfig.setPosterTitleMaxLines(2)
-                            AppearanceConfig.setPosterRoundingDp(10)
-                            CardMetadataConfig.setAutoCleanTitles(true)
-                        },
-                        label = { Text("🍎 Infuse Clean", style = MaterialTheme.typography.labelSmall) },
-                        shape = RoundedCornerShape(8.dp),
-                    )
-
-                    FilterChip(
-                        selected = posterTextAlignment == PosterTextAlignment.CENTER &&
-                            posterMetadataPosition == PosterMetadataPosition.BELOW_POSTER,
-                        onClick = {
-                            AppearanceConfig.setPosterTextAlignment(PosterTextAlignment.CENTER)
-                            AppearanceConfig.setPosterMetadataPosition(PosterMetadataPosition.BELOW_POSTER)
-                            AppearanceConfig.setPosterTitlePosition(PosterTitlePosition.BELOW)
-                        },
-                        label = { Text("🎬 Centered", style = MaterialTheme.typography.labelSmall) },
-                        shape = RoundedCornerShape(8.dp),
-                    )
-
-                    FilterChip(
-                        selected = posterMetadataPosition == PosterMetadataPosition.ON_POSTER,
-                        onClick = {
-                            AppearanceConfig.setPosterMetadataPosition(PosterMetadataPosition.ON_POSTER)
-                            AppearanceConfig.setPosterTitlePosition(PosterTitlePosition.BELOW)
-                        },
-                        label = { Text("🏷️ On Poster", style = MaterialTheme.typography.labelSmall) },
-                        shape = RoundedCornerShape(8.dp),
-                    )
-
-                    FilterChip(
-                        selected = posterTitleMaxLines == 1 && posterTextAlignment == PosterTextAlignment.LEFT,
-                        onClick = {
-                            AppearanceConfig.setPosterTextAlignment(PosterTextAlignment.LEFT)
-                            AppearanceConfig.setPosterTitleMaxLines(1)
-                            AppearanceConfig.setPosterMetadataPosition(PosterMetadataPosition.BELOW_POSTER)
-                            AppearanceConfig.setPosterTitlePosition(PosterTitlePosition.BELOW)
-                            AppearanceConfig.setPosterWidthDp(135)
-                        },
-                        label = { Text("⚡ Ultra Compact", style = MaterialTheme.typography.labelSmall) },
-                        shape = RoundedCornerShape(8.dp),
-                    )
-                }
-
-                Spacer(modifier = Modifier.weight(1f))
-
-                FilterChip(
-                    selected = isInspectorOpen,
-                    onClick = { isInspectorOpen = !isInspectorOpen },
-                    leadingIcon = {
-                        Icon(Icons.Default.Tune, contentDescription = null, modifier = Modifier.size(15.dp))
-                    },
-                    label = {
-                        Text(
-                            if (isInspectorOpen) "Close Sliders" else "Fine-Tune Sliders",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                    },
-                    shape = RoundedCornerShape(8.dp),
-                )
-
-                Spacer(modifier = Modifier.width(8.dp))
-
-                TextButton(
-                    onClick = {
-                        AppearanceConfig.setPosterWidthDp(160)
-                        AppearanceConfig.setHomeSpacingDp(12)
-                        AppearanceConfig.setHomeVerticalSpacingDp(16)
-                        AppearanceConfig.setPosterRoundingDp(12)
-                        AppearanceConfig.setPosterTitlePosition(PosterTitlePosition.BELOW)
-                        AppearanceConfig.setPosterMetadataPosition(PosterMetadataPosition.BELOW_POSTER)
-                        AppearanceConfig.setPosterTextAlignment(PosterTextAlignment.LEFT)
-                        AppearanceConfig.setPosterTitleMaxLines(2)
-                        AppearanceConfig.setContinueWatchingStyle(ContinueWatchingStyle.PREMIUM)
-                        AppearanceConfig.setProviderBadgeDisplayMode(ProviderBadgeDisplayMode.HIDDEN)
-                        AppearanceConfig.setPosterHoverGlowEnabled(true)
-                        CardMetadataConfig.setAutoCleanTitles(true)
-                        CardMetadataConfig.setAutoDetectSubDub(true)
-                        CardMetadataConfig.setAutoDetectQuality(true)
-                        CardMetadataConfig.setShowRatingBadges(true)
-                    },
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                ) {
-                    Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(15.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Reset", style = MaterialTheme.typography.labelSmall)
-                }
-            }
-        }
-
-        // 3. Right Collapsible Inspector Drawer (Zero Poster Occlusion)
-        androidx.compose.animation.AnimatedVisibility(
-            visible = isInspectorOpen,
-            modifier = Modifier.align(Alignment.CenterEnd),
-            enter = androidx.compose.animation.slideInHorizontally { it } + androidx.compose.animation.fadeIn(),
-            exit = androidx.compose.animation.slideOutHorizontally { it } + androidx.compose.animation.fadeOut(),
-        ) {
-            Surface(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .width(380.dp)
-                    .padding(top = 70.dp, bottom = 14.dp, end = 14.dp),
-                shape = RoundedCornerShape(16.dp),
-                color = theme.SurfaceElevated,
-                border = BorderStroke(1.dp, theme.Divider.copy(alpha = 0.6f)),
-                shadowElevation = 16.dp,
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(16.dp),
-                ) {
-                    // Header of Inspector
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        ) {
-                            Icon(
-                                Icons.Default.Tune,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(16.dp),
-                            )
-                            Text(
-                                "Studio Inspector",
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = theme.TextPrimary,
-                            )
-                        }
-                        IconButton(
-                            onClick = { isInspectorOpen = false },
-                            modifier = Modifier.size(28.dp),
-                        ) {
-                            Icon(
-                                Icons.Default.Close,
-                                contentDescription = "Close Inspector",
-                                tint = theme.TextMuted,
-                                modifier = Modifier.size(16.dp),
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    // Segmented Tabs: Dimensions | Style | Badges
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    ) {
-                        FilterChip(
-                            selected = activeControlTab == 0,
-                            onClick = { activeControlTab = 0 },
-                            label = { Text("Sizes", style = MaterialTheme.typography.labelSmall) },
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier.weight(1f),
-                        )
-                        FilterChip(
-                            selected = activeControlTab == 1,
-                            onClick = { activeControlTab = 1 },
-                            label = { Text("Style", style = MaterialTheme.typography.labelSmall) },
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier.weight(1f),
-                        )
-                        FilterChip(
-                            selected = activeControlTab == 2,
-                            onClick = { activeControlTab = 2 },
-                            label = { Text("Badges", style = MaterialTheme.typography.labelSmall) },
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier.weight(1f),
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(10.dp))
-                    HorizontalDivider(color = theme.Divider.copy(alpha = 0.5f))
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    // Scrollable Inspector Body
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .verticalScroll(rememberScrollState()),
-                        verticalArrangement = Arrangement.spacedBy(16.dp),
-                    ) {
-                        when (activeControlTab) {
-                            0 -> {
-                                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                                    // Poster Width
-                                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                            Text("Poster Width", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = theme.TextPrimary)
-                                            Text("$posterWidthDp dp", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
-                                        }
-                                        Slider(
-                                            value = posterWidthDp.toFloat(),
-                                            onValueChange = { AppearanceConfig.setPosterWidthDp(it.toInt()) },
-                                            valueRange = 100f..250f,
-                                            steps = 29,
-                                        )
-                                    }
-
-                                    // Card Spacing
-                                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                            Text("Card Spacing", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = theme.TextPrimary)
-                                            Text("$homeSpacingDp dp", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
-                                        }
-                                        Slider(
-                                            value = homeSpacingDp.toFloat(),
-                                            onValueChange = { AppearanceConfig.setHomeSpacingDp(it.toInt()) },
-                                            valueRange = 0f..32f,
-                                            steps = 15,
-                                        )
-                                    }
-
-                                    // Row Spacing
-                                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                            Text("Row Spacing", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = theme.TextPrimary)
-                                            Text("$homeVerticalSpacingDp dp", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
-                                        }
-                                        Slider(
-                                            value = homeVerticalSpacingDp.toFloat(),
-                                            onValueChange = { AppearanceConfig.setHomeVerticalSpacingDp(it.toInt()) },
-                                            valueRange = 0f..64f,
-                                            steps = 31,
-                                        )
-                                    }
-
-                                    // Corner Radius
-                                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                            Text("Corner Radius", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = theme.TextPrimary)
-                                            Text("$posterRoundingDp dp", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
-                                        }
-                                        Slider(
-                                            value = posterRoundingDp.toFloat(),
-                                            onValueChange = { AppearanceConfig.setPosterRoundingDp(it.toInt()) },
-                                            valueRange = 0f..24f,
-                                            steps = 23,
-                                        )
-                                    }
-                                }
-                            }
-                            1 -> {
-                                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                                    // Poster Title Position
-                                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                        Text("Poster Title Position", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = theme.TextPrimary)
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                        ) {
-                                            listOf(
-                                                PosterTitlePosition.BELOW to "Below",
-                                                PosterTitlePosition.INSIDE to "Hover",
-                                                PosterTitlePosition.HIDDEN to "Hidden",
-                                            ).forEach { (pos, label) ->
-                                                FilterChip(
-                                                    selected = posterTitlePosition == pos,
-                                                    onClick = { AppearanceConfig.setPosterTitlePosition(pos) },
-                                                    label = {
-                                                        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                                                            Text(label, style = MaterialTheme.typography.labelSmall)
-                                                        }
-                                                    },
-                                                    shape = RoundedCornerShape(8.dp),
-                                                    modifier = Modifier.weight(1f),
-                                                )
-                                            }
-                                        }
-                                    }
-
-                                    // Poster Metadata Position
-                                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                        Text("Poster Metadata Position", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = theme.TextPrimary)
-                                        val metaPositions = listOf(
-                                            PosterMetadataPosition.BELOW_POSTER to "Below",
-                                            PosterMetadataPosition.ON_POSTER to "On Card",
-                                            PosterMetadataPosition.HYBRID to "Hybrid",
-                                            PosterMetadataPosition.STEALTH_HOVER to "Hover",
-                                        )
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                        ) {
-                                            metaPositions.take(2).forEach { (pos, label) ->
-                                                FilterChip(
-                                                    selected = posterMetadataPosition == pos,
-                                                    onClick = { AppearanceConfig.setPosterMetadataPosition(pos) },
-                                                    label = {
-                                                        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                                                            Text(label, style = MaterialTheme.typography.labelSmall)
-                                                        }
-                                                    },
-                                                    shape = RoundedCornerShape(8.dp),
-                                                    modifier = Modifier.weight(1f),
-                                                )
-                                            }
-                                        }
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                        ) {
-                                            metaPositions.drop(2).forEach { (pos, label) ->
-                                                FilterChip(
-                                                    selected = posterMetadataPosition == pos,
-                                                    onClick = { AppearanceConfig.setPosterMetadataPosition(pos) },
-                                                    label = {
-                                                        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                                                            Text(label, style = MaterialTheme.typography.labelSmall)
-                                                        }
-                                                    },
-                                                    shape = RoundedCornerShape(8.dp),
-                                                    modifier = Modifier.weight(1f),
-                                                )
-                                            }
-                                        }
-                                    }
-
-                                    // Poster Text Alignment
-                                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                        Text("Poster Text Alignment", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = theme.TextPrimary)
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                        ) {
-                                            listOf(
-                                                PosterTextAlignment.LEFT to "Left (Infuse)",
-                                                PosterTextAlignment.CENTER to "Center",
-                                            ).forEach { (align, label) ->
-                                                FilterChip(
-                                                    selected = posterTextAlignment == align,
-                                                    onClick = { AppearanceConfig.setPosterTextAlignment(align) },
-                                                    label = {
-                                                        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                                                            Text(label, style = MaterialTheme.typography.labelSmall)
-                                                        }
-                                                    },
-                                                    shape = RoundedCornerShape(8.dp),
-                                                    modifier = Modifier.weight(1f),
-                                                )
-                                            }
-                                        }
-                                    }
-
-                                    // Title Line Clamping
-                                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                        Text("Title Line Clamping", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = theme.TextPrimary)
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                        ) {
-                                            listOf(
-                                                1 to "1 Line",
-                                                2 to "2 Lines",
-                                            ).forEach { (lines, label) ->
-                                                FilterChip(
-                                                    selected = posterTitleMaxLines == lines,
-                                                    onClick = { AppearanceConfig.setPosterTitleMaxLines(lines) },
-                                                    label = {
-                                                        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                                                            Text(label, style = MaterialTheme.typography.labelSmall)
-                                                        }
-                                                    },
-                                                    shape = RoundedCornerShape(8.dp),
-                                                    modifier = Modifier.weight(1f),
-                                                )
-                                            }
-                                        }
-                                    }
-
-                                    // Continue Watching Style
-                                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                        Text("Continue Watching Style", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = theme.TextPrimary)
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                        ) {
-                                            listOf(
-                                                ContinueWatchingStyle.PREMIUM to "Wide",
-                                                ContinueWatchingStyle.DETAILED to "Detailed",
-                                                ContinueWatchingStyle.THUMBNAIL to "Classic",
-                                            ).forEach { (style, label) ->
-                                                FilterChip(
-                                                    selected = continueWatchingStyle == style,
-                                                    onClick = { AppearanceConfig.setContinueWatchingStyle(style) },
-                                                    label = {
-                                                        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                                                            Text(label, style = MaterialTheme.typography.labelSmall)
-                                                        }
-                                                    },
-                                                    shape = RoundedCornerShape(8.dp),
-                                                    modifier = Modifier.weight(1f),
-                                                )
-                                            }
-                                        }
-                                    }
-
-                                    // Hover Ambient Glow
-                                    Surface(
-                                        shape = RoundedCornerShape(12.dp),
-                                        color = theme.SurfaceCard.copy(alpha = 0.6f),
-                                        border = BorderStroke(1.dp, theme.Divider.copy(alpha = 0.4f)),
-                                        modifier = Modifier.fillMaxWidth(),
-                                    ) {
-                                        Row(
-                                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                        ) {
-                                            Column(modifier = Modifier.weight(1f)) {
-                                                Text("Hover Glow", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = theme.TextPrimary)
-                                                Text("Ambient light beneath cards", style = MaterialTheme.typography.labelSmall, color = theme.TextMuted)
-                                            }
-                                            Switch(
-                                                checked = posterHoverGlowEnabled,
-                                                onCheckedChange = { AppearanceConfig.setPosterHoverGlowEnabled(it) },
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                            else -> {
-                                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                                    // Smart Title Sanitization
-                                    Surface(
-                                        shape = RoundedCornerShape(12.dp),
-                                        color = theme.SurfaceCard.copy(alpha = 0.6f),
-                                        border = BorderStroke(1.dp, theme.Divider.copy(alpha = 0.4f)),
-                                        modifier = Modifier.fillMaxWidth(),
-                                    ) {
-                                        Row(
-                                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                        ) {
-                                            Column(modifier = Modifier.weight(1f)) {
-                                                Text("Clean Titles", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = theme.TextPrimary)
-                                                Text("Strip [4K], release tags", style = MaterialTheme.typography.labelSmall, color = theme.TextMuted)
-                                            }
-                                            Switch(
-                                                checked = autoCleanTitles,
-                                                onCheckedChange = { CardMetadataConfig.setAutoCleanTitles(it) },
-                                            )
-                                        }
-                                    }
-
-                                    // Rating Badges
-                                    Surface(
-                                        shape = RoundedCornerShape(12.dp),
-                                        color = theme.SurfaceCard.copy(alpha = 0.6f),
-                                        border = BorderStroke(1.dp, theme.Divider.copy(alpha = 0.4f)),
-                                        modifier = Modifier.fillMaxWidth(),
-                                    ) {
-                                        Row(
-                                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                        ) {
-                                            Column(modifier = Modifier.weight(1f)) {
-                                                Text("Rating Badges (★)", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = theme.TextPrimary)
-                                                Text("Show score pill", style = MaterialTheme.typography.labelSmall, color = theme.TextMuted)
-                                            }
-                                            Switch(
-                                                checked = showRatingBadges,
-                                                onCheckedChange = { CardMetadataConfig.setShowRatingBadges(it) },
-                                            )
-                                        }
-                                    }
-
-                                    // Quality Badges
-                                    Surface(
-                                        shape = RoundedCornerShape(12.dp),
-                                        color = theme.SurfaceCard.copy(alpha = 0.6f),
-                                        border = BorderStroke(1.dp, theme.Divider.copy(alpha = 0.4f)),
-                                        modifier = Modifier.fillMaxWidth(),
-                                    ) {
-                                        Row(
-                                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                        ) {
-                                            Column(modifier = Modifier.weight(1f)) {
-                                                Text("Quality Badges", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = theme.TextPrimary)
-                                                Text("4K, UHD, 1080p tags", style = MaterialTheme.typography.labelSmall, color = theme.TextMuted)
-                                            }
-                                            Switch(
-                                                checked = autoDetectQuality,
-                                                onCheckedChange = { CardMetadataConfig.setAutoDetectQuality(it) },
-                                            )
-                                        }
-                                    }
-
-                                    // SUB / DUB Badges
-                                    Surface(
-                                        shape = RoundedCornerShape(12.dp),
-                                        color = theme.SurfaceCard.copy(alpha = 0.6f),
-                                        border = BorderStroke(1.dp, theme.Divider.copy(alpha = 0.4f)),
-                                        modifier = Modifier.fillMaxWidth(),
-                                    ) {
-                                        Row(
-                                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                        ) {
-                                            Column(modifier = Modifier.weight(1f)) {
-                                                Text("SUB / DUB Badges", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = theme.TextPrimary)
-                                                Text("Audio & subtitle flags", style = MaterialTheme.typography.labelSmall, color = theme.TextMuted)
-                                            }
-                                            Switch(
-                                                checked = autoDetectSubDub,
-                                                onCheckedChange = { CardMetadataConfig.setAutoDetectSubDub(it) },
-                                            )
-                                        }
-                                    }
-
-                                    // Provider Badges
-                                    Surface(
-                                        shape = RoundedCornerShape(12.dp),
-                                        color = theme.SurfaceCard.copy(alpha = 0.6f),
-                                        border = BorderStroke(1.dp, theme.Divider.copy(alpha = 0.4f)),
-                                        modifier = Modifier.fillMaxWidth(),
-                                    ) {
-                                        Column(
-                                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-                                            verticalArrangement = Arrangement.spacedBy(6.dp),
-                                        ) {
-                                            Text("Provider Badges", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = theme.TextPrimary)
-                                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                                listOf(
-                                                    ProviderBadgeDisplayMode.HIDDEN to "Hidden",
-                                                    ProviderBadgeDisplayMode.ICON_ONLY to "Icon",
-                                                    ProviderBadgeDisplayMode.FULL_BADGE to "Full",
-                                                ).forEach { (mode, label) ->
-                                                    FilterChip(
-                                                        selected = providerBadgeDisplayMode == mode,
-                                                        onClick = { AppearanceConfig.setProviderBadgeDisplayMode(mode) },
-                                                        label = { Text(label, style = MaterialTheme.typography.labelSmall) },
-                                                        shape = RoundedCornerShape(8.dp),
-                                                    )
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
                     }
                 }
             }
         }
     }
+}
+
+@Composable
+private fun StudioSection(
+    title: String,
+    subtitle: String? = null,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val theme = LocalDesktopTheme.current
+
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Column {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            if (subtitle != null) {
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = theme.TextMuted,
+                )
+            }
+        }
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(14.dp),
+            color = theme.SurfaceCard.copy(alpha = 0.55f),
+            border = BorderStroke(1.dp, theme.Divider.copy(alpha = 0.5f)),
+        ) {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+                content = content,
+            )
+        }
+    }
+}
+
+@Composable
+private fun StudioSliderControl(
+    label: String,
+    valueText: String,
+    value: Float,
+    valueRange: ClosedFloatingPointRange<Float>,
+    step: Float,
+    onValueChange: (Float) -> Unit,
+) {
+    val theme = LocalDesktopTheme.current
+    val intervalCount = ((valueRange.endInclusive - valueRange.start) / step).roundToInt()
+    val sliderSteps = (intervalCount - 1).coerceAtLeast(0)
+
+    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium,
+                color = theme.TextPrimary,
+            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                StudioStepperButton(
+                    icon = Icons.Default.Remove,
+                    contentDescription = "Decrease $label",
+                    enabled = value > valueRange.start,
+                    onClick = { onValueChange((value - step).coerceIn(valueRange)) },
+                )
+                Text(
+                    text = valueText,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.widthIn(min = 58.dp),
+                )
+                StudioStepperButton(
+                    icon = Icons.Default.Add,
+                    contentDescription = "Increase $label",
+                    enabled = value < valueRange.endInclusive,
+                    onClick = { onValueChange((value + step).coerceIn(valueRange)) },
+                )
+            }
+        }
+        Slider(
+            value = value,
+            onValueChange = onValueChange,
+            valueRange = valueRange,
+            steps = sliderSteps,
+            colors = SliderDefaults.colors(
+                thumbColor = MaterialTheme.colorScheme.primary,
+                activeTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
+                inactiveTrackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
+            ),
+        )
+    }
+}
+
+@Composable
+private fun StudioStepperButton(
+    icon: ImageVector,
+    contentDescription: String,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    val theme = LocalDesktopTheme.current
+
+    Surface(
+        modifier = Modifier
+            .size(28.dp)
+            .clickable(enabled = enabled, onClick = onClick),
+        shape = RoundedCornerShape(8.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(
+                imageVector = icon,
+                contentDescription = contentDescription,
+                tint = if (enabled) theme.TextPrimary else theme.TextMuted.copy(alpha = 0.4f),
+                modifier = Modifier.size(14.dp),
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun <T> StudioChoiceControl(
+    label: String,
+    options: List<Pair<T, String>>,
+    selected: T,
+    onSelect: (T) -> Unit,
+) {
+    val theme = LocalDesktopTheme.current
+
+    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Medium,
+            color = theme.TextPrimary,
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            options.forEach { (value, text) ->
+                FilterChip(
+                    selected = selected == value,
+                    onClick = { onSelect(value) },
+                    label = {
+                        Text(
+                            text = text,
+                            style = MaterialTheme.typography.labelSmall,
+                        )
+                    },
+                    shape = RoundedCornerShape(8.dp),
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = MaterialTheme.colorScheme.primary,
+                        selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+                    ),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun StudioToggleControl(
+    label: String,
+    subtitle: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    val theme = LocalDesktopTheme.current
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onCheckedChange(!checked) }
+            .padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium,
+                color = theme.TextPrimary,
+            )
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = theme.TextMuted,
+            )
+        }
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = MaterialTheme.colorScheme.primary,
+                checkedTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
+            ),
+        )
+    }
+}
+
+@Composable
+private fun StudioPresetChip(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    FilterChip(
+        selected = selected,
+        onClick = onClick,
+        label = {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+            )
+        },
+        shape = RoundedCornerShape(8.dp),
+        colors = FilterChipDefaults.filterChipColors(
+            selectedContainerColor = MaterialTheme.colorScheme.primary,
+            selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+        ),
+    )
+}
+
+@Composable
+private fun StudioDivider() {
+    HorizontalDivider(
+        modifier = Modifier.padding(vertical = 2.dp),
+        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f),
+    )
 }
