@@ -128,6 +128,19 @@ object ImageUtils {
         }
     }
 
+    private val logoValidityCache = java.util.concurrent.ConcurrentHashMap<String, Boolean>()
+
+    fun isClearLogoCached(url: String?): Boolean? {
+        if (url.isNullOrBlank()) return null
+        return logoValidityCache[url]
+    }
+
+    fun cacheClearLogo(url: String?, isValid: Boolean) {
+        if (!url.isNullOrBlank()) {
+            logoValidityCache[url] = isValid
+        }
+    }
+
     val InvertColorMatrix = androidx.compose.ui.graphics.ColorMatrix(
         floatArrayOf(
             -1f, 0f, 0f, 0f, 255f,
@@ -136,6 +149,60 @@ object ImageUtils {
             0f, 0f, 0f, 1f, 0f,
         ),
     )
+
+    /**
+     * Validates whether an image is a true transparent clearlogo (cutout typography/symbol)
+     * rather than an opaque rectangular card, banner, or solid-fill sticker.
+     */
+    fun isClearLogo(image: coil3.Image?): Boolean {
+        if (image == null) return false
+        val bitmap = (image as? coil3.BitmapImage)?.bitmap ?: return false
+        return isClearBitmap(bitmap)
+    }
+
+    fun isClearBitmap(bitmap: org.jetbrains.skia.Bitmap): Boolean {
+        val width = bitmap.width
+        val height = bitmap.height
+        if (width <= 0 || height <= 0) return false
+
+        // 1. Check outer corners: true logos have transparent canvas corners
+        val cornerSamples = listOf(
+            Pair(0, 0),
+            Pair(width - 1, 0),
+            Pair(0, height - 1),
+            Pair(width - 1, height - 1),
+        )
+        var opaqueCorners = 0
+        for ((cx, cy) in cornerSamples) {
+            val color = bitmap.getColor(cx, cy)
+            val alpha = (color ushr 24 and 0xFF) / 255.0
+            if (alpha > 0.85) {
+                opaqueCorners++
+            }
+        }
+        if (opaqueCorners == 4) return false
+
+        // 2. Sample canvas transparency ratio
+        val stepX = maxOf(2, width / 50)
+        val stepY = maxOf(2, height / 50)
+        var transparentSamples = 0
+        var totalSamples = 0
+
+        for (y in 0 until height step stepY) {
+            for (x in 0 until width step stepX) {
+                totalSamples++
+                val color = bitmap.getColor(x, y)
+                val alpha = (color ushr 24 and 0xFF) / 255.0
+                if (alpha <= 0.15) {
+                    transparentSamples++
+                }
+            }
+        }
+
+        if (totalSamples == 0) return false
+        val transparencyRatio = transparentSamples.toDouble() / totalSamples
+        return transparencyRatio >= 0.20
+    }
 
     /**
      * Inspects a logo bitmap to identify dark monochrome typography that lacks contrast on dark surfaces.

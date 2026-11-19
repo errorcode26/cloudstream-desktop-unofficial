@@ -426,72 +426,91 @@ private fun HeroMetadataLayer(
     ) {
         if (!meta?.logoUrl.isNullOrBlank()) {
             val displayTitle = meta.title ?: com.lagradost.cloudstream3.desktop.repo.HeroRepository.cleanHeroTitle(item.name)
-            Box(
-                modifier = Modifier
-                    .widthIn(
-                        min = if (isCompact) 120.dp else DesktopDimens.HeroLogoMinWidth,
-                        max = if (isCompact) 220.dp else DesktopDimens.HeroLogoMaxWidth,
-                    )
-                    .heightIn(max = if (isCompact) 85.dp else DesktopDimens.HeroLogoMaxHeight),
-                contentAlignment = Alignment.BottomStart,
-            ) {
-                var isDarkLogo by remember(meta.logoUrl) {
-                    mutableStateOf(com.lagradost.cloudstream3.desktop.utils.ImageUtils.isDarkLogoCached(meta.logoUrl) ?: false)
-                }
-                val platformContext = coil3.compose.LocalPlatformContext.current
-
-                val logoRequest = remember(meta.logoUrl, platformContext) {
-                    coil3.request.ImageRequest.Builder(platformContext)
-                        .data(meta.logoUrl)
-                        .size(1600, 800)
-                        .crossfade(true)
-                        .listener(
-                            onSuccess = { _, result ->
-                                val dark = com.lagradost.cloudstream3.desktop.utils.ImageUtils.isDarkImage(result.image)
-                                com.lagradost.cloudstream3.desktop.utils.ImageUtils.cacheDarkLogo(meta.logoUrl, dark)
-                                isDarkLogo = dark
-                            },
-                        )
-                        .build()
-                }
-                if (!performanceModeEnabled) {
-                    coil3.compose.AsyncImage(
-                    model = logoRequest,
-                    contentDescription = null,
+            var isValidLogo by remember(meta.logoUrl) {
+                mutableStateOf(com.lagradost.cloudstream3.desktop.utils.ImageUtils.isClearLogoCached(meta.logoUrl) ?: true)
+            }
+            if (isValidLogo) {
+                Box(
                     modifier = Modifier
-                        .fillMaxSize()
-                        .offset(
-                            x = DesktopDimens.LogoShadowOffsetX,
-                            y = DesktopDimens.LogoShadowOffsetY,
+                        .widthIn(
+                            min = if (isCompact) 120.dp else DesktopDimens.HeroLogoMinWidth,
+                            max = if (isCompact) 220.dp else DesktopDimens.HeroLogoMaxWidth,
                         )
-                        .blur(
-                            DesktopDimens.LogoShadowBlur,
-                            edgeTreatment = androidx.compose.ui.draw.BlurredEdgeTreatment.Unbounded,
-                        ),
-                    contentScale = ContentScale.Fit,
-                    alignment = Alignment.BottomStart,
-                    colorFilter = DesktopDimens.LogoShadowFilter,
-                )
-                }
-                coil3.compose.SubcomposeAsyncImage(
-                    model = logoRequest,
-                    contentDescription = "Logo",
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Fit,
-                    alignment = Alignment.BottomStart,
-                    colorFilter = if (isDarkLogo) androidx.compose.ui.graphics.ColorFilter.colorMatrix(com.lagradost.cloudstream3.desktop.utils.ImageUtils.InvertColorMatrix) else null,
-                    error = {
-                        if (displayTitle.isNotBlank()) {
-                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.BottomStart) {
-                                com.lagradost.cloudstream3.desktop.ui.components.CinematicTitle(
-                                    text = displayTitle,
-                                    isCompact = isCompact,
-                                    fontSize = if (isCompact) 26.sp else 46.sp,
+                        .heightIn(max = if (isCompact) 85.dp else DesktopDimens.HeroLogoMaxHeight),
+                    contentAlignment = Alignment.BottomStart,
+                ) {
+                    var isDarkLogo by remember(meta.logoUrl) {
+                        mutableStateOf(com.lagradost.cloudstream3.desktop.utils.ImageUtils.isDarkLogoCached(meta.logoUrl) ?: false)
+                    }
+                    val platformContext = coil3.compose.LocalPlatformContext.current
+
+                    val logoRequest = remember(meta.logoUrl, platformContext) {
+                        coil3.request.ImageRequest.Builder(platformContext)
+                            .data(meta.logoUrl)
+                            .size(1600, 800)
+                            .crossfade(true)
+                            .listener(
+                                onSuccess = { _, result ->
+                                    val isClear = com.lagradost.cloudstream3.desktop.utils.ImageUtils.isClearLogo(result.image)
+                                    com.lagradost.cloudstream3.desktop.utils.ImageUtils.cacheClearLogo(meta.logoUrl, isClear)
+                                    isValidLogo = isClear
+
+                                    if (isClear) {
+                                        val dark = com.lagradost.cloudstream3.desktop.utils.ImageUtils.isDarkImage(result.image)
+                                        com.lagradost.cloudstream3.desktop.utils.ImageUtils.cacheDarkLogo(meta.logoUrl, dark)
+                                        isDarkLogo = dark
+                                    }
+                                },
+                            )
+                            .build()
+                    }
+                    if (!performanceModeEnabled) {
+                        coil3.compose.AsyncImage(
+                            model = logoRequest,
+                            contentDescription = null,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .offset(
+                                    x = DesktopDimens.LogoShadowOffsetX,
+                                    y = DesktopDimens.LogoShadowOffsetY,
                                 )
+                                .blur(
+                                    DesktopDimens.LogoShadowBlur,
+                                    edgeTreatment = androidx.compose.ui.draw.BlurredEdgeTreatment.Unbounded,
+                                ),
+                            contentScale = ContentScale.Fit,
+                            alignment = Alignment.BottomStart,
+                            colorFilter = DesktopDimens.LogoShadowFilter,
+                        )
+                    }
+                    coil3.compose.SubcomposeAsyncImage(
+                        model = logoRequest,
+                        contentDescription = "Logo",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Fit,
+                        alignment = Alignment.BottomStart,
+                        colorFilter = if (isDarkLogo) androidx.compose.ui.graphics.ColorFilter.colorMatrix(com.lagradost.cloudstream3.desktop.utils.ImageUtils.InvertColorMatrix) else null,
+                        error = {
+                            if (displayTitle.isNotBlank()) {
+                                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.BottomStart) {
+                                    com.lagradost.cloudstream3.desktop.ui.components.CinematicTitle(
+                                        text = displayTitle,
+                                        isCompact = isCompact,
+                                        fontSize = if (isCompact) 26.sp else 46.sp,
+                                    )
+                                }
                             }
-                        }
-                    },
-                )
+                        },
+                    )
+                }
+            } else {
+                if (displayTitle.isNotBlank()) {
+                    com.lagradost.cloudstream3.desktop.ui.components.CinematicTitle(
+                        text = displayTitle,
+                        isCompact = isCompact,
+                        fontSize = if (isCompact) 26.sp else 46.sp,
+                    )
+                }
             }
         } else {
             val displayTitle = meta?.title ?: com.lagradost.cloudstream3.desktop.repo.HeroRepository.cleanHeroTitle(item.name)

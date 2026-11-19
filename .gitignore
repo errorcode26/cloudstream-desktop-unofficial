@@ -116,7 +116,13 @@ NuvioDesktop-Dev/
 QuickNovel-master/
 vega-desktop-main/
 
-# Screenshots & temporary media
+# Badges resource packs & icon assets (Never commit to repository)
+/badges/
+desktop-app/src/main/resources/badges/
+
+# Screenshots & temporary media dumps
+*.jpg
+*.jpeg
 desktop-app/mpv-shot*.jpg
 screenshots/
 

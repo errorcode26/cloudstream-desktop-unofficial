@@ -8,6 +8,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -24,18 +25,31 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.pointer.PointerButton
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import coil3.request.crossfade
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.desktop.ui.components.DesktopBackButton
 import com.lagradost.cloudstream3.desktop.ui.components.DesktopVerticalScrollbar
 import com.lagradost.cloudstream3.desktop.ui.components.DesktopThemeColors.*
 import com.lagradost.cloudstream3.desktop.ui.components.LocalDesktopTheme
+import com.lagradost.cloudstream3.desktop.ui.components.WindowControlsPill
 import com.lagradost.cloudstream3.desktop.ui.navigation.Config
 import com.lagradost.cloudstream3.desktop.ui.screens.details.*
 import com.lagradost.cloudstream3.desktop.ui.screens.details.contract.DetailsUiEffect
@@ -47,7 +61,7 @@ import dev.chrisbanes.haze.hazeSource
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, androidx.compose.ui.ExperimentalComposeUiApi::class)
 @Composable
 fun ComposeDetailsScreen(
     onNavigate: (Config) -> Unit,
@@ -181,7 +195,73 @@ fun ComposeDetailsScreen(
         val hazeState = remember { HazeState() }
         val isAmoled = LocalDesktopTheme.current.isAmoled
 
-        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val isDrawerOpen = isPanelOpen || activeLinkData != null
+
+        val focusRequester = remember { FocusRequester() }
+        LaunchedEffect(isDrawerOpen) {
+            if (isDrawerOpen) {
+                try { focusRequester.requestFocus() } catch (_: Throwable) {}
+            }
+        }
+
+        DisposableEffect(isDrawerOpen) {
+            if (!isDrawerOpen) return@DisposableEffect onDispose {}
+
+            val listener = java.awt.event.AWTEventListener { event ->
+                if (event is java.awt.event.MouseEvent && event.id == java.awt.event.MouseEvent.MOUSE_RELEASED && event.button == 4) {
+                    viewModel.onEvent(DetailsUiEvent.OnCloseLinksPanel)
+                    event.consume()
+                }
+            }
+            java.awt.Toolkit.getDefaultToolkit().addAWTEventListener(
+                listener,
+                java.awt.AWTEvent.MOUSE_EVENT_MASK,
+            )
+            onDispose {
+                java.awt.Toolkit.getDefaultToolkit().removeAWTEventListener(listener)
+            }
+        }
+
+        BoxWithConstraints(
+            modifier = Modifier
+                .fillMaxSize()
+                .focusRequester(focusRequester)
+                .focusable()
+                .onPreviewKeyEvent { event ->
+                    if ((event.key == Key.Escape || event.key == Key.Back || event.key == Key.Backspace) && event.type == KeyEventType.KeyUp) {
+                        if (isDrawerOpen) {
+                            viewModel.onEvent(DetailsUiEvent.OnCloseLinksPanel)
+                            true
+                        } else {
+                            false
+                        }
+                    } else {
+                        false
+                    }
+                }
+                .pointerInput(isDrawerOpen) {
+                    awaitPointerEventScope {
+                        while (true) {
+                            val event = awaitPointerEvent(PointerEventPass.Initial)
+                            if (event.type == PointerEventType.Release && event.button == PointerButton.Back) {
+                                if (isDrawerOpen) {
+                                    viewModel.onEvent(DetailsUiEvent.OnCloseLinksPanel)
+                                    event.changes.forEach { it.consume() }
+                                }
+                            }
+                        }
+                    }
+                },
+        ) {
+            val rootMaxWidth = maxWidth
+            val currentStage = remember(isLoading, response, fetchFailed) {
+                when {
+                    fetchFailed && response == null -> com.lagradost.cloudstream3.desktop.ui.components.ScreenStage.ERROR
+                    response != null -> com.lagradost.cloudstream3.desktop.ui.components.ScreenStage.CONTENT
+                    isLoading -> com.lagradost.cloudstream3.desktop.ui.components.ScreenStage.LOADING
+                    else -> com.lagradost.cloudstream3.desktop.ui.components.ScreenStage.ERROR
+                }
+            }
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -212,14 +292,6 @@ fun ComposeDetailsScreen(
                     }
                 }
                 val enableDownloadButtons = com.lagradost.common.storage.DesktopDataStore.getKey<Boolean>(com.lagradost.common.storage.DesktopDataStore.PREF_ENABLE_DOWNLOAD_BUTTONS) ?: true
-                val currentStage = remember(isLoading, response, fetchFailed) {
-                    when {
-                        fetchFailed && response == null -> com.lagradost.cloudstream3.desktop.ui.components.ScreenStage.ERROR
-                        response != null -> com.lagradost.cloudstream3.desktop.ui.components.ScreenStage.CONTENT
-                        isLoading -> com.lagradost.cloudstream3.desktop.ui.components.ScreenStage.LOADING
-                        else -> com.lagradost.cloudstream3.desktop.ui.components.ScreenStage.ERROR
-                    }
-                }
 
                 com.lagradost.cloudstream3.desktop.ui.components.ScreenStateCrossfade(
                     stage = currentStage,
@@ -236,9 +308,16 @@ fun ComposeDetailsScreen(
                     content = {
                         val activeData = response ?: fakeData
                         if (activeData != null) {
+                            val handleBack = {
+                                if (isPanelOpen) {
+                                    viewModel.onEvent(DetailsUiEvent.OnCloseLinksPanel)
+                                } else {
+                                    onBack()
+                                }
+                            }
                             DetailsContent(
                                 onNavigate = onNavigate,
-                                onBack = onBack,
+                                onBack = handleBack,
                                 provider = provider,
                                 data = activeData,
                                 screenshots = screenshots,
@@ -342,14 +421,54 @@ fun ComposeDetailsScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(Color.Black.copy(alpha = if (isAmoled) 0.65f else 0.45f))
-                        .clickable { viewModel.onEvent(DetailsUiEvent.OnCloseLinksPanel) },
-                )
+                        .background(Color.Black.copy(alpha = if (isAmoled) 0.70f else 0.55f))
+                        .clickable(
+                            indication = null,
+                            interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                        ) { viewModel.onEvent(DetailsUiEvent.OnCloseLinksPanel) },
+                ) {
+                    val panelWidth = if (rootMaxWidth >= 1000.dp) rootMaxWidth * 0.50f else (rootMaxWidth * 0.60f).coerceIn(480.dp, rootMaxWidth * 0.85f)
+                    val leftZoneWidth = rootMaxWidth - panelWidth
+                    if (leftZoneWidth >= 360.dp && activeLinkData != null) {
+                        val activeHistory = activeLinkData.third
+                        val allEpisodes = remember(response) {
+                            when (response) {
+                                is com.lagradost.cloudstream3.TvSeriesLoadResponse -> response.episodes
+                                is com.lagradost.cloudstream3.AnimeLoadResponse -> response.episodes.values.flatten()
+                                else -> emptyList()
+                            }
+                        }
+                        val activeEpisode = remember(activeLinkData, allEpisodes) {
+                            allEpisodes.firstOrNull { it.matchesHistory(activeHistory) }
+                                ?: allEpisodes.firstOrNull { it.data == activeLinkData.second }
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .fillMaxHeight()
+                                .width(leftZoneWidth)
+                                .align(Alignment.CenterStart)
+                                .padding(horizontal = 24.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            FloatingEpisodeCard(
+                                provider = provider,
+                                response = response,
+                                activeEpisode = activeEpisode,
+                                activeHistory = activeHistory,
+                                activeLinkData = activeLinkData,
+                                uiState = uiState,
+                                isAmoled = isAmoled,
+                                cardWidth = minOf(560.dp, leftZoneWidth - 48.dp),
+                            )
+                        }
+                    }
+                }
             }
 
             if (activeLinkData != null) {
-                val panelWidth = minOf(640.dp, maxWidth * 0.95f)
-                val drawerShape = RoundedCornerShape(topStart = 20.dp, bottomStart = 20.dp)
+                val panelWidth = if (rootMaxWidth >= 1000.dp) rootMaxWidth * 0.50f else (rootMaxWidth * 0.60f).coerceIn(480.dp, rootMaxWidth * 0.85f)
+                val drawerShape = RoundedCornerShape(20.dp)
                 val offsetX by androidx.compose.animation.core.animateDpAsState(
                     targetValue = if (isPanelOpen) 0.dp else panelWidth + 20.dp,
                     animationSpec = tween(300),
@@ -360,6 +479,7 @@ fun ComposeDetailsScreen(
                         .offset(x = offsetX)
                         .fillMaxHeight()
                         .width(panelWidth)
+                        .padding(top = 56.dp, bottom = 16.dp, end = 16.dp)
                         .shadow(28.dp, shape = drawerShape, ambientColor = Color.Transparent, spotColor = Color.Black.copy(alpha = 0.5f))
                         .clip(drawerShape)
                         .border(
@@ -405,6 +525,33 @@ fun ComposeDetailsScreen(
                             onClose = { viewModel.onEvent(DetailsUiEvent.OnCloseLinksPanel) },
                         )
                     }
+                }
+            }
+
+            // Hoisted Floating Top Action Layer (Corner-anchored, remains visible and clickable above scrim & drawer)
+            if (currentStage != com.lagradost.cloudstream3.desktop.ui.components.ScreenStage.LOADING) {
+                Row(
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .fillMaxWidth()
+                        .padding(start = 16.dp, end = 16.dp, top = 7.dp)
+                        .zIndex(100f),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    val handleBack = {
+                        if (isDrawerOpen) {
+                            viewModel.onEvent(DetailsUiEvent.OnCloseLinksPanel)
+                        } else {
+                            onBack()
+                        }
+                    }
+                    DesktopBackButton(onClick = handleBack)
+
+                    WindowControlsPill(
+                        isHome = false,
+                        isCompact = rootMaxWidth < 600.dp,
+                    )
                 }
             }
         }
@@ -479,6 +626,13 @@ fun DetailsContent(
         val viewportHeight = maxHeight
         val viewportWidth = maxWidth
         val isWindowCompact = viewportWidth < 600.dp
+        val isLinksPanelOpen = uiState?.isPanelOpen == true
+        val backdropDimModifier = if (isLinksPanelOpen) {
+            Modifier.blur(45.dp).graphicsLayer { alpha = 0.20f }
+        } else {
+            Modifier
+        }
+
         DetailsBackdrop(
             provider = provider,
             data = data,
@@ -520,7 +674,7 @@ fun DetailsContent(
             state = scrollState,
             modifier = Modifier
                 .fillMaxSize()
-                .graphicsLayer { },
+                .then(if (isLinksPanelOpen) Modifier.blur(45.dp).graphicsLayer { alpha = 0.20f } else Modifier),
             contentPadding = PaddingValues(
                 bottom = 32.dp,
             ),
@@ -535,9 +689,12 @@ fun DetailsContent(
                 }
 
                 Box(
-                    modifier = Modifier.fillMaxWidth().run {
-                        if (heroMinHeight != null) this.heightIn(min = heroMinHeight) else this
-                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .run {
+                            if (heroMinHeight != null) this.heightIn(min = heroMinHeight) else this
+                        }
+                        .then(backdropDimModifier),
                     contentAlignment = if (isWindowCompact) Alignment.TopStart else Alignment.BottomStart,
                 ) {
                     DetailsMetadata(
@@ -747,7 +904,7 @@ fun DetailsContent(
                         val collItems = uiState?.enrichedCollectionItems ?: emptyList()
                         if (!collName.isNullOrBlank()) {
                             item(key = "Collection") {
-                                Box(modifier = Modifier.animateItem().fillMaxWidth().padding(top = 48.dp)) {
+                                Box(modifier = Modifier.animateItem().fillMaxWidth().padding(top = 48.dp).then(backdropDimModifier)) {
                                     com.lagradost.cloudstream3.desktop.ui.screens.details.DetailsCollectionSection(
                                         collName = collName,
                                         collBg = collBg,
@@ -766,7 +923,7 @@ fun DetailsContent(
                             item(key = "Recommendations") {
                                 BoxWithConstraints(modifier = Modifier.animateItem().fillMaxWidth()) {
                                     val hPadding = if (maxWidth < 1100.dp) 24.dp else 64.dp
-                                    Box(modifier = Modifier.fillMaxWidth().padding(top = 48.dp)) {
+                                    Box(modifier = Modifier.fillMaxWidth().padding(top = 48.dp).then(backdropDimModifier)) {
                                         com.lagradost.cloudstream3.desktop.ui.screens.details.DetailsRecommendationsSection(
                                             validRecs = validRecs,
                                             onNavigate = onNavigate,
@@ -782,7 +939,7 @@ fun DetailsContent(
                             item(key = "Reviews") {
                                 BoxWithConstraints(modifier = Modifier.animateItem().fillMaxWidth()) {
                                     val hPadding = if (maxWidth < 1100.dp) 24.dp else 64.dp
-                                    Box(modifier = Modifier.fillMaxWidth().padding(top = 48.dp)) {
+                                    Box(modifier = Modifier.fillMaxWidth().padding(top = 48.dp).then(backdropDimModifier)) {
                                         com.lagradost.cloudstream3.desktop.ui.screens.details.DetailsReviewsSection(
                                             reviews = uiState.enrichedReviews,
                                             horizontalPadding = hPadding,
@@ -804,25 +961,6 @@ fun DetailsContent(
             listState = scrollState,
             modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
         )
-
-        // Floating Top Action Layer (Corner-anchored, matching Web Player 1:1 geometry)
-        Row(
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .fillMaxWidth()
-                .padding(start = 16.dp, end = 16.dp, top = 7.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            // Floating Back Button
-            DesktopBackButton(onClick = onBack)
-
-            // Floating Window Controls Pill
-            com.lagradost.cloudstream3.desktop.ui.components.WindowControlsPill(
-                isHome = false,
-                isCompact = isWindowCompact,
-            )
-        }
 
         // Fullscreen screenshot lightbox — must be at outer Box level to cover the whole window
         val lightboxScreenshots = screenshots

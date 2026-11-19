@@ -33,6 +33,19 @@ class HeroRepositoryImpl : HeroRepository {
     private val prefetchingUrls = ConcurrentHashMap.newKeySet<String>()
     private val backgroundSemaphore = Semaphore(2)
 
+    init {
+        // Clean up legacy herometa keys from persistent storage to eliminate bloat
+        try {
+            val legacyKeys = DesktopDataStore.getAllKeysWithPrefix("herometa_")
+            if (legacyKeys.isNotEmpty()) {
+                legacyKeys.forEach { DesktopDataStore.removeKey(it) }
+                AppLogger.i("HeroRepository", "Cleaned up ${legacyKeys.size} legacy herometa storage keys")
+            }
+        } catch (e: Throwable) {
+            AppLogger.w("HeroRepository", "Failed to clean legacy herometa keys", e)
+        }
+    }
+
     override fun cleanHeroTitle(title: String): String = TitleUtils.cleanProviderTitle(title).first
 
     override suspend fun prefetchTopHistory(topHistory: List<WatchHistory>, providers: List<MainAPI>) {
@@ -62,16 +75,7 @@ class HeroRepositoryImpl : HeroRepository {
         item: SearchResponse,
     ): Flow<HeroUpdate> = callbackFlow {
         val cacheKey = "${provider?.name}_${item.url}"
-        var existing = HeroCache.get(cacheKey)
-        if (existing == null) {
-            val persisted = DesktopDataStore.getKey<HeroMeta>("herometa_$cacheKey")
-            if (persisted != null && (System.currentTimeMillis() - persisted.cachedAtMs) < HERO_CACHE_TTL_MS) {
-                existing = persisted
-                HeroCache.put(cacheKey, existing)
-            } else if (persisted != null) {
-                DesktopDataStore.removeKey("herometa_$cacheKey")
-            }
-        }
+        val existing = HeroCache.get(cacheKey)
 
         if (existing != null) {
             trySend(HeroUpdate.Meta(item.url, existing))
@@ -104,7 +108,15 @@ class HeroRepositoryImpl : HeroRepository {
                 AppLogger.i("Enrichment", "[HERO] prefetch | raw='${item.name}' | clean='$dummyTitle' | type=$actualType | url=${item.url}")
 
                 if (provider != null) {
-                    val dummy = if (actualType == com.lagradost.cloudstream3.TvType.TvSeries || actualType == com.lagradost.cloudstream3.TvType.Anime) {
+                    // Fetch authentic scraped provider details like upstream Android
+                    val raw = try {
+                        DetailsRepository.fetchRaw(provider, item.url, fallbackName = item.name)
+                    } catch (e: Exception) {
+                        AppLogger.w("HeroRepository", "fetchRaw failed for ${item.name}, using fallback dummy", e)
+                        null
+                    }
+
+                    val target = raw ?: if (actualType == com.lagradost.cloudstream3.TvType.TvSeries || actualType == com.lagradost.cloudstream3.TvType.Anime) {
                         provider.newTvSeriesLoadResponse(
                             name = item.name,
                             url = item.url,
@@ -127,23 +139,22 @@ class HeroRepositoryImpl : HeroRepository {
                     }
 
                     HybridEnrichmentService.enrich(
-                        loaded = dummy,
-                        url = "dummy_${item.url}",
+                        loaded = target,
+                        url = item.url,
                         fetchCast = false,
                         onScreenshotsLoaded = {},
                     )
 
-                    val backdropUrl = dummy.backgroundPosterUrl?.takeIf { it.isNotBlank() }?.let { provider.fixUrlNull(it) }
-                    val logoUrl = dummy.logoUrl?.takeIf { it.isNotBlank() }?.let { provider.fixUrlNull(it) }
-                    val title = dummy.name.takeIf { it.isNotBlank() && it != dummyTitle && it != item.name } ?: dummyTitle
-                    val tags = dummy.tags?.take(4) ?: emptyList()
-                    val plot = TitleUtils.cleanPlot(dummy.plot)?.replace(Regex("""\s*\n+\s*"""), " ")?.take(250)
-                    val score = dummy.score?.toString()
+                    val backdropUrl = target.backgroundPosterUrl?.takeIf { it.isNotBlank() }?.let { provider.fixUrlNull(it) }
+                    val logoUrl = target.logoUrl?.takeIf { it.isNotBlank() }?.let { provider.fixUrlNull(it) }
+                    val title = target.name.takeIf { it.isNotBlank() && it != dummyTitle && it != item.name } ?: dummyTitle
+                    val tags = target.tags?.take(4) ?: emptyList()
+                    val plot = TitleUtils.cleanPlot(target.plot)?.replace(Regex("""\s*\n+\s*"""), " ")?.take(250)
+                    val score = target.score?.toString()
 
-                    val meta = HeroMeta(title, backdropUrl, logoUrl, tags, plot, score, dummy.year, dummy.type, dummy.contentRating, dummy.duration, cachedAtMs = System.currentTimeMillis())
+                    val meta = HeroMeta(title, backdropUrl, logoUrl, tags, plot, score, target.year, target.type, target.contentRating, target.duration, cachedAtMs = System.currentTimeMillis())
                     AppLogger.i("Enrichment", "[HERO] RESULT | title='$title' | backdrop=${backdropUrl != null} | logo=${logoUrl != null} | tags=$tags | score=$score")
                     HeroCache.put(cacheKey, meta)
-                    DesktopDataStore.setKey("herometa_$cacheKey", meta)
                     trySend(HeroUpdate.Meta(item.url, meta))
 
                     val colorTarget = backdropUrl ?: provider.fixUrlNull(item.posterUrl)

@@ -25,13 +25,24 @@ data class HeroMeta(
 internal const val HERO_CACHE_TTL_MS = 24 * 60 * 60 * 1000L // 24 hours
 
 object HeroCache {
-    private val cache = ConcurrentHashMap<String, HeroMeta>()
+    private const val MAX_ENTRIES = 50
+    private val cache: MutableMap<String, HeroMeta> = java.util.Collections.synchronizedMap(
+        object : java.util.LinkedHashMap<String, HeroMeta>(MAX_ENTRIES, 0.75f, true) {
+            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, HeroMeta>?): Boolean {
+                return size > MAX_ENTRIES
+            }
+        }
+    )
+
     fun get(key: String): HeroMeta? = cache[key]
     fun put(key: String, meta: HeroMeta) {
         cache[key] = meta
     }
     fun remove(key: String) {
         cache.remove(key)
+    }
+    fun clear() {
+        cache.clear()
     }
 }
 

@@ -392,6 +392,21 @@ fun ComposeNativeWebPlayer(
                     val isAdaptiveStream = l.isM3u8 || l.isDash || l.url.contains(".m3u8", ignoreCase = true) || l.url.contains(".mpd", ignoreCase = true)
                     val currentLiveSize = if (index == currentLinkIndex && liveFileSize > 0L && !isAdaptiveStream) formatByteSize(liveFileSize) else null
                     val effectiveSize = currentLiveSize ?: nameSize
+
+                    val addonSource = l.source.trim().ifBlank { null }
+                    val hostSource = if (l.source.isNotBlank() && l.source != l.name) l.source else com.lagradost.cloudstream3.desktop.ui.screens.links.extractCleanServer(l.name, "")
+                    val targetName = addonSource ?: hostSource.takeIf { it.isNotBlank() } ?: providerName
+                    val resolvedLogo = if (!targetName.isNullOrBlank()) {
+                        com.lagradost.cloudstream3.desktop.repo.DesktopRepositoryManager.getPluginIcon(targetName)
+                            ?: com.lagradost.cloudstream3.desktop.stremio.StremioAddonManager.addons.value.firstOrNull {
+                                it.name.equals(targetName, ignoreCase = true) ||
+                                    targetName.contains(it.name, ignoreCase = true) ||
+                                    it.name.contains(targetName, ignoreCase = true)
+                            }?.logoUrl
+                            ?: providerName?.let { com.lagradost.cloudstream3.desktop.repo.DesktopRepositoryManager.getPluginIcon(it) }
+                    } else null
+                    val safeStreamLogo = resolvedLogo?.let { com.lagradost.cloudstream3.desktop.utils.ImageUtils.getCachedDiskFileUri(it) ?: it }
+
                     LinkPayload(
                         index = index,
                         name = l.name,
@@ -403,6 +418,7 @@ fun ComposeNativeWebPlayer(
                         isTorrent = isTorrent,
                         source = l.source,
                         size = effectiveSize,
+                        logoUrl = safeStreamLogo,
                     )
                 },
                 episodes = episodes.map {
@@ -743,9 +759,12 @@ fun ComposeNativeWebPlayer(
             val finalCss = if (dynamicFontsCss.isNotEmpty()) "$dynamicFontsCss\n$cssContent" else cssContent
             val initialTheme = com.lagradost.common.storage.DesktopDataStore.getKey<String>(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_PLAYER_UI_THEME) ?: "modern_default"
 
+            val badgesBaseUrl = com.lagradost.cloudstream3.desktop.ui.badges.BadgeManager.getBadgesBaseUri()
+            val injectedJs = "window.__BADGES_BASE_URL__ = '$badgesBaseUrl';\n$jsContent"
+
             val htmlContent = htmlTemplate
                 .replace("/* CSS_INJECT */", finalCss)
-                .replace("/* JS_INJECT */", jsContent)
+                .replace("/* JS_INJECT */", injectedJs)
                 .replace("{{ACCENT_COLOR}}", accentColorHex)
                 .replace("{{ACCENT_COLOR_RGB}}", accentColorRgb)
                 .replace("{{INITIAL_BACKDROP_URL}}", initialBackdropUrl)

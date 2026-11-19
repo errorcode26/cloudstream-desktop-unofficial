@@ -5,6 +5,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.hoverable
@@ -661,6 +662,51 @@ fun androidx.compose.ui.unit.Dp.applyShadowMultiplier(): androidx.compose.ui.uni
 
 fun Modifier.desktopDragScroll(
     state: androidx.compose.foundation.lazy.LazyListState,
+): Modifier {
+    return this.pointerInput(state) {
+        awaitPointerEventScope {
+            while (true) {
+                val downEvent = awaitPointerEvent(pass = androidx.compose.ui.input.pointer.PointerEventPass.Initial)
+                val down = downEvent.changes.firstOrNull { it.pressed } ?: continue
+                var totalDx = 0f
+                var totalDy = 0f
+                var dragging = false
+
+                while (true) {
+                    val event = awaitPointerEvent(pass = androidx.compose.ui.input.pointer.PointerEventPass.Initial)
+                    val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                    if (!change.pressed) {
+                        if (dragging) {
+                            change.consume()
+                        }
+                        break
+                    }
+
+                    val delta = change.position - change.previousPosition
+                    totalDx += delta.x
+                    totalDy += delta.y
+
+                    if (!dragging) {
+                        val horizontalDrag = kotlin.math.abs(totalDx) > viewConfiguration.touchSlop && kotlin.math.abs(totalDx) > kotlin.math.abs(totalDy)
+                        val verticalDrag = kotlin.math.abs(totalDy) > viewConfiguration.touchSlop && kotlin.math.abs(totalDy) > kotlin.math.abs(totalDx)
+
+                        when {
+                            verticalDrag -> break
+                            horizontalDrag -> dragging = true
+                            else -> continue
+                        }
+                    }
+
+                    state.dispatchRawDelta(-delta.x)
+                    change.consume()
+                }
+            }
+        }
+    }
+}
+
+fun Modifier.desktopDragScroll(
+    state: ScrollState,
 ): Modifier {
     return this.pointerInput(state) {
         awaitPointerEventScope {

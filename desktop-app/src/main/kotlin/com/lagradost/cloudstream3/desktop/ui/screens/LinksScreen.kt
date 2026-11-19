@@ -1,8 +1,12 @@
 package com.lagradost.cloudstream3.desktop.ui.screens
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -21,14 +25,29 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.pointer.PointerButton
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import coil3.compose.AsyncImage
 import com.lagradost.cloudstream3.MainAPI
+import com.lagradost.cloudstream3.desktop.repo.DesktopRepositoryManager
+import com.lagradost.cloudstream3.desktop.stremio.StremioAddonManager
 import com.lagradost.cloudstream3.desktop.torrent.DesktopTorrentEngine
 import com.lagradost.cloudstream3.desktop.torrent.TorrentPlayability
 import com.lagradost.cloudstream3.desktop.ui.components.CloudstreamAlertDialog
 import com.lagradost.cloudstream3.desktop.ui.components.DesktopUi
+import com.lagradost.cloudstream3.desktop.ui.components.desktopDragScroll
 import com.lagradost.cloudstream3.desktop.ui.components.P2pTorrentDisclaimerDialog
 import com.lagradost.cloudstream3.desktop.ui.components.TorrServerInstallRequiredDialog
 import com.lagradost.cloudstream3.desktop.ui.screens.links.LinksViewModel
@@ -41,7 +60,7 @@ import com.lagradost.player.impl.VlcPlayer
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, androidx.compose.ui.ExperimentalComposeUiApi::class)
 @Composable
 fun LinksSidePanel(
     provider: MainAPI,
@@ -84,6 +103,7 @@ fun LinksSidePanel(
     val selectedSource = uiState.selectedSource
     val isP2pEnabled = uiState.isP2pEnabled
     var showPriorityDialog by remember { mutableStateOf(false) }
+    var selectedSpecFilter by remember { mutableStateOf(StreamSpecFilter.ALL) }
     var p2pDisclaimerTargetAction by remember { mutableStateOf<(() -> Unit)?>(null) }
     var torrServerInstallTargetAction by remember { mutableStateOf<(() -> Unit)?>(null) }
 
@@ -123,31 +143,64 @@ fun LinksSidePanel(
         }
     }
 
-    val availableSources = remember(links, provider.name) {
-        val groups = links.groupBy { link ->
-            val src = link.source.trim()
-            if (src.isNotBlank()) src else provider.name
+    val installedAddons by StremioAddonManager.addons.collectAsState()
+    val addonNames = remember(installedAddons) { installedAddons.map { it.name } }
+    val isAddonStream: (com.lagradost.cloudstream3.utils.ExtractorLink) -> Boolean = remember(addonNames) {
+        { link -> com.lagradost.cloudstream3.desktop.ui.screens.links.StreamFilterHelper.isAddonStream(link, addonNames) }
+    }
+
+    val getAddonName: (com.lagradost.cloudstream3.utils.ExtractorLink) -> String = remember(addonNames, provider.name) {
+        { link -> com.lagradost.cloudstream3.desktop.ui.screens.links.StreamFilterHelper.getAddonName(link, provider.name, addonNames) }
+    }
+
+    val sourceTabs = remember(links, provider.name) {
+        val pluginCount = links.count { !isAddonStream(it) }
+        val addonLinks = links.filter { isAddonStream(it) }
+        val addonGroups = addonLinks.groupBy { getAddonName(it) }
+
+        val list = mutableListOf<SourceOption>()
+        list.add(SourceOption(name = "All Sources", count = links.size, isAddon = false))
+        if (pluginCount > 0) {
+            list.add(SourceOption(name = provider.name, count = pluginCount, isAddon = false))
         }
-        groups.map { (srcName, list) ->
-            val isAddon = list.any { it.name.startsWith("⚡") } || !srcName.equals(provider.name, ignoreCase = true)
-            SourceOption(
-                name = srcName,
-                count = list.size,
-                isAddon = isAddon,
-            )
-        }.sortedWith(compareByDescending<SourceOption> { it.count }.thenBy { it.name })
+        addonGroups.forEach { (addonName, aLinks) ->
+            list.add(SourceOption(name = addonName, count = aLinks.size, isAddon = true))
+        }
+        list
     }
 
     val availableQualities = remember(links) {
-        links.groupBy { com.lagradost.cloudstream3.desktop.player.QualityDataHelper.extractEffectiveQuality(it) }
-            .map { (qual, list) ->
-                QualityOption(
-                    qualityValue = qual,
-                    label = com.lagradost.cloudstream3.desktop.player.QualityDataHelper.formatQuality(qual),
-                    count = list.size,
-                )
-            }
-            .sortedByDescending { it.qualityValue }
+        val count4k = links.count { com.lagradost.cloudstream3.desktop.player.QualityDataHelper.extractEffectiveQuality(it) >= 2160 }
+        val count1080 = links.count { com.lagradost.cloudstream3.desktop.player.QualityDataHelper.extractEffectiveQuality(it) in 1080..2159 }
+        val count720 = links.count { com.lagradost.cloudstream3.desktop.player.QualityDataHelper.extractEffectiveQuality(it) in 720..1079 }
+        val countSd = links.count { com.lagradost.cloudstream3.desktop.player.QualityDataHelper.extractEffectiveQuality(it) in 1..719 }
+
+        val list = mutableListOf<QualityOption>()
+        if (count4k > 0) list.add(QualityOption(2160, "4K UHD", count4k))
+        if (count1080 > 0) list.add(QualityOption(1080, "1080p FHD", count1080))
+        if (count720 > 0) list.add(QualityOption(720, "720p HD", count720))
+        if (countSd > 0) list.add(QualityOption(480, "SD (<720p)", countSd))
+        list
+    }
+
+    val availableSpecs = remember(links) {
+        val totalDebrid = links.count { link ->
+            link.name.contains("⚡") || link.name.contains("[TB]") || link.name.contains("[RD]") ||
+                link.name.contains("[AD]") || link.name.contains("[PM]") || link.name.contains("[DL]") ||
+                link.name.contains("torbox", ignoreCase = true) || link.name.contains("real-debrid", ignoreCase = true) ||
+                link.name.contains("debrid", ignoreCase = true)
+        }
+        val totalRemux = links.count { it.name.contains("remux", ignoreCase = true) }
+        val totalBluRay = links.count { Regex("""\b(bluray|blu-ray|bdrip|brrip)\b""", RegexOption.IGNORE_CASE).containsMatchIn(it.name) }
+        val totalWebDl = links.count { Regex("""\b(web-dl|webdl|webrip|web-rip)\b""", RegexOption.IGNORE_CASE).containsMatchIn(it.name) }
+
+        val list = mutableListOf<Pair<StreamSpecFilter, Int>>()
+        list.add(StreamSpecFilter.ALL to links.size)
+        if (totalDebrid > 0) list.add(StreamSpecFilter.DEBRID to totalDebrid)
+        if (totalRemux > 0) list.add(StreamSpecFilter.REMUX to totalRemux)
+        if (totalBluRay > 0) list.add(StreamSpecFilter.BLURAY to totalBluRay)
+        if (totalWebDl > 0) list.add(StreamSpecFilter.WEBDL to totalWebDl)
+        list
     }
 
     val availableFormats = remember(links) {
@@ -176,13 +229,40 @@ fun LinksSidePanel(
         list
     }
 
-    val filteredLinks = remember(links, selectedQuality, selectedFormat, selectedSource, isP2pEnabled) {
+    val filteredLinks = remember(links, selectedQuality, selectedFormat, selectedSource, selectedSpecFilter, isP2pEnabled) {
         val base = links.filter { link ->
-            val linkSrc = link.source.trim().ifBlank { provider.name }
-            val sourceMatches = selectedSource == null || linkSrc.equals(selectedSource, ignoreCase = true)
+            val sourceMatches = when {
+                selectedSource == null || selectedSource == "All Sources" -> true
+                selectedSource.equals(provider.name, ignoreCase = true) -> !isAddonStream(link)
+                else -> isAddonStream(link) && (
+                    selectedSource.equals("Addons", ignoreCase = true) ||
+                    getAddonName(link).equals(selectedSource, ignoreCase = true) ||
+                    link.source.contains(selectedSource, ignoreCase = true) ||
+                    selectedSource.contains(link.source, ignoreCase = true)
+                )
+            }
 
             val effQual = com.lagradost.cloudstream3.desktop.player.QualityDataHelper.extractEffectiveQuality(link)
-            val qualityMatches = selectedQuality == null || effQual == selectedQuality
+            val qualityMatches = when (selectedQuality) {
+                null -> true
+                2160 -> effQual >= 2160
+                1080 -> effQual in 1080..2159
+                720 -> effQual in 720..1079
+                480 -> effQual in 1..719
+                else -> effQual == selectedQuality
+            }
+
+            val specMatches = when (selectedSpecFilter) {
+                StreamSpecFilter.ALL -> true
+                StreamSpecFilter.DEBRID -> link.name.contains("⚡") || link.name.contains("[TB]") || link.name.contains("[RD]") ||
+                    link.name.contains("[AD]") || link.name.contains("[PM]") || link.name.contains("[DL]") ||
+                    link.name.contains("torbox", ignoreCase = true) || link.name.contains("real-debrid", ignoreCase = true) ||
+                    link.name.contains("debrid", ignoreCase = true)
+                StreamSpecFilter.REMUX -> link.name.contains("remux", ignoreCase = true)
+                StreamSpecFilter.BLURAY -> Regex("""\b(bluray|blu-ray|bdrip|brrip)\b""", RegexOption.IGNORE_CASE).containsMatchIn(link.name)
+                StreamSpecFilter.WEBDL -> Regex("""\b(web-dl|webdl|webrip|web-rip)\b""", RegexOption.IGNORE_CASE).containsMatchIn(link.name)
+            }
+
             val isHls = link.isM3u8 || link.name.contains("HLS", ignoreCase = true) || link.url.contains(".m3u8")
             val isDash = link.isDash || link.name.contains("DASH", ignoreCase = true) || link.url.contains(".mpd")
             val isTorrent = DesktopTorrentEngine.isTorrentLink(link)
@@ -195,7 +275,7 @@ fun LinksSidePanel(
                 StreamFormatFilter.DASH -> isDash
                 StreamFormatFilter.TORRENT -> isTorrent
             }
-            sourceMatches && qualityMatches && formatMatches
+            sourceMatches && qualityMatches && formatMatches && specMatches
         }
         if (!DesktopTorrentEngine.isP2pReady && selectedFormat == StreamFormatFilter.ALL) {
             base.sortedBy { DesktopTorrentEngine.isTorrentLink(it) }
@@ -285,7 +365,30 @@ fun LinksSidePanel(
         }
     }
 
-    Surface(modifier = Modifier.fillMaxSize(), color = Color.Transparent) {
+    Surface(
+        modifier = Modifier
+            .fillMaxSize()
+            .onPreviewKeyEvent { event ->
+                if ((event.key == Key.Escape || event.key == Key.Back || event.key == Key.Backspace) && event.type == KeyEventType.KeyUp) {
+                    onClose()
+                    true
+                } else {
+                    false
+                }
+            }
+            .pointerInput(Unit) {
+                awaitPointerEventScope {
+                    while (true) {
+                        val event = awaitPointerEvent(PointerEventPass.Initial)
+                        if (event.type == PointerEventType.Release && event.button == PointerButton.Back) {
+                            onClose()
+                            event.changes.forEach { it.consume() }
+                        }
+                    }
+                }
+            },
+        color = Color.Transparent,
+    ) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
             Column(modifier = Modifier.fillMaxWidth().fillMaxHeight()) {
                 // Header Bar
@@ -296,10 +399,17 @@ fun LinksSidePanel(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
+                        val epTitle = remember(history, loadResponse) {
+                            (loadResponse as? com.lagradost.cloudstream3.TvSeriesLoadResponse)?.episodes?.find {
+                                it.episode == history.episode && (history.season == null || it.season == history.season)
+                            }?.name
+                        }
                         val epSubtitle = if (history.season != null && history.episode != null) {
-                            "Season ${history.season} • Episode ${history.episode}"
+                            if (!epTitle.isNullOrBlank()) "Season ${history.season} • Episode ${history.episode}: $epTitle"
+                            else "Season ${history.season} • Episode ${history.episode}"
                         } else if (history.episode != null) {
-                            "Episode ${history.episode}"
+                            if (!epTitle.isNullOrBlank()) "Episode ${history.episode}: $epTitle"
+                            else "Episode ${history.episode}"
                         } else {
                             "Movie"
                         }
@@ -316,6 +426,8 @@ fun LinksSidePanel(
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.primary,
                             fontWeight = FontWeight.Medium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                         )
                     }
 
@@ -484,56 +596,69 @@ fun LinksSidePanel(
 
                     Spacer(modifier = Modifier.width(8.dp))
 
-                    // Addon / Provider Source Chips
+                    // Plugin vs Addons Source Tabs (Single Tabs, Zero Server Clutter)
                     val sourceScrollState = rememberScrollState()
                     Row(
                         modifier = Modifier
                             .weight(1f)
-                            .horizontalScroll(sourceScrollState),
+                            .horizontalScroll(sourceScrollState)
+                            .desktopDragScroll(sourceScrollState),
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        FilterChip(
-                            selected = selectedSource == null,
-                            onClick = { viewModel.onEvent(LinksUiEvent.OnFilterSource(null)) },
-                            label = {
-                                Text(
-                                    "All Sources (${links.size})",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = if (selectedSource == null) FontWeight.Bold else FontWeight.Normal,
-                                )
-                            },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
-                                selectedLabelColor = MaterialTheme.colorScheme.primary,
-                            ),
-                            shape = RoundedCornerShape(8.dp),
-                        )
+                        sourceTabs.forEach { tab ->
+                            val isSel = (tab.name == "All Sources" && selectedSource == null) ||
+                                (selectedSource != null && selectedSource.equals(tab.name, ignoreCase = true))
+                            val isPluginTab = !tab.isAddon && tab.name != "All Sources"
+                            val sourceLogoUrl = remember(tab.name) {
+                                if (isPluginTab) {
+                                    DesktopRepositoryManager.getPluginIcon(provider.name)
+                                } else if (tab.isAddon) {
+                                    DesktopRepositoryManager.getPluginIcon(tab.name)
+                                        ?: StremioAddonManager.addons.value.firstOrNull {
+                                            it.name.equals(tab.name, ignoreCase = true) ||
+                                                tab.name.contains(it.name, ignoreCase = true) ||
+                                                it.name.contains(tab.name, ignoreCase = true)
+                                        }?.logoUrl
+                                } else {
+                                    null
+                                }
+                            }
 
-                        availableSources.forEach { source ->
-                            val isSelected = selectedSource.equals(source.name, ignoreCase = true)
-                            FilterChip(
-                                selected = isSelected,
-                                onClick = { viewModel.onEvent(LinksUiEvent.OnFilterSource(if (isSelected) null else source.name)) },
+                            DesktopFilterPill(
+                                label = tab.name,
+                                count = tab.count,
+                                selected = isSel,
+                                onClick = {
+                                    viewModel.onEvent(LinksUiEvent.OnFilterSource(if (tab.name == "All Sources" || isSel) null else tab.name))
+                                },
                                 leadingIcon = {
-                                    Icon(
-                                        if (source.isAddon) Icons.Default.Extension else Icons.Default.Public,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(12.dp),
-                                    )
+                                    if (sourceLogoUrl != null) {
+                                        AsyncImage(
+                                            model = sourceLogoUrl,
+                                            contentDescription = null,
+                                            modifier = Modifier
+                                                .size(16.dp)
+                                                .clip(RoundedCornerShape(3.dp)),
+                                            contentScale = ContentScale.Fit,
+                                        )
+                                    } else if (tab.isAddon) {
+                                        Icon(
+                                            Icons.Default.Extension,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(13.dp),
+                                            tint = if (isSel) MaterialTheme.colorScheme.secondary else Color.White.copy(alpha = 0.7f),
+                                        )
+                                    } else if (isPluginTab) {
+                                        Icon(
+                                            Icons.Default.Public,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(13.dp),
+                                            tint = if (isSel) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.7f),
+                                        )
+                                    }
                                 },
-                                label = {
-                                    Text(
-                                        "${source.name} (${source.count})",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                    )
-                                },
-                                colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = MaterialTheme.colorScheme.secondary.copy(alpha = 0.2f),
-                                    selectedLabelColor = MaterialTheme.colorScheme.secondary,
-                                ),
-                                shape = RoundedCornerShape(8.dp),
+                                accentColor = if (tab.isAddon) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.primary,
                             )
                         }
                     }
@@ -554,52 +679,69 @@ fun LinksSidePanel(
                     }
                 }
 
-                // Quality & Protocol Filter Strip
-                if (availableQualities.isNotEmpty() || availableFormats.size > 1) {
+                // Quality & Protocol & Spec Filter Strip
+                if (availableQualities.isNotEmpty() || availableSpecs.size > 1 || availableFormats.size > 1) {
                     val filterScrollState = rememberScrollState()
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 20.dp, vertical = 2.dp)
-                            .horizontalScroll(filterScrollState),
+                            .horizontalScroll(filterScrollState)
+                            .desktopDragScroll(filterScrollState),
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         if (availableQualities.isNotEmpty()) {
-                            FilterChip(
+                            DesktopFilterPill(
+                                label = "All Qualities",
+                                count = links.size,
                                 selected = selectedQuality == null,
                                 onClick = { viewModel.onEvent(LinksUiEvent.OnFilterQuality(null)) },
-                                label = {
-                                    Text(
-                                        "All Qualities",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        fontWeight = if (selectedQuality == null) FontWeight.Bold else FontWeight.Normal,
-                                    )
-                                },
-                                colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = DesktopUi.AccentSoft,
-                                    selectedLabelColor = DesktopUi.Accent,
-                                ),
-                                shape = RoundedCornerShape(8.dp),
+                                accentColor = DesktopUi.Accent,
                             )
 
                             availableQualities.forEach { option ->
                                 val isSel = selectedQuality == option.qualityValue
-                                FilterChip(
+                                val pillAccent = when {
+                                    option.qualityValue >= 2160 -> Color(0xFFF59E0B)
+                                    option.qualityValue in 1080..2159 -> Color(0xFF3B82F6)
+                                    option.qualityValue in 720..1079 -> Color(0xFF06B6D4)
+                                    option.qualityValue in 480..719 -> Color(0xFF94A3B8)
+                                    else -> DesktopUi.Accent
+                                }
+                                DesktopFilterPill(
+                                    label = option.label,
+                                    count = option.count,
                                     selected = isSel,
                                     onClick = { viewModel.onEvent(LinksUiEvent.OnFilterQuality(if (isSel) null else option.qualityValue)) },
-                                    label = {
-                                        Text(
-                                            "${option.label} (${option.count})",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            fontWeight = if (isSel) FontWeight.Bold else FontWeight.Normal,
-                                        )
-                                    },
-                                    colors = FilterChipDefaults.filterChipColors(
-                                        selectedContainerColor = DesktopUi.AccentSoft,
-                                        selectedLabelColor = DesktopUi.Accent,
-                                    ),
-                                    shape = RoundedCornerShape(8.dp),
+                                    accentColor = pillAccent,
+                                )
+                            }
+                        }
+
+                        if (availableSpecs.size > 1) {
+                            Box(
+                                modifier = Modifier
+                                    .height(20.dp)
+                                    .width(1.dp)
+                                    .background(Color.White.copy(alpha = 0.15f)),
+                            )
+
+                            availableSpecs.filter { it.first != StreamSpecFilter.ALL }.forEach { (spec, count) ->
+                                val isSel = selectedSpecFilter == spec
+                                val pillAccent = when (spec) {
+                                    StreamSpecFilter.ALL -> MaterialTheme.colorScheme.primary
+                                    StreamSpecFilter.DEBRID -> Color(0xFFF59E0B)
+                                    StreamSpecFilter.REMUX -> Color(0xFF8B5CF6)
+                                    StreamSpecFilter.BLURAY -> Color(0xFF3B82F6)
+                                    StreamSpecFilter.WEBDL -> Color(0xFF10B981)
+                                }
+                                DesktopFilterPill(
+                                    label = spec.label,
+                                    count = count,
+                                    selected = isSel,
+                                    onClick = { selectedSpecFilter = if (isSel) StreamSpecFilter.ALL else spec },
+                                    accentColor = pillAccent,
                                 )
                             }
                         }
@@ -607,28 +749,19 @@ fun LinksSidePanel(
                         if (availableFormats.size > 1) {
                             Box(
                                 modifier = Modifier
-                                    .height(16.dp)
+                                    .height(20.dp)
                                     .width(1.dp)
-                                    .background(DesktopUi.Divider.copy(alpha = 0.5f)),
+                                    .background(Color.White.copy(alpha = 0.15f)),
                             )
 
                             availableFormats.forEach { formatOpt ->
                                 val isSel = selectedFormat == formatOpt.format
-                                FilterChip(
+                                DesktopFilterPill(
+                                    label = formatOpt.format.label,
+                                    count = formatOpt.count,
                                     selected = isSel,
                                     onClick = { viewModel.onEvent(LinksUiEvent.OnFilterFormat(formatOpt.format)) },
-                                    label = {
-                                        Text(
-                                            "${formatOpt.format.label} (${formatOpt.count})",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            fontWeight = if (isSel) FontWeight.Bold else FontWeight.Normal,
-                                        )
-                                    },
-                                    colors = FilterChipDefaults.filterChipColors(
-                                        selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
-                                        selectedLabelColor = MaterialTheme.colorScheme.primary,
-                                    ),
-                                    shape = RoundedCornerShape(8.dp),
+                                    accentColor = MaterialTheme.colorScheme.primary,
                                 )
                             }
                         }
@@ -677,6 +810,7 @@ fun LinksSidePanel(
                     itemsIndexed(filteredLinks, key = { index, it -> "${it.name}-${it.url}-$index" }) { _, link ->
                         StreamLinkCard(
                             link = link,
+                            providerName = provider.name,
                             isP2pEnabled = isP2pEnabled,
                             isPlaying = (currentPlayingUrl == link.url),
                             isBusy = isLaunchingPlayer && currentPlayingUrl != link.url,
@@ -814,3 +948,90 @@ internal data class SourceOption(
     val count: Int,
     val isAddon: Boolean = false,
 )
+
+internal enum class StreamSpecFilter(val label: String) {
+    ALL("All"),
+    DEBRID("⚡ Debrid"),
+    REMUX("REMUX"),
+    BLURAY("BluRay"),
+    WEBDL("WEB-DL"),
+}
+
+@Composable
+private fun DesktopFilterPill(
+    label: String,
+    count: Int? = null,
+    selected: Boolean,
+    onClick: () -> Unit,
+    leadingIcon: (@Composable () -> Unit)? = null,
+    accentColor: Color = DesktopUi.Accent,
+    modifier: Modifier = Modifier,
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
+
+    val containerColor = when {
+        selected -> accentColor.copy(alpha = 0.22f)
+        isHovered -> Color.White.copy(alpha = 0.08f)
+        else -> Color(0xFF1E222D).copy(alpha = 0.65f)
+    }
+
+    val borderColor = when {
+        selected -> accentColor.copy(alpha = 0.75f)
+        isHovered -> Color.White.copy(alpha = 0.25f)
+        else -> Color.White.copy(alpha = 0.10f)
+    }
+
+    val textColor = when {
+        selected -> Color.White
+        isHovered -> Color.White
+        else -> Color.White.copy(alpha = 0.85f)
+    }
+
+    Surface(
+        shape = RoundedCornerShape(8.dp),
+        color = containerColor,
+        border = BorderStroke(1.dp, borderColor),
+        modifier = modifier
+            .height(32.dp)
+            .hoverable(interactionSource)
+            .clip(RoundedCornerShape(8.dp))
+            .clickable(onClick = onClick),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            if (leadingIcon != null) {
+                leadingIcon()
+            }
+
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium.copy(
+                    fontSize = 12.sp,
+                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                ),
+                color = textColor,
+            )
+
+            if (count != null) {
+                Surface(
+                    shape = RoundedCornerShape(6.dp),
+                    color = if (selected) accentColor.copy(alpha = 0.35f) else Color.White.copy(alpha = 0.08f),
+                ) {
+                    Text(
+                        text = count.toString(),
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontSize = 10.5.sp,
+                            fontWeight = FontWeight.Bold,
+                        ),
+                        color = if (selected) Color.White else Color.White.copy(alpha = 0.70f),
+                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.5.dp),
+                    )
+                }
+            }
+        }
+    }
+}
