@@ -34,52 +34,53 @@ class DetailsViewModel(
     private val getBookmarks: GetBookmarks = AppContainerHolder.container.getBookmarks,
     private val bookmarksRepository: BookmarksRepository = AppContainerHolder.container.bookmarksRepository,
 ) : BaseMviViewModel<DetailsUiState, DetailsUiEvent, DetailsUiEffect>(
-    initialState = cachedUiState?.copy(
-        fetchFailed = false,
-        error = null,
-        selectedSeason = initialSeason ?: cachedUiState.selectedSeason,
-        hasUserSelectedSeason = initialSeason != null,
-    ) ?: DetailsUiState(
-        preloadedName = preloadedName,
-        response = cachedResponse,
-        selectedSeason = initialSeason,
-        hasUserSelectedSeason = initialSeason != null,
-        enrichedLogoUrl = cachedResponse?.logoUrl,
-        enrichedBackdropUrl = cachedResponse?.backgroundPosterUrl,
-        isLoading = cachedResponse == null,
-        fakeData = if (cachedResponse == null) {
-            @Suppress("DEPRECATION_ERROR", "DEPRECATION")
-            MovieLoadResponse(
-                name = preloadedName ?: "",
-                url = url,
-                apiName = provider.name,
-                type = TvType.Movie,
-                dataUrl = url,
-                posterUrl = preloadedPoster,
-            ).apply {
-                this.backgroundPosterUrl = preloadedBg
-            }
-        } else {
-            null
-        },
-    ),
+    initialState = run {
+        val autoPlay = DesktopDataStore.getKey<Boolean>(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_AUTO_PLAY) ?: true
+        val isStacked = DesktopDataStore.getKey<Boolean>(PreferenceKeys.PREF_EPISODES_STACKED_VIEW) ?: false
+        val viewMode = DesktopDataStore.getKey<Int>(PreferenceKeys.PREF_EPISODES_VIEW_MODE) ?: if (isStacked) 1 else 0
+        val isPinned = DesktopDataStore.getKey<Boolean>(PreferenceKeys.DETAILS_RIGHT_COLUMN_PINNED) ?: false
+
+        cachedUiState?.copy(
+            fetchFailed = false,
+            error = null,
+            selectedSeason = initialSeason ?: cachedUiState.selectedSeason,
+            hasUserSelectedSeason = initialSeason != null,
+            autoPlayEnabled = autoPlay,
+            isEpisodesStackedView = isStacked,
+            episodeViewMode = viewMode,
+            isRightColumnPinned = isPinned,
+        ) ?: DetailsUiState(
+            preloadedName = preloadedName,
+            response = cachedResponse,
+            selectedSeason = initialSeason,
+            hasUserSelectedSeason = initialSeason != null,
+            enrichedLogoUrl = cachedResponse?.logoUrl,
+            enrichedBackdropUrl = cachedResponse?.backgroundPosterUrl,
+            isLoading = cachedResponse == null,
+            fakeData = if (cachedResponse == null) {
+                @Suppress("DEPRECATION_ERROR", "DEPRECATION")
+                MovieLoadResponse(
+                    name = preloadedName ?: "",
+                    url = url,
+                    apiName = provider.name,
+                    type = TvType.Movie,
+                    dataUrl = url,
+                    posterUrl = preloadedPoster,
+                ).apply {
+                    this.backgroundPosterUrl = preloadedBg
+                }
+            } else {
+                null
+            },
+            autoPlayEnabled = autoPlay,
+            isEpisodesStackedView = isStacked,
+            episodeViewMode = viewMode,
+            isRightColumnPinned = isPinned,
+        )
+    },
 ) {
 
     init {
-        viewModelScope.launch(Dispatchers.IO) {
-            val autoPlay = DesktopDataStore.getKey<Boolean>(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_AUTO_PLAY) ?: true
-            val isStacked = DesktopDataStore.getKey<Boolean>(PreferenceKeys.PREF_EPISODES_STACKED_VIEW) ?: false
-            val viewMode = DesktopDataStore.getKey<Int>(PreferenceKeys.PREF_EPISODES_VIEW_MODE) ?: if (isStacked) 1 else 0
-            val isPinned = DesktopDataStore.getKey<Boolean>(PreferenceKeys.DETAILS_RIGHT_COLUMN_PINNED) ?: false
-            updateState {
-                copy(
-                    autoPlayEnabled = autoPlay,
-                    isEpisodesStackedView = isStacked,
-                    episodeViewMode = viewMode,
-                    isRightColumnPinned = isPinned,
-                )
-            }
-        }
         viewModelScope.launch(Dispatchers.IO) {
             getWatchHistory.subscribeAll().collect {
                 val currentDataUrl = uiState.value.response?.url ?: url

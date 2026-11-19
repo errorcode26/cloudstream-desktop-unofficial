@@ -10,7 +10,6 @@ import com.lagradost.cloudstream3.desktop.repo.HeroCache
 import com.lagradost.cloudstream3.desktop.repo.HeroMeta
 import com.lagradost.cloudstream3.desktop.utils.TitleUtils
 import com.lagradost.common.logging.AppLogger
-import com.lagradost.common.storage.DesktopDataStore
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -347,7 +346,6 @@ object MetadataPipeline {
                 duration = loaded.duration,
             )
             val cacheKey = "${loaded.apiName}_$urlClean"
-            DesktopDataStore.setKey("herometa_$cacheKey", heroMeta)
             HeroCache.put(cacheKey, heroMeta)
 
             callbacks.onEnrichmentComplete()

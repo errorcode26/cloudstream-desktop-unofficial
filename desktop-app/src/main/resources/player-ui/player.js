@@ -1914,28 +1914,263 @@
 
     let activeServerFilter = 'All';
 
+    window.copyToClipboard = (encodedUrl, btn) => {
+        const text = decodeURIComponent(encodedUrl || '');
+        if (!text) return;
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text);
+        } else {
+            const ta = document.createElement('textarea');
+            ta.value = text;
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+        }
+        if (btn) {
+            btn.classList.add('copied');
+            const orig = btn.innerHTML;
+            btn.innerHTML = '<svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>';
+            setTimeout(() => {
+                btn.classList.remove('copied');
+                btn.innerHTML = orig;
+            }, 1200);
+        }
+    };
+
+    function parseStreamTechTags(rawName) {
+        if (!rawName) return [];
+        const tags = [];
+        const upper = rawName.toUpperCase();
+
+        // 0. Debrid providers
+        if (upper.includes('[RD]') || upper.includes('RD+') || upper.includes('REAL-DEBRID')) {
+            tags.push({ text: 'Real-Debrid', type: 'format', badge: 'rd.png' });
+        } else if (upper.includes('[TB]') || upper.includes('TB+') || upper.includes('TORBOX')) {
+            tags.push({ text: 'TorBox', type: 'format', badge: 'torbox.png' });
+        } else if (upper.includes('[AD]') || upper.includes('AD+') || upper.includes('ALLDEBRID')) {
+            tags.push({ text: 'AllDebrid', type: 'format', badge: 'alldebrid.png' });
+        } else if (upper.includes('[PM]') || upper.includes('PM+') || upper.includes('PREMIUMIZE')) {
+            tags.push({ text: 'Premiumize', type: 'format', badge: 'premiumize.png' });
+        } else if (upper.includes('[DL]') || upper.includes('DL+') || upper.includes('DEBRID-LINK') || upper.includes('DEBRIDLINK')) {
+            tags.push({ text: 'Debrid-Link', type: 'format', badge: 'debridlink.png' });
+        }
+
+        // 1. Format / Rip Source
+        if (upper.includes('REMUX')) {
+            tags.push({ text: 'REMUX', type: 'format', badge: 'source-remux.png' });
+        } else if (upper.includes('BLURAY') || upper.includes('BLU-RAY') || upper.includes('BDRIP') || upper.includes('BRRIP')) {
+            tags.push({ text: 'BluRay', type: 'format', badge: 'source-bluray.png' });
+        } else if (upper.includes('WEB-DL') || upper.includes('WEBDL')) {
+            tags.push({ text: 'WEB-DL', type: 'format', badge: 'source-webdl.png' });
+        } else if (upper.includes('WEBRIP') || upper.includes('WEB-RIP')) {
+            tags.push({ text: 'WEBRip', type: 'format', badge: 'source-webrip.png' });
+        } else if (upper.includes('CAMRIP') || upper.includes('CAM-RIP') || upper.includes('HDCAM') || /\bCAM\b/.test(upper)) {
+            tags.push({ text: 'CAM', type: 'format', badge: 'cam.png' });
+        } else if (upper.includes('TELESYNC') || upper.includes('HDTS') || upper.includes('HD-TS') || /\bTS\b/.test(upper)) {
+            tags.push({ text: 'TeleSync', type: 'format', badge: 'telesync.png' });
+        } else if (upper.includes('TELECINE') || upper.includes('HDTC') || /\bTC\b/.test(upper)) {
+            tags.push({ text: 'TeleCine', type: 'format', badge: 'tc.png' });
+        } else if (upper.includes('SCREENER') || upper.includes('DVDSCR') || /\bSCR\b/.test(upper)) {
+            tags.push({ text: 'SCR', type: 'format', badge: 'scr.png' });
+        } else if (upper.includes('HDTV') || upper.includes('PDTV')) {
+            tags.push({ text: 'HDTV', type: 'format', badge: 'source-hdtv.png' });
+        } else if (upper.includes('DVDRIP') || upper.includes('DVD-RIP') || /\bDVD\b/.test(upper)) {
+            tags.push({ text: 'DVD', type: 'format', badge: 'source-dvd.png' });
+        }
+
+        // Editions
+        if (upper.includes('IMAX ENHANCED')) {
+            tags.push({ text: 'IMAX Enhanced', type: 'format', badge: 'imax-enhanced.png' });
+        } else if (upper.includes('IMAX')) {
+            tags.push({ text: 'IMAX', type: 'format', badge: 'imax.png' });
+        }
+        if (upper.includes('DIRECTORS CUT') || upper.includes("DIRECTOR'S CUT") || /\bDC\b/.test(upper)) {
+            tags.push({ text: "Director's Cut", type: 'format', badge: 'directors-cut.png' });
+        } else if (upper.includes('EXTENDED')) {
+            tags.push({ text: 'Extended', type: 'format', badge: 'extended.png' });
+        } else if (upper.includes('REMASTERED') || upper.includes('REMASTER')) {
+            tags.push({ text: 'Remastered', type: 'format', badge: 'remastered.png' });
+        } else if (/\bPROPER\b/.test(upper)) {
+            tags.push({ text: 'PROPER', type: 'format', badge: 'proper.png' });
+        }
+
+        // 2. Dynamic Range / HDR
+        if (upper.includes('DOLBY VISION') || upper.includes('DOVI') || upper.includes('DV ') || upper.includes('.DV.') || upper.includes('-DV-') || upper.includes('[DV]')) {
+            tags.push({ text: 'DV', type: 'hdr', badge: 'dolby-vision.png' });
+        } else if (upper.includes('HDR10+')) {
+            tags.push({ text: 'HDR10+', type: 'hdr', badge: 'hdr10plus.png' });
+        } else if (upper.includes('HDR10')) {
+            tags.push({ text: 'HDR10', type: 'hdr', badge: 'hdr10.png' });
+        } else if (upper.includes(' HDR ') || upper.includes('.HDR.') || upper.includes('-HDR-') || upper.includes('[HDR]')) {
+            tags.push({ text: 'HDR', type: 'hdr', badge: 'hdr.png' });
+        }
+
+        // 3. Video Codec
+        if (upper.includes('AV1')) {
+            tags.push({ text: 'AV1', type: 'codec', badge: 'av1.png' });
+        } else if (upper.includes('HEVC') || upper.includes('X265') || upper.includes('H.265') || upper.includes('H265')) {
+            tags.push({ text: 'HEVC', type: 'codec', badge: 'hevc.png' });
+        } else if (upper.includes('X264') || upper.includes('H.264') || upper.includes('H264') || upper.includes('AVC')) {
+            tags.push({ text: 'AVC', type: 'codec', badge: 'avc.png' });
+        } else if (upper.includes('PRORES')) {
+            tags.push({ text: 'ProRes', type: 'codec', badge: 'prores.png' });
+        } else if (upper.includes('VP9')) {
+            tags.push({ text: 'VP9', type: 'codec', badge: 'vp9.png' });
+        }
+        if (upper.includes('10BIT') || upper.includes('10-BIT') || upper.includes('10 BIT')) {
+            tags.push({ text: '10-bit', type: 'codec', badge: '10bit.png' });
+        }
+
+        // 4. Audio Codec
+        if (upper.includes('ATMOS')) {
+            tags.push({ text: 'Atmos', type: 'audio', badge: 'atmos.png' });
+        }
+        if (upper.includes('TRUEHD')) {
+            tags.push({ text: 'TrueHD', type: 'audio', badge: 'truehd.png' });
+        } else if (upper.includes('DTS:X') || upper.includes('DTS-X')) {
+            tags.push({ text: 'DTS:X', type: 'audio', badge: 'dtsx.png' });
+        } else if (upper.includes('DTS-HD') || upper.includes('DTSHD')) {
+            tags.push({ text: 'DTS-HD', type: 'audio', badge: 'dtshd-ma.png' });
+        } else if (upper.includes('DTS')) {
+            tags.push({ text: 'DTS', type: 'audio', badge: 'dts.png' });
+        } else if (upper.includes('DDP5.1') || upper.includes('DDP 5.1') || upper.includes('EAC3 5.1') || upper.includes('E-AC-3 5.1') || upper.includes('DDP5')) {
+            tags.push({ text: 'DDP 5.1', type: 'audio', badge: 'ddplus.png' });
+        } else if (upper.includes('DDP7.1') || upper.includes('DDP 7.1') || upper.includes('EAC3 7.1')) {
+            tags.push({ text: 'DDP 7.1', type: 'audio', badge: 'ddplus.png' });
+        } else if (upper.includes('DDP2') || upper.includes('DDP 2.0') || upper.includes('DDP') || upper.includes('DD+') || upper.includes('EAC3') || upper.includes('E-AC-3')) {
+            tags.push({ text: 'DD+', type: 'audio', badge: 'ddplus.png' });
+        } else if (upper.includes('DD5.1') || upper.includes('DD 5.1') || upper.includes('AC3 5.1') || upper.includes('AC-3 5.1')) {
+            tags.push({ text: 'DD 5.1', type: 'audio', badge: 'dd.png' });
+        } else if (upper.includes('FLAC')) {
+            tags.push({ text: 'FLAC', type: 'audio', badge: 'flac.png' });
+        } else if (upper.includes('AAC 5.1') || upper.includes('AAC5.1')) {
+            tags.push({ text: 'AAC 5.1', type: 'audio', badge: 'aac.png' });
+        } else if (upper.includes('AAC')) {
+            tags.push({ text: 'AAC', type: 'audio', badge: 'aac.png' });
+        } else if (upper.includes('OPUS')) {
+            tags.push({ text: 'Opus', type: 'audio', badge: 'opus.png' });
+        }
+
+        // Audio Channels
+        if (upper.includes('7.1') || upper.includes('8CH') || upper.includes('8 CH')) {
+            tags.push({ text: '7.1', type: 'audio', badge: '7-1.png' });
+        } else if (upper.includes('5.1') || upper.includes('6CH') || upper.includes('6 CH')) {
+            tags.push({ text: '5.1', type: 'audio', badge: '5-1.png' });
+        } else if (upper.includes('2.0') || upper.includes('2CH') || upper.includes('STEREO')) {
+            tags.push({ text: '2.0', type: 'audio', badge: '2-0.png' });
+        }
+
+        // Audio & Subtitle Features
+        if (upper.includes('DUAL AUDIO') || upper.includes('DUAL-AUDIO') || upper.includes('DUALAUDIO')) {
+            tags.push({ text: 'Dual Audio', type: 'audio', badge: 'dual-audio.png' });
+        } else if (upper.includes('MULTI AUDIO') || upper.includes('MULTI-AUDIO') || upper.includes('MULTIAUDIO')) {
+            tags.push({ text: 'Multi Audio', type: 'audio', badge: 'multi-audio.png' });
+        } else if (upper.includes('DUBBED') || /\bDUB\b/.test(upper)) {
+            tags.push({ text: 'Dubbed', type: 'audio', badge: 'dubbed.png' });
+        }
+        if (upper.includes('MULTI SUB') || upper.includes('MULTI-SUB') || upper.includes('MULTISUB')) {
+            tags.push({ text: 'Multi Sub', type: 'format', badge: 'multi-sub.png' });
+        }
+
+        // 5. Languages (Audio flags)
+        if (/\b(HIN|HINDI)\b/.test(upper)) {
+            tags.push({ text: 'HIN', type: 'format', badge: 'lang-hi.png' });
+        }
+        if (/\b(ENG|ENGLISH)\b/.test(upper)) {
+            tags.push({ text: 'ENG', type: 'format', badge: 'lang-en.png' });
+        }
+        if (/\b(TAM|TAMIL)\b/.test(upper)) {
+            tags.push({ text: 'TAM', type: 'format', badge: 'lang-ta.png' });
+        }
+        if (/\b(TEL|TELUGU)\b/.test(upper)) {
+            tags.push({ text: 'TEL', type: 'format', badge: 'lang-te.png' });
+        }
+        if (/\b(MAL|MALAYALAM)\b/.test(upper)) {
+            tags.push({ text: 'MAL', type: 'format', badge: 'lang-ml.png' });
+        }
+        if (/\b(KAN|KANNADA)\b/.test(upper)) {
+            tags.push({ text: 'KAN', type: 'format', badge: 'lang-kn.png' });
+        }
+        if (/\b(SPA|SPANISH|CASTELLANO)\b/.test(upper)) {
+            tags.push({ text: 'SPA', type: 'format', badge: 'lang-es.png' });
+        }
+        if (/\b(FRE|FRA|FRENCH|VFF|VFQ)\b/.test(upper)) {
+            tags.push({ text: 'FRE', type: 'format', badge: 'lang-fr.png' });
+        }
+        if (/\b(GER|DEU|GERMAN|DEUTSCH)\b/.test(upper)) {
+            tags.push({ text: 'GER', type: 'format', badge: 'lang-de.png' });
+        }
+        if (/\b(ITA|ITALIAN)\b/.test(upper)) {
+            tags.push({ text: 'ITA', type: 'format', badge: 'lang-it.png' });
+        }
+        if (/\b(POR|PORTUGUESE)\b/.test(upper)) {
+            tags.push({ text: 'POR', type: 'format', badge: 'lang-pt.png' });
+        }
+        if (/\b(RUS|RUSSIAN)\b/.test(upper)) {
+            tags.push({ text: 'RUS', type: 'format', badge: 'lang-ru.png' });
+        }
+        if (/\b(JPN|JAPANESE)\b/.test(upper)) {
+            tags.push({ text: 'JPN', type: 'format', badge: 'lang-ja.png' });
+        }
+        if (/\b(KOR|KOREAN)\b/.test(upper)) {
+            tags.push({ text: 'KOR', type: 'format', badge: 'lang-ko.png' });
+        }
+        if (/\b(CHI|CHINESE|MANDARIN|CANTONESE)\b/.test(upper)) {
+            tags.push({ text: 'CHI', type: 'format', badge: 'lang-zh.png' });
+        }
+        if (/\b(ARA|ARABIC)\b/.test(upper)) {
+            tags.push({ text: 'ARA', type: 'format', badge: 'lang-ar.png' });
+        }
+        if (/\b(TUR|TURKISH)\b/.test(upper)) {
+            tags.push({ text: 'TUR', type: 'format', badge: 'lang-tr.png' });
+        }
+
+        // Deduplicate tags by text
+        const seen = new Set();
+        return tags.filter(t => {
+            if (seen.has(t.text)) return false;
+            seen.add(t.text);
+            return true;
+        });
+    }
+
     window.setServerFilter = (filterVal) => {
         activeServerFilter = filterVal;
         renderFilteredServers();
     };
 
     const renderFilteredServers = () => {
-        const filtered = linksData.filter(l => {
-            if (activeServerFilter === 'All') return true;
+        try {
+            if (!Array.isArray(linksData)) return;
+            const filtered = linksData.filter(l => {
+                if (!l) return false;
+                if (activeServerFilter === 'All') return true;
             
             const isHls = l.isM3u8 || (l.name || '').toLowerCase().includes('hls') || (l.url || '').includes('.m3u8');
             const isDash = l.isDash || (l.name || '').toLowerCase().includes('dash') || (l.url || '').includes('.mpd');
             
             if (activeServerFilter === 'Auto / HLS') return isHls || isDash;
             if (activeServerFilter === 'MP4 (Downloadable)') return !isHls && !isDash;
+
+            const nameLower = (l.name || '').toLowerCase();
+            if (activeServerFilter === '⚡ Debrid') {
+                return (l.name || '').includes('⚡') || (l.name || '').includes('[TB]') || (l.name || '').includes('[RD]') ||
+                       (l.name || '').includes('[AD]') || (l.name || '').includes('[PM]') || (l.name || '').includes('[DL]') ||
+                       nameLower.includes('torbox') || nameLower.includes('real-debrid') || nameLower.includes('alldebrid') ||
+                       nameLower.includes('premiumize') || nameLower.includes('debrid');
+            }
+            if (activeServerFilter === 'REMUX') return nameLower.includes('remux');
+            if (activeServerFilter === 'BluRay') return /\b(bluray|blu-ray|bdrip|brrip)\b/i.test(l.name || '');
+            if (activeServerFilter === 'WEB-DL') return /\b(web-dl|webdl|webrip|web-rip)\b/i.test(l.name || '');
             
             const qVal = l.quality;
             const isAutoQuality = !qVal || qVal === 400 || qVal <= 0;
             const qStr = isAutoQuality ? '' : String(qVal).toLowerCase();
-            if (activeServerFilter === '4K') return qStr === '2160' || qStr === '4k';
-            if (activeServerFilter === '1080p') return qStr === '1080';
-            if (activeServerFilter === '720p') return qStr === '720';
-            if (activeServerFilter === '480p / SD') return qStr === '480' || qStr.includes('sd');
+            if (activeServerFilter === '4K') return qVal >= 2160 || qStr === '2160' || qStr === '4k';
+            if (activeServerFilter === '1080p') return (qVal >= 1080 && qVal < 2160) || qStr === '1080';
+            if (activeServerFilter === '720p') return (qVal >= 720 && qVal < 1080) || qStr === '720';
+            if (activeServerFilter === 'SD') return (qVal > 0 && qVal < 720) || qStr === '480' || qStr === '360' || qStr.includes('sd');
             
             return false;
         });
@@ -1949,18 +2184,28 @@
             const isHls = l.isM3u8 || (l.name || '').toLowerCase().includes('hls') || (l.url || '').includes('.m3u8');
             const isDash = l.isDash || (l.name || '').toLowerCase().includes('dash') || (l.url || '').includes('.mpd');
             if (isHls || isDash) availableChips.add('Auto / HLS');
-            else availableChips.add('MP4 (Downloadable)');
+
+            const nameLower = (l.name || '').toLowerCase();
+            if ((l.name || '').includes('⚡') || (l.name || '').includes('[TB]') || (l.name || '').includes('[RD]') ||
+                (l.name || '').includes('[AD]') || (l.name || '').includes('[PM]') || (l.name || '').includes('[DL]') ||
+                nameLower.includes('torbox') || nameLower.includes('real-debrid') || nameLower.includes('alldebrid') ||
+                nameLower.includes('premiumize') || nameLower.includes('debrid')) {
+                availableChips.add('⚡ Debrid');
+            }
+            if (nameLower.includes('remux')) availableChips.add('REMUX');
+            if (/\b(bluray|blu-ray|bdrip|brrip)\b/i.test(l.name || '')) availableChips.add('BluRay');
+            if (/\b(web-dl|webdl|webrip|web-rip)\b/i.test(l.name || '')) availableChips.add('WEB-DL');
             
             const qVal = l.quality;
             const isAutoQuality = !qVal || qVal === 400 || qVal <= 0;
             const qStr = isAutoQuality ? '' : String(qVal).toLowerCase();
-            if (qStr === '2160' || qStr === '4k') availableChips.add('4K');
-            else if (qStr === '1080') availableChips.add('1080p');
-            else if (qStr === '720') availableChips.add('720p');
-            else if (qStr === '480' || qStr.includes('sd')) availableChips.add('480p / SD');
+            if (qVal >= 2160 || qStr === '2160' || qStr === '4k') availableChips.add('4K');
+            else if ((qVal >= 1080 && qVal < 2160) || qStr === '1080') availableChips.add('1080p');
+            else if ((qVal >= 720 && qVal < 1080) || qStr === '720') availableChips.add('720p');
+            else if ((qVal > 0 && qVal < 720) || qStr === '480' || qStr === '360' || qStr.includes('sd')) availableChips.add('SD');
         });
         
-        const order = ['All', '4K', '1080p', '720p', '480p / SD', 'Auto / HLS', 'MP4 (Downloadable)'];
+        const order = ['All', '4K', '1080p', '720p', 'SD', '⚡ Debrid', 'REMUX', 'BluRay', 'WEB-DL', 'Auto / HLS'];
         const chipsHtml = order.filter(c => availableChips.has(c)).map(c => 
             `<div class="filter-chip ${activeServerFilter === c ? 'active' : ''}" onclick="setServerFilter('${c}')">${c}</div>`
         ).join('');
@@ -1982,7 +2227,7 @@
 
         const failedArr = (window.lastMeta && window.lastMeta.failedLinks) || [];
         const currentFailedJson = JSON.stringify(failedArr);
-        const listSignature = activeServerFilter + '::' + filtered.map(l => (l.url || '') + ':' + (l.name || '') + ':' + (l.quality || '') + ':' + (l.isTorrent || '') + ':' + (l.seeds || '')).join('|');
+        const listSignature = activeServerFilter + '::' + filtered.map(l => (l.url || '') + ':' + (l.name || '') + ':' + (l.quality || '') + ':' + (l.isTorrent || '') + ':' + (l.seeds || '') + ':' + (l.logoUrl || '')).join('|');
 
         if (serversListElem._lastSignature === listSignature && serversListElem._lastFailedJson === currentFailedJson && serversListElem.children.length === filtered.length) {
             // Update active state in-place without rebuilding DOM under hover cursor
@@ -2008,7 +2253,9 @@
         serversListElem._lastFailedJson = currentFailedJson;
 
         serversListElem.innerHTML = filtered.map(l => {
-            const failedInfo = failedArr.find(f => f.index === l.index || (f.url && f.url === l.url));
+            try {
+                if (!l) return '';
+                const failedInfo = failedArr.find(f => f.index === l.index || (f.url && f.url === l.url));
             const isFailed = !!failedInfo;
 
             const qVal = l.quality;
@@ -2020,8 +2267,9 @@
             const qStrLower = String(qVal || '').toLowerCase();
             const is4K = qStrLower.includes('2160') || qStrLower.includes('4k') || qVal >= 2160;
             const isHD = qStrLower.includes('1080') || qVal >= 1080;
+            const is720 = qStrLower.includes('720') || (qVal >= 720 && qVal < 1080);
             
-            let badgeText = 'SD';
+            let badgeText = '480p SD';
             let badgeClass = 'sd';
             if (isFailed) {
                 badgeText = failedInfo.reason ? (failedInfo.reason.length > 10 ? failedInfo.reason.slice(0, 8) + '…' : failedInfo.reason) : 'FAILED';
@@ -2030,11 +2278,14 @@
                 badgeText = l.seeds ? `P2P · ${l.seeds}s` : 'P2P';
                 badgeClass = 'p2p';
             } else if (is4K) {
-                badgeText = '4K';
+                badgeText = '4K UHD';
                 badgeClass = 'uhd';
             } else if (isHD) {
-                badgeText = '1080p';
+                badgeText = '1080p FHD';
                 badgeClass = 'fhd';
+            } else if (is720) {
+                badgeText = '720p HD';
+                badgeClass = 'hd';
             } else if (isAutoQuality) {
                 badgeText = isHls ? 'HLS' : isDash ? 'DASH' : 'AUTO';
                 badgeClass = 'hd';
@@ -2045,31 +2296,69 @@
             if (l.isActive) itemClasses.push('active');
             if (isFailed) itemClasses.push('failed');
 
-            let cleanName = escapeHtml(l.name || ('Source ' + (l.index + 1)));
+            const rawName = l.name || ('Source ' + (l.index + 1));
             const rawSizeText = l.size || (l.isActive && window.currentFileSize ? window.currentFileSize : '');
             const serverSizeNum = parseFloat(String(rawSizeText || '').replace(/[^\d.]/g, ''));
             const sizeText = (!isNaN(serverSizeNum) && serverSizeNum > 0) ? String(rawSizeText).trim() : '';
+
+            // Clean title for display
+            let cleanName = rawName.replace(/^⚡\s*/, '').trim();
             if (sizeText) {
-                cleanName = cleanName.replace(new RegExp(`\\[?\\s*${sizeText.replace('.', '\\.')}\\s*\\]?`, 'i'), '').trim();
-                cleanName = cleanName.replace(/[\s\-_•/·:]+$/g, '').trim();
-            } else {
-                cleanName = cleanName.replace(/\[\s*0+(?:\.0+)?\s*(?:GB|MB|GiB|MiB|B|KB)\s*\]|\(\s*0+(?:\.0+)?\s*(?:GB|MB|GiB|MiB|B|KB)\s*\)|\b0+(?:\.0+)?\s*(?:GB|MB|GiB|MiB|B|KB)\b/gi, '').trim();
-                cleanName = cleanName.replace(/[\s\-_•/·:]+$/g, '').trim();
+                cleanName = cleanName.replace(new RegExp(`\\[?\\s*${sizeText.replace('.', '\\.')}\\s*\\]?`, 'ig'), '').trim();
             }
-            const sizeSpan = sizeText ? `<span class="srv-size">${escapeHtml(sizeText)}</span>` : '';
-            const tooltip = isFailed ? (failedInfo.reason || 'Playback Failed') : cleanName;
-            const showExtraQuality = qStr && qStr.toLowerCase() !== badgeText.toLowerCase() && badgeText !== '1080p' && badgeText !== '4K' && badgeText !== '720p';
-            const qualitySpan = showExtraQuality ? `<span class="srv-quality">${qStr}</span>` : '';
+            cleanName = cleanName.replace(/\[\s*0+(?:\.0+)?\s*(?:GB|MB|GiB|MiB|B|KB)\s*\]|\(\s*0+(?:\.0+)?\s*(?:GB|MB|GiB|MiB|B|KB)\s*\)|\b0+(?:\.0+)?\s*(?:GB|MB|GiB|MiB|B|KB)\b/gi, '').trim();
+            cleanName = cleanName.replace(/\[\s*\]|\(\s*\)/g, '').replace(/[\s\-_•/·:]+$/g, '').trim();
+            cleanName = escapeHtml(cleanName || ('Source ' + (l.index + 1)));
+
+            // Extract tags
+            const tags = parseStreamTechTags(rawName);
+            const badgesBaseUrl = window.__BADGES_BASE_URL__ || '';
+            const tagsHtml = tags.map(t => {
+                if (t.badge && badgesBaseUrl) {
+                    const badgeSrc = escapeHtml(badgesBaseUrl + t.badge);
+                    return `<img src="${badgeSrc}" class="srv-badge-img" alt="${escapeHtml(t.text)}" title="${escapeHtml(t.text)}" onerror="this.style.display='none';this.nextElementSibling.style.display='inline-flex';" /><span class="srv-cube-badge tag-${t.type}" style="display:none;">${escapeHtml(t.text)}</span>`;
+                }
+                return `<span class="srv-cube-badge tag-${t.type}">${escapeHtml(t.text)}</span>`;
+            }).join('');
+            const sizeHtml = sizeText ? `<span class="srv-cube-badge tag-size">${escapeHtml(sizeText)}</span>` : '';
+
+            // Logo HTML
+            const logoHtml = l.logoUrl
+                ? `<img src="${escapeHtml(l.logoUrl)}" class="srv-logo" onerror="this.style.display='none';this.nextElementSibling.style.display='block';" alt="" /><svg class="srv-logo-fallback" viewBox="0 0 24 24" fill="currentColor" style="display:none;"><path d="M4 1h16c.55 0 1 .45 1 1v4c0 .55-.45 1-1 1H4c-.55 0-1-.45-1-1V2c0-.55.45-1 1-1zm0 8h16c.55 0 1 .45 1 1v4c0 .55-.45 1-1 1H4c-.55 0-1-.45-1-1v-4c0-.55.45-1 1-1zm0 8h16c.55 0 1 .45 1 1v4c0 .55-.45 1-1 1H4c-.55 0-1-.45-1-1v-4c0-.55.45-1 1-1z"/><circle cx="19" cy="4" r="1" fill="currentColor"/><circle cx="19" cy="12" r="1" fill="currentColor"/><circle cx="19" cy="20" r="1" fill="currentColor"/></svg>`
+                : `<svg class="srv-logo-fallback" viewBox="0 0 24 24" fill="currentColor"><path d="M4 1h16c.55 0 1 .45 1 1v4c0 .55-.45 1-1 1H4c-.55 0-1-.45-1-1V2c0-.55.45-1 1-1zm0 8h16c.55 0 1 .45 1 1v4c0 .55-.45 1-1 1H4c-.55 0-1-.45-1-1v-4c0-.55.45-1 1-1zm0 8h16c.55 0 1 .45 1 1v4c0 .55-.45 1-1 1H4c-.55 0-1-.45-1-1v-4c0-.55.45-1 1-1z"/><circle cx="19" cy="4" r="1" fill="currentColor"/><circle cx="19" cy="12" r="1" fill="currentColor"/><circle cx="19" cy="20" r="1" fill="currentColor"/></svg>`;
+
+            const playingHtml = l.isActive ? `<span class="srv-now-playing-pill"><svg viewBox="0 0 24 24" width="11" height="11" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg> NOW PLAYING</span>` : '';
+            const qualityHtml = `<span class="srv-quality-pill ${badgeClass}">${badgeText}</span>`;
+            const tooltip = isFailed ? (failedInfo.reason || 'Playback Failed') : rawName;
 
             return `<div class="${itemClasses.join(' ')}" onclick="send('changeLink', decodeURIComponent('${urlEncoded}'));closeAllPanels();" title="${tooltip}">
                 <span class="srv-check">${l.isActive ? SVGS.check : ''}</span>
-                <svg class="srv-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M4 1h16c.55 0 1 .45 1 1v4c0 .55-.45 1-1 1H4c-.55 0-1-.45-1-1V2c0-.55.45-1 1-1zm0 8h16c.55 0 1 .45 1 1v4c0 .55-.45 1-1 1H4c-.55 0-1-.45-1-1v-4c0-.55.45-1 1-1zm0 8h16c.55 0 1 .45 1 1v4c0 .55-.45 1-1 1H4c-.55 0-1-.45-1-1v-4c0-.55.45-1 1-1z"/><circle cx="19" cy="4" r="1" fill="currentColor"/><circle cx="19" cy="12" r="1" fill="currentColor"/><circle cx="19" cy="20" r="1" fill="currentColor"/></svg>
-                <span class="srv-name">${cleanName}</span>
-                ${sizeSpan}
-                ${qualitySpan}
-                <span class="srv-badge ${badgeClass}">${badgeText}</span>
+                <div class="srv-logo-box">${logoHtml}</div>
+                <div class="srv-body">
+                    <div class="srv-title-row">
+                        <span class="srv-clean-name">${cleanName}</span>
+                    </div>
+                    <div class="srv-tag-row">
+                        ${tagsHtml}
+                        ${sizeHtml}
+                    </div>
+                </div>
+                <div class="srv-actions-right">
+                    ${playingHtml}
+                    ${qualityHtml}
+                    <button class="srv-copy-btn" onclick="event.stopPropagation();copyToClipboard('${urlEncoded}', this);" title="Copy Stream URL">
+                        <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+                    </button>
+                </div>
             </div>`;
+            } catch (cardErr) {
+                console.error('[PlayerServers] Failed rendering server item:', cardErr);
+                return '';
+            }
         }).join('');
+        } catch (err) {
+            console.error('[PlayerServers] renderFilteredServers critical failure:', err);
+        }
     };
     window.renderFilteredServers = renderFilteredServers;
 

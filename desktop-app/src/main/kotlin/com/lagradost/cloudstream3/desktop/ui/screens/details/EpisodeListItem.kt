@@ -90,14 +90,23 @@ fun EpisodeListItem(
 
     val baseColor = MaterialTheme.colorScheme.surfaceVariant
     val heroColor = MaterialTheme.colorScheme.primary
-    val cardBg = if (isEpisodeLocked) {
+
+    val isPanelOpen = uiState?.isPanelOpen == true
+    val activeHistory = uiState?.activeLinkData?.third
+    val isActiveForPanel = isPanelOpen && activeHistory != null && ep.matchesHistory(activeHistory)
+
+    val cardBg = if (isActiveForPanel) {
+        heroColor.copy(alpha = 0.18f)
+    } else if (isEpisodeLocked) {
         baseColor.copy(alpha = (uiCardOpacity * 0.7f).coerceAtLeast(0.35f))
     } else if (isHovered) {
         baseColor.copy(alpha = (uiCardOpacity + 0.15f).coerceAtMost(1f))
     } else {
         baseColor.copy(alpha = uiCardOpacity)
     }
-    val borderColor = if (isEpisodeLocked) {
+    val borderColor = if (isActiveForPanel) {
+        heroColor
+    } else if (isEpisodeLocked) {
         Color(0xFFFFB74D).copy(alpha = 0.35f)
     } else if (isHovered) {
         heroColor.copy(alpha = 0.55f)
@@ -110,7 +119,7 @@ fun EpisodeListItem(
     Surface(
         shape = RoundedCornerShape(16.dp),
         color = cardBg,
-        border = BorderStroke(1.dp, borderColor),
+        border = BorderStroke(if (isActiveForPanel) 2.dp else 1.dp, borderColor),
         modifier = modifier
             .fillMaxWidth()
             .pointerInput(ep, isContextMenuEnabled) {

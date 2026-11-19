@@ -19,13 +19,16 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.desktop.player.LanguagePriorityHelper
 import com.lagradost.cloudstream3.desktop.ui.components.DesktopActionBadge
@@ -768,6 +771,8 @@ private fun RenderEpisodesSection(
     }
 
     val currentMode = uiState?.episodeViewMode ?: if (isEpisodesStackedView) 1 else 0
+    val isPanelOpen = uiState?.isPanelOpen == true
+    val activeHistory = uiState?.activeLinkData?.third
 
     if (currentMode == 1 || currentMode == 2) {
         BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
@@ -797,6 +802,9 @@ private fun RenderEpisodesSection(
                         val isLatest = latestHistory != null && ep.matchesHistory(latestHistory)
                         val history = historyLookup.find(ep)
                         val canMarkPrevious = index > 0 && (ep.episode ?: (index + 1)) > 1
+                        val isActive = isPanelOpen && activeHistory != null && ep.matchesHistory(activeHistory)
+                        val isDimmed = isPanelOpen && !isActive
+
                         if (currentMode == 2) {
                             EpisodeListItem(
                                 ep = ep,
@@ -809,7 +817,14 @@ private fun RenderEpisodesSection(
                                 thumbnailVersion = uiState?.episodeThumbnailVersion ?: 0,
                                 lockUnreleasedEpisodes = lockUnreleasedEpisodes,
                                 uiCardOpacity = uiCardOpacity,
-                                modifier = Modifier.width(cardWidth).padding(bottom = 12.dp),
+                                modifier = Modifier
+                                    .width(cardWidth)
+                                    .padding(bottom = 12.dp)
+                                    .then(
+                                        if (isDimmed) Modifier.blur(6.dp).graphicsLayer { alpha = 0.35f }
+                                        else if (isActive) Modifier.zIndex(25f)
+                                        else Modifier,
+                                    ),
                                 enableDownloadButtons = enableDownloadButtons,
                                 onPlay = onPlay,
                                 onDownload = onDownload,
@@ -829,7 +844,13 @@ private fun RenderEpisodesSection(
                                 thumbnailVersion = uiState?.episodeThumbnailVersion ?: 0,
                                 lockUnreleasedEpisodes = lockUnreleasedEpisodes,
                                 posterHoverGlowEnabled = posterHoverGlowEnabled,
-                                modifier = Modifier.width(cardWidth),
+                                modifier = Modifier
+                                    .width(cardWidth)
+                                    .then(
+                                        if (isDimmed) Modifier.blur(6.dp).graphicsLayer { alpha = 0.35f }
+                                        else if (isActive) Modifier.zIndex(25f)
+                                        else Modifier,
+                                    ),
                                 enableDownloadButtons = enableDownloadButtons,
                                 onPlay = onPlay,
                                 onDownload = onDownload,
@@ -876,6 +897,9 @@ private fun RenderEpisodesSection(
                     val isLatest = latestHistory != null && ep.matchesHistory(latestHistory)
                     val history = historyLookup.find(ep)
                     val canMarkPrevious = index > 0 && (ep.episode ?: (index + 1)) > 1
+                    val isActive = isPanelOpen && activeHistory != null && ep.matchesHistory(activeHistory)
+                    val isDimmed = isPanelOpen && !isActive
+
                     EpisodeCard(
                         ep = ep,
                         isLatest = isLatest,
@@ -887,7 +911,13 @@ private fun RenderEpisodesSection(
                         thumbnailVersion = uiState?.episodeThumbnailVersion ?: 0,
                         lockUnreleasedEpisodes = lockUnreleasedEpisodes,
                         posterHoverGlowEnabled = posterHoverGlowEnabled,
-                        modifier = Modifier.width(cardWidth),
+                        modifier = Modifier
+                            .width(cardWidth)
+                            .then(
+                                if (isDimmed) Modifier.blur(6.dp).graphicsLayer { alpha = 0.35f }
+                                else if (isActive) Modifier.zIndex(25f)
+                                else Modifier,
+                            ),
                         enableDownloadButtons = enableDownloadButtons,
                         onPlay = onPlay,
                         onDownload = onDownload,

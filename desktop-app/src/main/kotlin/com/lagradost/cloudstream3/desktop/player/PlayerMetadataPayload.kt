@@ -106,6 +106,7 @@ data class LinkPayload(
     val peers: Int? = null,
     val source: String? = null,
     val size: String? = null,
+    val logoUrl: String? = null,
 )
 
 data class EpisodePayload(

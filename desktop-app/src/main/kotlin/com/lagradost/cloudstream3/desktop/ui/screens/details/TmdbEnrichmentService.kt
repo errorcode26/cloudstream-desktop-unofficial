@@ -665,14 +665,20 @@ object TmdbEnrichmentService {
                                     if (path != null && path != "null") Triple(path, lang, Pair(votes, count)) else null
                                 }
 
-                                val bestLogoCandidate = allLogos.filter { it.first.endsWith(".png", ignoreCase = true) && (it.second == "en" || it.second == "en-US") }
-                                    .maxByOrNull { it.third.first }
-                                    ?: allLogos.filter { it.first.endsWith(".png", ignoreCase = true) && (it.second.isNullOrBlank() || it.second == "null") }
-                                        .maxByOrNull { it.third.first }
-                                    ?: allLogos.filter { it.first.endsWith(".png", ignoreCase = true) }
-                                        .maxByOrNull { it.third.first }
-                                    ?: allLogos.filter { (it.second == "en" || it.second == "en-US") }
-                                        .maxByOrNull { it.third.first }
+                                val logoScore = { candidate: Triple<String, String?, Pair<Double, Int>> ->
+                                    val (votes, count) = candidate.third
+                                    if (count > 0) votes * count else votes * 0.1
+                                }
+
+                                val pngEnglish = allLogos.filter { it.first.endsWith(".png", ignoreCase = true) && (it.second == "en" || it.second == "en-US") }
+                                val pngNeutral = allLogos.filter { it.first.endsWith(".png", ignoreCase = true) && (it.second.isNullOrBlank() || it.second == "null") }
+                                val pngAny = allLogos.filter { it.first.endsWith(".png", ignoreCase = true) }
+                                val anyEnglish = allLogos.filter { it.second == "en" || it.second == "en-US" }
+
+                                val bestLogoCandidate = pngEnglish.maxByOrNull(logoScore)
+                                    ?: pngNeutral.maxByOrNull(logoScore)
+                                    ?: pngAny.maxByOrNull(logoScore)
+                                    ?: anyEnglish.maxByOrNull(logoScore)
                                     ?: allLogos.firstOrNull()
 
                                 if (bestLogoCandidate != null) {

@@ -29,6 +29,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import coil3.request.crossfade
 import com.lagradost.cloudstream3.Episode
 import com.lagradost.cloudstream3.LoadResponse
@@ -99,7 +100,19 @@ fun EpisodeCard(
     val formattedDate = p.formattedDate
     val durationText = p.durationText
 
-    val scale by animateFloatAsState(if (isHovered && isContextMenuEnabled && !isEpisodeLocked) 1.02f else 1f, animationSpec = tween(180))
+    val isPanelOpen = uiState?.isPanelOpen == true
+    val activeHistory = uiState?.activeLinkData?.third
+    val isActiveForPanel = isPanelOpen && activeHistory != null && ep.matchesHistory(activeHistory)
+
+    val scale by animateFloatAsState(
+        targetValue = when {
+            isActiveForPanel -> 1.04f
+            isHovered && isContextMenuEnabled && !isEpisodeLocked -> 1.02f
+            else -> 1f
+        },
+        animationSpec = tween(220),
+        label = "epCardScale",
+    )
 
     // thumbnailVersion is intentionally read here so Compose re-evaluates epImg when episode
     // thumbnails are enriched in-place (plain field mutations don't trigger recompose otherwise).
@@ -112,6 +125,7 @@ fun EpisodeCard(
 
     Box(
         modifier = modifier
+            .then(if (isActiveForPanel) Modifier.zIndex(25f) else Modifier)
             .aspectRatio(16f / 13.5f)
             .graphicsLayer {
                 scaleX = scale
@@ -189,20 +203,24 @@ fun EpisodeCard(
                     )
                 }
                 .shadow(
-                    elevation = 4.dp,
+                    elevation = if (isHovered && isContextMenuEnabled && !isEpisodeLocked) 12.dp else 4.dp,
                     shape = RoundedCornerShape(16.dp),
                     spotColor = if (isHovered && isContextMenuEnabled && !isEpisodeLocked) heroColor else Color.Black,
                     ambientColor = Color.Transparent,
                 )
                 .border(
-                    width = if (isHovered && isContextMenuEnabled && !isEpisodeLocked) {
+                    width = if (isActiveForPanel) {
+                        1.5.dp
+                    } else if (isHovered && isContextMenuEnabled && !isEpisodeLocked) {
                         1.5.dp
                     } else if (isEpisodeLocked) {
                         1.dp
                     } else {
                         0.5.dp
                     },
-                    color = if (isEpisodeLocked) {
+                    color = if (isActiveForPanel) {
+                        Color.White.copy(alpha = 0.50f)
+                    } else if (isEpisodeLocked) {
                         Color(0xFFFFB74D).copy(alpha = 0.45f)
                     } else if (isHovered && isContextMenuEnabled) {
                         heroColor
@@ -443,7 +461,7 @@ fun EpisodeCard(
                 }
             }
 
-            // Top-Right: Watched completion indicator or Unreleased indicator
+            // Top-Right: Active episode badge, Watched completion indicator or Unreleased indicator
             if (isWatched && !isEpisodeLocked) {
                 Box(
                     modifier = Modifier
