@@ -1509,16 +1509,8 @@ fun ComposeNativeWebPlayer(
                         com.lagradost.cloudstream3.desktop.ui.PipState.setPipMode(false)
                     }
 
-                    // Asynchronously tear down native WebView while tracking the thread handle.
-
-                    NativePlayerBridge.destroyWebViewAsync()
-                    if (false) {
-
-
-
-
-
-                    }
+                    // Synchronously tear down native WebView before AWT destroys the canvas HWND.
+                    NativePlayerBridge.safeDestroyWebView()
                     }
                 }
             }

@@ -1741,6 +1741,8 @@
             margin: 0;
             outline: none;
             cursor: pointer;
+            box-sizing: border-box;
+            padding: 0 8px;
         }
         .vol-slider::-webkit-slider-runnable-track {
             width: 100%; height: 4px;
@@ -6950,12 +6952,26 @@ body[data-player-theme="horizon_cinema"] #skipForwardBtn svg {
     fill: currentColor;
 }
 
+body[data-player-theme="horizon_cinema"] .vol-group {
+    padding-right: 12px !important;
+    overflow: visible !important;
+}
+
 body[data-player-theme="horizon_cinema"] .vol-slider-wrap {
-    width: 86px !important;
-    max-width: 86px !important;
+    width: 96px !important;
+    max-width: 96px !important;
     opacity: 1 !important;
     pointer-events: auto !important;
-    margin-left: 6px !important;
+    margin-left: 2px !important;
+    overflow: visible !important;
+}
+
+body[data-player-theme="horizon_cinema"] .vol-slider {
+    width: 96px !important;
+    min-width: 96px !important;
+    box-sizing: border-box !important;
+    padding: 0 8px !important;
+    overflow: visible !important;
 }
 
 body[data-player-theme="horizon_cinema"] .ctrl-group:not(.center):not(.right) {
