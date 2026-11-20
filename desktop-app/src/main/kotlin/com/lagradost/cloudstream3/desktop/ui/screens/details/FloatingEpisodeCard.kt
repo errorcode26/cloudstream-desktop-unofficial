@@ -11,7 +11,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -50,11 +53,15 @@ fun FloatingEpisodeCard(
     isAmoled: Boolean,
     cardWidth: Dp,
     modifier: Modifier = Modifier,
+    enrichedLogoUrl: String? = null,
 ) {
     if (response == null) return
 
-    val logoUrl = uiState?.enrichedLogoUrl ?: response.logoUrl
-    val showName = response.name.ifBlank { activeHistory?.showName ?: "" }
+    val logoUrl = enrichedLogoUrl ?: uiState?.enrichedLogoUrl ?: response.logoUrl
+    val rawShowName = response.name.ifBlank { activeHistory?.showName ?: "" }
+    val showName = remember(rawShowName) {
+        com.lagradost.cloudstream3.desktop.utils.TitleUtils.cleanProviderTitle(rawShowName).first.ifBlank { rawShowName }
+    }
 
     val leftSeconds = if (activeHistory != null && activeHistory.duration > 0) activeHistory.duration - activeHistory.position else 0L
     val leftMins = leftSeconds / 60000L
@@ -80,8 +87,10 @@ fun FloatingEpisodeCard(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        // 1. Large, Crisp Title LOGO above (or bold typography if no logo exists)
-        if (!logoUrl.isNullOrBlank()) {
+        // 1. Large, Crisp Title LOGO above (or bold typography if no logo exists or fails to load)
+        var logoLoadFailed by remember(logoUrl) { mutableStateOf(false) }
+
+        if (!logoUrl.isNullOrBlank() && !logoLoadFailed) {
             AsyncImage(
                 model = logoUrl,
                 contentDescription = showName,
@@ -90,6 +99,7 @@ fun FloatingEpisodeCard(
                     .fillMaxWidth(0.95f),
                 contentScale = ContentScale.Fit,
                 alignment = Alignment.Center,
+                onError = { logoLoadFailed = true },
             )
         } else {
             Text(
@@ -99,7 +109,7 @@ fun FloatingEpisodeCard(
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
                 textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
             )
         }
 

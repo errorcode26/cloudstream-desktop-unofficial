@@ -745,9 +745,10 @@ fun StreamLinkCard(
                                 model = badgeFile,
                                 contentDescription = tag.text,
                                 modifier = Modifier
-                                    .height(18.dp)
-                                    .clip(RoundedCornerShape(3.dp)),
+                                    .height(22.dp)
+                                    .clip(RoundedCornerShape(4.dp)),
                                 contentScale = ContentScale.Fit,
+                                filterQuality = androidx.compose.ui.graphics.FilterQuality.High,
                             )
                         } else {
                             val (bgColor, borderColor, textColor) = when (tag.type) {
@@ -765,11 +766,11 @@ fun StreamLinkCard(
                                     text = tag.text,
                                     color = textColor,
                                     style = MaterialTheme.typography.labelSmall.copy(
-                                        fontSize = 10.5.sp,
+                                        fontSize = 11.sp,
                                         fontWeight = FontWeight.SemiBold,
                                         letterSpacing = 0.3.sp,
                                     ),
-                                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.5.dp),
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
                                 )
                             }
                         }

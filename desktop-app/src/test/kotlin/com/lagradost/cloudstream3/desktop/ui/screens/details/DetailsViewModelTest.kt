@@ -5,11 +5,13 @@ import com.lagradost.cloudstream3.MainAPI
 import com.lagradost.cloudstream3.MovieLoadResponse
 import com.lagradost.cloudstream3.TvSeriesLoadResponse
 import com.lagradost.cloudstream3.TvType
+import com.lagradost.cloudstream3.desktop.ui.screens.details.contract.DetailsUiEffect
 import com.lagradost.cloudstream3.desktop.ui.screens.details.contract.DetailsUiEvent
 import com.lagradost.cloudstream3.desktop.ui.screens.details.contract.DetailsUiState
 import com.lagradost.cloudstream3.newEpisode
 import com.lagradost.cloudstream3.newTvSeriesLoadResponse
 import com.lagradost.common.storage.WatchHistory
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
@@ -73,14 +75,11 @@ class DetailsViewModelTest {
     }
 
     @Test
-    fun testOnOpenAndCloseLinksPanel_TogglesPanelState() {
+    fun testOnOpenLinksPanel_EmitsOpenLinksEffect() = runBlocking {
         val vm = DetailsViewModel(
             provider = testApi,
             url = "https://details.example.com/show/42",
         ).also { activeVm = it }
-
-        assertFalse(vm.uiState.value.isPanelOpen)
-        assertNull(vm.uiState.value.activeLinkData)
 
         val history = WatchHistory(
             parentId = "https://details.example.com/show/42",
@@ -99,12 +98,23 @@ class DetailsViewModelTest {
         )
         val data = Triple(testApi, "ep1_data", history)
 
-        vm.onEvent(DetailsUiEvent.OnOpenLinksPanel(data))
-        assertTrue(vm.uiState.value.isPanelOpen)
-        assertEquals(data, vm.uiState.value.activeLinkData)
+        var emittedEffect: DetailsUiEffect? = null
+        val job = launch(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
+            vm.effectFlow.collect { effect ->
+                emittedEffect = effect
+            }
+        }
 
-        vm.onEvent(DetailsUiEvent.OnCloseLinksPanel)
-        assertFalse(vm.uiState.value.isPanelOpen)
+        vm.onEvent(DetailsUiEvent.OnOpenLinksPanel(data))
+        kotlinx.coroutines.yield()
+
+        val openLinks = emittedEffect as? DetailsUiEffect.OpenLinks
+        assertNotNull(openLinks)
+        assertEquals(testApi.name, openLinks.config.providerName)
+        assertEquals("ep1_data", openLinks.config.dataUrl)
+        assertEquals(history, openLinks.config.history)
+
+        job.cancel()
     }
 
     @Test

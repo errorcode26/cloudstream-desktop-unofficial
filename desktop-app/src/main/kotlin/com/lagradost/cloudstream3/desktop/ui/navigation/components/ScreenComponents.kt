@@ -205,3 +205,10 @@ class FullCastComponent(
         com.lagradost.cloudstream3.desktop.ui.screens.details.FullCastViewModel(config)
     }
 }
+
+class LinksComponent(
+    componentContext: ComponentContext,
+    val config: Config.Links,
+) : ComponentContext by componentContext {
+    val api: MainAPI? = APIHolder.allProviders.firstOrNull { it.name == config.providerName } ?: APIHolder.getApiFromNameNull(config.providerName)
+}

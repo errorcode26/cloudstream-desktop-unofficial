@@ -9,6 +9,7 @@ import com.lagradost.cloudstream3.desktop.domain.history.interactor.GetWatchHist
 import com.lagradost.cloudstream3.desktop.domain.history.interactor.RemoveWatchHistory
 import com.lagradost.cloudstream3.desktop.domain.history.interactor.UpsertWatchHistory
 import com.lagradost.cloudstream3.desktop.ui.base.BaseMviViewModel
+import com.lagradost.cloudstream3.desktop.ui.navigation.Config
 import com.lagradost.cloudstream3.desktop.ui.screens.details.contract.DetailsUiEffect
 import com.lagradost.cloudstream3.desktop.ui.screens.details.contract.DetailsUiEvent
 import com.lagradost.cloudstream3.desktop.ui.screens.details.contract.DetailsUiState
@@ -755,7 +756,28 @@ class DetailsViewModel(
     }
 
     private fun openLinksPanel(data: Triple<MainAPI, String, WatchHistory>) {
-        updateState { copy(activeLinkData = data, isPanelOpen = true) }
+        val currentSeason = data.third.season ?: uiState.value.selectedSeason
+        val seasonCast = if (currentSeason != null && currentSeason > 0) {
+            uiState.value.seasonCredits[currentSeason]
+        } else {
+            null
+        }
+        val hasAnimeDualCast = uiState.value.enrichedActors?.any { it.voiceActor != null } == true
+        val effectiveActors = if (hasAnimeDualCast) uiState.value.enrichedActors else (seasonCast ?: uiState.value.enrichedActors ?: uiState.value.response?.actors)
+
+        sendEffect(
+            DetailsUiEffect.OpenLinks(
+                Config.Links(
+                    providerName = data.first.name,
+                    dataUrl = data.second,
+                    history = data.third,
+                    loadResponse = uiState.value.response,
+                    enrichedActors = effectiveActors,
+                    enrichedLogoUrl = uiState.value.enrichedLogoUrl,
+                    enrichedBackdropUrl = uiState.value.enrichedBackdropUrl,
+                ),
+            ),
+        )
     }
 
     private fun handleTogglePinRightColumn() {
@@ -767,6 +789,6 @@ class DetailsViewModel(
     }
 
     private fun closeLinksPanel() {
-        updateState { copy(isPanelOpen = false) }
+        updateState { copy(isPanelOpen = false, activeLinkData = null) }
     }
 }
