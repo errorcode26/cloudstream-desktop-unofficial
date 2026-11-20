@@ -2,6 +2,7 @@ package com.lagradost.cloudstream3.desktop.ui.screens
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.hoverable
@@ -23,7 +24,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -39,15 +44,28 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import coil3.compose.AsyncImage
+import coil3.request.crossfade
+import com.lagradost.cloudstream3.ActorData
+import com.lagradost.cloudstream3.AnimeLoadResponse
+import com.lagradost.cloudstream3.Episode
+import com.lagradost.cloudstream3.LoadResponse
 import com.lagradost.cloudstream3.MainAPI
+import com.lagradost.cloudstream3.TvSeriesLoadResponse
 import com.lagradost.cloudstream3.desktop.repo.DesktopRepositoryManager
 import com.lagradost.cloudstream3.desktop.stremio.StremioAddonManager
 import com.lagradost.cloudstream3.desktop.torrent.DesktopTorrentEngine
 import com.lagradost.cloudstream3.desktop.torrent.TorrentPlayability
 import com.lagradost.cloudstream3.desktop.ui.components.CloudstreamAlertDialog
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopBackButton
+import com.lagradost.cloudstream3.desktop.ui.components.LocalDesktopTheme
 import com.lagradost.cloudstream3.desktop.ui.components.DesktopUi
+import com.lagradost.cloudstream3.desktop.ui.components.WindowControlsPill
 import com.lagradost.cloudstream3.desktop.ui.components.desktopDragScroll
+import com.lagradost.cloudstream3.desktop.ui.screens.details.FloatingEpisodeCard
+import com.lagradost.cloudstream3.desktop.ui.screens.details.matchesHistory
+import com.lagradost.cloudstream3.desktop.ui.theme.AppearanceConfig
 import com.lagradost.cloudstream3.desktop.ui.components.P2pTorrentDisclaimerDialog
 import com.lagradost.cloudstream3.desktop.ui.components.TorrServerInstallRequiredDialog
 import com.lagradost.cloudstream3.desktop.ui.screens.links.LinksViewModel
@@ -1031,6 +1049,152 @@ private fun DesktopFilterPill(
                         modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.5.dp),
                     )
                 }
+            }
+        }
+    }
+}
+
+@Composable
+fun ComposeLinksScreen(
+    provider: MainAPI,
+    dataUrl: String,
+    history: WatchHistory,
+    loadResponse: LoadResponse?,
+    enrichedActors: List<ActorData>? = null,
+    enrichedLogoUrl: String? = null,
+    enrichedBackdropUrl: String? = null,
+    onBack: () -> Unit,
+) {
+    val isAmoled = LocalDesktopTheme.current.isAmoled
+    val performanceModeEnabled by AppearanceConfig.performanceModeEnabled.collectAsState()
+    val allEpisodes = remember(loadResponse) {
+        when (loadResponse) {
+            is TvSeriesLoadResponse -> loadResponse.episodes
+            is AnimeLoadResponse -> loadResponse.episodes.values.flatten()
+            else -> emptyList()
+        }
+    }
+    val activeEpisode = remember(dataUrl, history, allEpisodes) {
+        allEpisodes.firstOrNull { it.matchesHistory(history) }
+            ?: allEpisodes.firstOrNull { it.data == dataUrl }
+    }
+
+    BoxWithConstraints(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black)
+            .onPreviewKeyEvent { event ->
+                if ((event.key == Key.Escape || event.key == Key.Back || event.key == Key.Backspace) && event.type == KeyEventType.KeyUp) {
+                    onBack()
+                    true
+                } else {
+                    false
+                }
+            },
+    ) {
+        val rootMaxWidth = maxWidth
+
+        if (enrichedBackdropUrl != null && !performanceModeEnabled) {
+            AsyncImage(
+                model = coil3.request.ImageRequest.Builder(coil3.compose.LocalPlatformContext.current)
+                    .data(enrichedBackdropUrl)
+                    .size(1280, 720)
+                    .crossfade(true)
+                    .build(),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .blur(45.dp, edgeTreatment = androidx.compose.ui.draw.BlurredEdgeTreatment.Unbounded)
+                    .drawWithCache {
+                        onDrawWithContent {
+                            drawContent()
+                            drawRect(Color.Black.copy(alpha = if (isAmoled) 0.70f else 0.55f))
+                        }
+                    },
+            )
+        }
+
+        Box(modifier = Modifier.fillMaxSize()) {
+            val panelWidth = if (rootMaxWidth >= 1000.dp) rootMaxWidth * 0.50f else (rootMaxWidth * 0.60f).coerceIn(480.dp, rootMaxWidth * 0.85f)
+            val leftZoneWidth = rootMaxWidth - panelWidth
+
+            if (leftZoneWidth >= 360.dp && loadResponse != null) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .width(leftZoneWidth)
+                        .align(Alignment.CenterStart)
+                        .padding(horizontal = 24.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    FloatingEpisodeCard(
+                        provider = provider,
+                        response = loadResponse,
+                        activeEpisode = activeEpisode,
+                        activeHistory = history,
+                        activeLinkData = Triple(provider, dataUrl, history),
+                        uiState = null,
+                        isAmoled = isAmoled,
+                        cardWidth = minOf(560.dp, leftZoneWidth - 48.dp),
+                        enrichedLogoUrl = enrichedLogoUrl,
+                    )
+                }
+            }
+
+            val drawerShape = RoundedCornerShape(20.dp)
+            Box(
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .fillMaxHeight()
+                    .width(panelWidth)
+                    .padding(top = 56.dp, bottom = 16.dp, end = 16.dp)
+                    .shadow(28.dp, shape = drawerShape, ambientColor = Color.Transparent, spotColor = Color.Black.copy(alpha = 0.5f))
+                    .clip(drawerShape)
+                    .border(
+                        width = 1.dp,
+                        brush = Brush.verticalGradient(
+                            colors = listOf(
+                                Color.White.copy(alpha = 0.18f),
+                                Color.White.copy(alpha = 0.05f),
+                            ),
+                        ),
+                        shape = drawerShape,
+                    )
+                    .background(
+                        if (isAmoled || performanceModeEnabled) {
+                            Color(0xFF09090E).copy(alpha = 0.95f)
+                        } else {
+                            Color(0xFF0D0D17).copy(alpha = 0.80f)
+                        },
+                    ),
+            ) {
+                LinksSidePanel(
+                    provider = provider,
+                    dataUrl = dataUrl,
+                    history = history,
+                    loadResponse = loadResponse,
+                    enrichedActors = enrichedActors,
+                    enrichedLogoUrl = enrichedLogoUrl,
+                    enrichedBackdropUrl = enrichedBackdropUrl,
+                    onClose = onBack,
+                )
+            }
+
+            Row(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .fillMaxWidth()
+                    .padding(start = 16.dp, end = 16.dp, top = 7.dp)
+                    .zIndex(100f),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                DesktopBackButton(onClick = onBack)
+                WindowControlsPill(
+                    isHome = false,
+                    isCompact = rootMaxWidth < 600.dp,
+                )
             }
         }
     }

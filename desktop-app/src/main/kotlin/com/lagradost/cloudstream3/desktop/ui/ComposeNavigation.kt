@@ -261,6 +261,7 @@ fun CloudstreamApp(rootComponent: RootComponent) {
                                     is RootComponent.Child.Person -> activeInstance.component.config.name
                                     is RootComponent.Child.Studio -> activeInstance.component.config.name
                                     is RootComponent.Child.FullCast -> "${activeInstance.component.config.mediaTitle} - Cast & Crew"
+                                    is RootComponent.Child.Links -> activeInstance.component.config.loadResponse?.name?.let { "Sources: $it" } ?: "Sources"
                                 }
 
                                 LaunchedEffect(activeInstance, currentVideo) {
@@ -278,6 +279,9 @@ fun CloudstreamApp(rootComponent: RootComponent) {
                                             }
                                             is RootComponent.Child.FullCast -> {
                                                 com.lagradost.cloudstream3.desktop.discord.DiscordRpcManager.updateBrowsing("Cast & Crew", activeInstance.component.config.mediaTitle)
+                                            }
+                                            is RootComponent.Child.Links -> {
+                                                com.lagradost.cloudstream3.desktop.discord.DiscordRpcManager.updateBrowsing("Sources", activeInstance.component.config.loadResponse?.name)
                                             }
                                             else -> {
                                                 com.lagradost.cloudstream3.desktop.discord.DiscordRpcManager.updateBrowsing(title)
@@ -300,6 +304,7 @@ fun CloudstreamApp(rootComponent: RootComponent) {
                                     is RootComponent.Child.Person -> false // Person manually pads itself
                                     is RootComponent.Child.Studio -> false // Studio manually pads itself
                                     is RootComponent.Child.FullCast -> false // FullCast manually pads itself
+                                    is RootComponent.Child.Links -> false // Links is full-bleed
                                     is RootComponent.Child.Home -> false // Home needs full-bleed for Hero
                                     is RootComponent.Child.Explore -> false // Explore needs full-bleed for Hero
                                     is RootComponent.Child.Search -> false // Search manages full-width centering & dock clearance
@@ -311,6 +316,7 @@ fun CloudstreamApp(rootComponent: RootComponent) {
                                     is RootComponent.Child.Person -> false
                                     is RootComponent.Child.Studio -> false
                                     is RootComponent.Child.FullCast -> false
+                                    is RootComponent.Child.Links -> false
                                     else -> true
                                 }
                                 val showTopBar = when (activeInstance) {
@@ -318,6 +324,7 @@ fun CloudstreamApp(rootComponent: RootComponent) {
                                     is RootComponent.Child.Person -> false
                                     is RootComponent.Child.Studio -> false
                                     is RootComponent.Child.FullCast -> false
+                                    is RootComponent.Child.Links -> false
                                     else -> true
                                 }
 
@@ -609,6 +616,22 @@ fun CloudstreamApp(rootComponent: RootComponent) {
                                                             onNavigate = { config -> rootComponent.bringToFront(config) },
                                                             viewModel = child.component.viewModel,
                                                         )
+                                                    }
+                                                    is RootComponent.Child.Links -> {
+                                                        val comp = child.component
+                                                        val api = comp.api
+                                                        if (api != null) {
+                                                            com.lagradost.cloudstream3.desktop.ui.screens.ComposeLinksScreen(
+                                                                provider = api,
+                                                                dataUrl = comp.config.dataUrl,
+                                                                history = comp.config.history,
+                                                                loadResponse = comp.config.loadResponse,
+                                                                enrichedActors = comp.config.enrichedActors,
+                                                                enrichedLogoUrl = comp.config.enrichedLogoUrl,
+                                                                enrichedBackdropUrl = comp.config.enrichedBackdropUrl,
+                                                                onBack = { rootComponent.pop() },
+                                                            )
+                                                        }
                                                     }
                                                 }
                                             }

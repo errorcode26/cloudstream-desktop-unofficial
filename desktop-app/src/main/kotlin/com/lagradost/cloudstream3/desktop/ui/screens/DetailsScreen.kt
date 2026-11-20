@@ -129,6 +129,7 @@ fun ComposeDetailsScreen(
         viewModel.effectFlow.collect { effect ->
             when (effect) {
                 is DetailsUiEffect.NavigateToPlayer -> playVideo(effect.launchData)
+                is DetailsUiEffect.OpenLinks -> onNavigate(effect.config)
                 is DetailsUiEffect.ShowErrorDialog -> viewModel.onEvent(DetailsUiEvent.OnShowPlaybackError(effect.message))
                 is DetailsUiEffect.ShowToast -> com.lagradost.cloudstream3.desktop.ui.components.AppToastManager.showInfo(effect.message)
             }
@@ -195,63 +196,8 @@ fun ComposeDetailsScreen(
         val hazeState = remember { HazeState() }
         val isAmoled = LocalDesktopTheme.current.isAmoled
 
-        val isDrawerOpen = isPanelOpen || activeLinkData != null
-
-        val focusRequester = remember { FocusRequester() }
-        LaunchedEffect(isDrawerOpen) {
-            if (isDrawerOpen) {
-                try { focusRequester.requestFocus() } catch (_: Throwable) {}
-            }
-        }
-
-        DisposableEffect(isDrawerOpen) {
-            if (!isDrawerOpen) return@DisposableEffect onDispose {}
-
-            val listener = java.awt.event.AWTEventListener { event ->
-                if (event is java.awt.event.MouseEvent && event.id == java.awt.event.MouseEvent.MOUSE_RELEASED && event.button == 4) {
-                    viewModel.onEvent(DetailsUiEvent.OnCloseLinksPanel)
-                    event.consume()
-                }
-            }
-            java.awt.Toolkit.getDefaultToolkit().addAWTEventListener(
-                listener,
-                java.awt.AWTEvent.MOUSE_EVENT_MASK,
-            )
-            onDispose {
-                java.awt.Toolkit.getDefaultToolkit().removeAWTEventListener(listener)
-            }
-        }
-
         BoxWithConstraints(
-            modifier = Modifier
-                .fillMaxSize()
-                .focusRequester(focusRequester)
-                .focusable()
-                .onPreviewKeyEvent { event ->
-                    if ((event.key == Key.Escape || event.key == Key.Back || event.key == Key.Backspace) && event.type == KeyEventType.KeyUp) {
-                        if (isDrawerOpen) {
-                            viewModel.onEvent(DetailsUiEvent.OnCloseLinksPanel)
-                            true
-                        } else {
-                            false
-                        }
-                    } else {
-                        false
-                    }
-                }
-                .pointerInput(isDrawerOpen) {
-                    awaitPointerEventScope {
-                        while (true) {
-                            val event = awaitPointerEvent(PointerEventPass.Initial)
-                            if (event.type == PointerEventType.Release && event.button == PointerButton.Back) {
-                                if (isDrawerOpen) {
-                                    viewModel.onEvent(DetailsUiEvent.OnCloseLinksPanel)
-                                    event.changes.forEach { it.consume() }
-                                }
-                            }
-                        }
-                    }
-                },
+            modifier = Modifier.fillMaxSize(),
         ) {
             val rootMaxWidth = maxWidth
             val currentStage = remember(isLoading, response, fetchFailed) {
@@ -413,122 +359,7 @@ fun ComposeDetailsScreen(
                 )
             }
 
-            AnimatedVisibility(
-                visible = isPanelOpen,
-                enter = fadeIn(animationSpec = tween(300)),
-                exit = fadeOut(animationSpec = tween(300)),
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color.Black.copy(alpha = if (isAmoled) 0.70f else 0.55f))
-                        .clickable(
-                            indication = null,
-                            interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
-                        ) { viewModel.onEvent(DetailsUiEvent.OnCloseLinksPanel) },
-                ) {
-                    val panelWidth = if (rootMaxWidth >= 1000.dp) rootMaxWidth * 0.50f else (rootMaxWidth * 0.60f).coerceIn(480.dp, rootMaxWidth * 0.85f)
-                    val leftZoneWidth = rootMaxWidth - panelWidth
-                    if (leftZoneWidth >= 360.dp && activeLinkData != null) {
-                        val activeHistory = activeLinkData.third
-                        val allEpisodes = remember(response) {
-                            when (response) {
-                                is com.lagradost.cloudstream3.TvSeriesLoadResponse -> response.episodes
-                                is com.lagradost.cloudstream3.AnimeLoadResponse -> response.episodes.values.flatten()
-                                else -> emptyList()
-                            }
-                        }
-                        val activeEpisode = remember(activeLinkData, allEpisodes) {
-                            allEpisodes.firstOrNull { it.matchesHistory(activeHistory) }
-                                ?: allEpisodes.firstOrNull { it.data == activeLinkData.second }
-                        }
-
-                        Box(
-                            modifier = Modifier
-                                .fillMaxHeight()
-                                .width(leftZoneWidth)
-                                .align(Alignment.CenterStart)
-                                .padding(horizontal = 24.dp),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            FloatingEpisodeCard(
-                                provider = provider,
-                                response = response,
-                                activeEpisode = activeEpisode,
-                                activeHistory = activeHistory,
-                                activeLinkData = activeLinkData,
-                                uiState = uiState,
-                                isAmoled = isAmoled,
-                                cardWidth = minOf(560.dp, leftZoneWidth - 48.dp),
-                            )
-                        }
-                    }
-                }
-            }
-
-            if (activeLinkData != null) {
-                val panelWidth = if (rootMaxWidth >= 1000.dp) rootMaxWidth * 0.50f else (rootMaxWidth * 0.60f).coerceIn(480.dp, rootMaxWidth * 0.85f)
-                val drawerShape = RoundedCornerShape(20.dp)
-                val offsetX by androidx.compose.animation.core.animateDpAsState(
-                    targetValue = if (isPanelOpen) 0.dp else panelWidth + 20.dp,
-                    animationSpec = tween(300),
-                )
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.CenterEnd)
-                        .offset(x = offsetX)
-                        .fillMaxHeight()
-                        .width(panelWidth)
-                        .padding(top = 56.dp, bottom = 16.dp, end = 16.dp)
-                        .shadow(28.dp, shape = drawerShape, ambientColor = Color.Transparent, spotColor = Color.Black.copy(alpha = 0.5f))
-                        .clip(drawerShape)
-                        .border(
-                            width = 1.dp,
-                            brush = Brush.verticalGradient(
-                                colors = listOf(
-                                    Color.White.copy(alpha = 0.18f),
-                                    Color.White.copy(alpha = 0.05f),
-                                ),
-                            ),
-                            shape = drawerShape,
-                        )
-                        .then(if (!isAmoled && !performanceModeEnabled) Modifier.hazeEffect(state = hazeState) {
-                            blurRadius = 40.dp
-                            backgroundColor = Color(0xFF0D0D17)
-                        }
-                        else Modifier)
-                        .background(
-                            if (isAmoled || performanceModeEnabled) {
-                                Color(0xFF09090E).copy(alpha = 0.95f)
-                            } else {
-                                Color(0xFF0D0D17).copy(alpha = 0.70f)
-                            },
-                        ),
-                ) {
-                    activeLinkData.let { (linkProvider, linkUrl, linkHistory) ->
-                        val currentSeason = linkHistory.season ?: uiState.selectedSeason
-                        val seasonCast = if (currentSeason != null && currentSeason > 0) {
-                            uiState.seasonCredits[currentSeason]
-                        } else {
-                            null
-                        }
-                        val hasAnimeDualCast = uiState.enrichedActors?.any { it.voiceActor != null } == true
-                        val effectiveActors = if (hasAnimeDualCast) uiState.enrichedActors else (seasonCast ?: uiState.enrichedActors ?: response?.actors)
-                        LinksSidePanel(
-                            provider = linkProvider,
-                            dataUrl = linkUrl,
-                            history = linkHistory,
-                            loadResponse = response, // Passed from ComposeDetailsScreen
-                            enrichedActors = effectiveActors,
-                            enrichedLogoUrl = uiState.enrichedLogoUrl,
-                            enrichedBackdropUrl = uiState.enrichedBackdropUrl,
-                            onClose = { viewModel.onEvent(DetailsUiEvent.OnCloseLinksPanel) },
-                        )
-                    }
-                }
-            }
-
-            // Hoisted Floating Top Action Layer (Corner-anchored, remains visible and clickable above scrim & drawer)
+            // Hoisted Floating Top Action Layer (Corner-anchored)
             if (currentStage != com.lagradost.cloudstream3.desktop.ui.components.ScreenStage.LOADING) {
                 Row(
                     modifier = Modifier
@@ -539,14 +370,7 @@ fun ComposeDetailsScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
-                    val handleBack = {
-                        if (isDrawerOpen) {
-                            viewModel.onEvent(DetailsUiEvent.OnCloseLinksPanel)
-                        } else {
-                            onBack()
-                        }
-                    }
-                    DesktopBackButton(onClick = handleBack)
+                    DesktopBackButton(onClick = onBack)
 
                     WindowControlsPill(
                         isHome = false,

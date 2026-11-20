@@ -5,5 +5,6 @@ import com.lagradost.cloudstream3.desktop.ui.base.UiEffect
 sealed interface DetailsUiEffect : UiEffect {
     data class ShowToast(val message: String) : DetailsUiEffect
     data class NavigateToPlayer(val launchData: com.lagradost.cloudstream3.desktop.ui.VideoLaunchData) : DetailsUiEffect
+    data class OpenLinks(val config: com.lagradost.cloudstream3.desktop.ui.navigation.Config.Links) : DetailsUiEffect
     data class ShowErrorDialog(val message: String) : DetailsUiEffect
 }

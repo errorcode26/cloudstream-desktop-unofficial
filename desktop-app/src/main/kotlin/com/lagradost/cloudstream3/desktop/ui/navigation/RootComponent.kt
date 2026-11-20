@@ -26,5 +26,6 @@ interface RootComponent {
         class Person(val component: com.lagradost.cloudstream3.desktop.ui.navigation.components.PersonComponent) : Child()
         class Studio(val component: com.lagradost.cloudstream3.desktop.ui.navigation.components.StudioComponent) : Child()
         class FullCast(val component: com.lagradost.cloudstream3.desktop.ui.navigation.components.FullCastComponent) : Child()
+        class Links(val component: com.lagradost.cloudstream3.desktop.ui.navigation.components.LinksComponent) : Child()
     }
 }

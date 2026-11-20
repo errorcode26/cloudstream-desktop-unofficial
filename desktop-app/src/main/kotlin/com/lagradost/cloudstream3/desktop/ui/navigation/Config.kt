@@ -48,4 +48,13 @@ sealed class Config {
         val availableSeasons: List<Int> = emptyList(),
         val initialSeason: Int? = null,
     ) : Config()
+    data class Links(
+        val providerName: String,
+        val dataUrl: String,
+        val history: com.lagradost.common.storage.WatchHistory,
+        val loadResponse: com.lagradost.cloudstream3.LoadResponse? = null,
+        val enrichedActors: List<ActorData>? = null,
+        val enrichedLogoUrl: String? = null,
+        val enrichedBackdropUrl: String? = null,
+    ) : Config()
 }
