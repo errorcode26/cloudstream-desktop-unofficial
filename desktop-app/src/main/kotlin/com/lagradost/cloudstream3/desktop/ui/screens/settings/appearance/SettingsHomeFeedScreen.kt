@@ -81,6 +81,7 @@ fun SettingsHomeFeedScreen(onNavigateToSubScreen: (SettingsSubScreen) -> Unit = 
                         com.lagradost.cloudstream3.desktop.ui.theme.HeroBannerStyle.CINEMA_PEEKING to "Cinema (Peeking Rails)",
                         com.lagradost.cloudstream3.desktop.ui.theme.HeroBannerStyle.FULLSCREEN_IMMERSIVE to "Fullscreen Immersive",
                         com.lagradost.cloudstream3.desktop.ui.theme.HeroBannerStyle.THUMBNAIL_STRIP to "Thumbnail Filmstrip",
+                        com.lagradost.cloudstream3.desktop.ui.theme.HeroBannerStyle.CARDS_CAROUSEL to "Cards Carousel (Peeking)",
                     ),
                     currentValue = heroBannerStyle,
                     onSelectionChanged = { AppearanceConfig.setHeroBannerStyle(it) },

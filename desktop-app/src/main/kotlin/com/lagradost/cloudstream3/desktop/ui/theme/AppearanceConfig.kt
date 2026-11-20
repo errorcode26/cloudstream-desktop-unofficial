@@ -145,6 +145,7 @@ enum class HeroBannerStyle(val label: String) {
     CINEMA_PEEKING("Cinema (Peeking Rails)"),
     FULLSCREEN_IMMERSIVE("Fullscreen Immersive"),
     THUMBNAIL_STRIP("Thumbnail Filmstrip"),
+    CARDS_CAROUSEL("Cards Carousel (Peeking)"),
     ;
 
     companion object {
