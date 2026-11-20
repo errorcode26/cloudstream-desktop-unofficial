@@ -406,6 +406,7 @@ fun SettingsCardsLayoutScreen() {
                         HeroBannerStyle.CINEMA_PEEKING to "Cinema (Peeking Rails)",
                         HeroBannerStyle.FULLSCREEN_IMMERSIVE to "Fullscreen Immersive",
                         HeroBannerStyle.THUMBNAIL_STRIP to "Thumbnail Filmstrip",
+                        HeroBannerStyle.CARDS_CAROUSEL to "Cards Carousel (Peeking)",
                     ),
                     currentValue = heroBannerStyle,
                     onSelectionChanged = { AppearanceConfig.setHeroBannerStyle(it) },

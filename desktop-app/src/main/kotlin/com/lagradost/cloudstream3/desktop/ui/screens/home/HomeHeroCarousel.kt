@@ -132,6 +132,19 @@ fun HomeHeroCarousel(
     val isLightMode = LocalDesktopTheme.current.isLightMode
     val dockPosition by AppearanceConfig.dockPosition.collectAsState()
 
+    if (heroBannerStyle == com.lagradost.cloudstream3.desktop.ui.theme.HeroBannerStyle.CARDS_CAROUSEL) {
+        HomeHeroCardsCarousel(
+            items = items,
+            provider = provider,
+            heroMetaMap = heroMetaMap,
+            allBookmarks = allBookmarks,
+            onPrefetchHeroItem = onPrefetchHeroItem,
+            onHeroBackgroundChanged = onHeroBackgroundChanged,
+            onItemClick = onItemClick,
+        )
+        return
+    }
+
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxWidth()
