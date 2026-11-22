@@ -145,6 +145,8 @@ class ExploreViewModel(
         private const val MAX_CACHE_ENTRIES = 120
     }
 
+    private val nativeCatalogs: List<ManifestCatalogDescriptor> by lazy { buildNativeCatalogs() }
+
     private val catalogItemsCache: MutableMap<String, List<ExploreItem>> = Collections.synchronizedMap(
         object : LinkedHashMap<String, List<ExploreItem>>(MAX_CACHE_ENTRIES, 0.75f, true) {
             override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, List<ExploreItem>>?): Boolean {
@@ -244,7 +246,6 @@ class ExploreViewModel(
             val enabledAddons: List<ManagedStremioAddon> = StremioAddonManager.addons.value.filter { it.enabled && it.providesCatalogs }
 
             // Step 1: Collect static native catalogs + pre-cached addon catalogs (0ms cold start!)
-            val nativeCatalogs = buildNativeCatalogs()
             val initialDiscovered = mutableListOf<ManifestCatalogDescriptor>()
             for (addon in enabledAddons) {
                 val cached = ExploreCatalogDiscoverer.getCachedCatalogs(addon)
@@ -829,15 +830,10 @@ class ExploreViewModel(
         if (uiState.value.isShelvesMode) {
             val allLoaded = uiState.value.allShelves.filter { matchesType(it.catalog, type) }
             if (allLoaded.isNotEmpty()) {
-                val filtered = allLoaded; if (false) {
-                    allLoaded
-                } else {
-                    allLoaded.filter { matchesType(it.catalog, type) }
-                }
-                val heroes = filtered.firstOrNull { it.items.isNotEmpty() }?.items?.take(5) ?: emptyList()
+                val heroes = allLoaded.firstOrNull { it.items.isNotEmpty() }?.items?.take(5) ?: emptyList()
                 updateState {
                     copy(
-                        shelves = filtered,
+                        shelves = allLoaded,
                         heroItems = if (heroes.isNotEmpty()) heroes else heroItems,
                     )
                 }
@@ -928,22 +924,19 @@ class ExploreViewModel(
         }
     }
 
-    private suspend fun searchPlugins(query: String): List<AddonSearchResultGroup> = coroutineScope {
+    private fun getResolvedRealProviders(): List<MainAPI> {
         var allProviders = com.lagradost.cloudstream3.desktop.repo.ActiveProviderRepository.allRealProviders.value
-
         val hasLazyStubs = allProviders.any { it is LazyPluginProvider }
         val loadedProviders = allProviders.filter {
             com.lagradost.cloudstream3.desktop.repo.ActiveProviderRepository.isRealContentProvider(it) &&
                 it !is LazyPluginProvider
         }
         if (hasLazyStubs || loadedProviders.isEmpty()) {
-
             com.lagradost.cloudstream3.desktop.init.loadAllRemainingPlugins()
             com.lagradost.cloudstream3.desktop.repo.ActiveProviderRepository.refreshProviders()
             allProviders = com.lagradost.cloudstream3.desktop.repo.ActiveProviderRepository.allRealProviders.value
         }
-
-        val activeProviders = allProviders.filter {
+        return allProviders.filter {
             com.lagradost.cloudstream3.desktop.repo.ActiveProviderRepository.isRealContentProvider(it) &&
                 it !is LazyPluginProvider
         }.ifEmpty {
@@ -952,16 +945,11 @@ class ExploreViewModel(
                     it !is LazyPluginProvider
             }
         }
+    }
 
-
-        if (activeProviders.isEmpty()) {
-
-
-    
-        }
-
+    private suspend fun searchPlugins(query: String): List<AddonSearchResultGroup> = coroutineScope {
+        val activeProviders = getResolvedRealProviders()
         if (activeProviders.isEmpty()) return@coroutineScope emptyList()
-
         val p2pReady = com.lagradost.cloudstream3.desktop.torrent.DesktopTorrentEngine.isP2pReady
         val targetProviders = activeProviders.filter {
             (it.hasMainPage || it.supportedTypes.isNotEmpty()) &&
@@ -1932,38 +1920,7 @@ class ExploreViewModel(
                 }
 
                 // Uses the single-source-of-truth real content providers
-                var allProviders = com.lagradost.cloudstream3.desktop.repo.ActiveProviderRepository.allRealProviders.value
-
-        val hasLazyStubs = allProviders.any { it is LazyPluginProvider }
-        val loadedProviders = allProviders.filter {
-            com.lagradost.cloudstream3.desktop.repo.ActiveProviderRepository.isRealContentProvider(it) &&
-                it !is LazyPluginProvider
-        }
-        if (hasLazyStubs || loadedProviders.isEmpty()) {
-
-            com.lagradost.cloudstream3.desktop.init.loadAllRemainingPlugins()
-            com.lagradost.cloudstream3.desktop.repo.ActiveProviderRepository.refreshProviders()
-            allProviders = com.lagradost.cloudstream3.desktop.repo.ActiveProviderRepository.allRealProviders.value
-        }
-
-        val activeProviders = allProviders.filter {
-            com.lagradost.cloudstream3.desktop.repo.ActiveProviderRepository.isRealContentProvider(it) &&
-                it !is LazyPluginProvider
-        }.ifEmpty {
-            APIHolder.allProviders.filter {
-                com.lagradost.cloudstream3.desktop.repo.ActiveProviderRepository.isRealContentProvider(it) &&
-                    it !is LazyPluginProvider
-            }
-        }
-        
-
-
-                if (activeProviders.isEmpty()) {
-        
-        
-            
-                }
-
+                val activeProviders = getResolvedRealProviders()
                 if (activeProviders.isEmpty()) {
                     updateState { copy(isSearchingProviders = false) }
                     return@launch
@@ -2077,5 +2034,18 @@ class ExploreViewModel(
             "collections", "collection" -> "Collections"
             else -> type.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.US) else it.toString() }
         }
+    }
+
+    override fun dispose() {
+        refreshJob?.cancel()
+        loadJob?.cancel()
+        loadMoreJob?.cancel()
+        loadShelvesJob?.cancel()
+        loadPlatformShelvesJob?.cancel()
+        providerSearchJob?.cancel()
+        liveSearchJob?.cancel()
+        collectionLoadJob?.cancel()
+        catalogItemsCache.clear()
+        super.dispose()
     }
 }

@@ -36,6 +36,10 @@ private const val PREF_SEARCH_PROVIDERS = PreferenceKeys.PREF_SEARCH_PROVIDERS
 private const val PREF_SEARCH_ADDON_MODE = "pref_search_addon_mode"
 private const val MAX_HISTORY_SIZE = 20
 
+private val NON_ALPHA_REGEX = Regex("[^a-z0-9]")
+private val WHITESPACE_REGEX = Regex("\\s+")
+private val MATCH_STOP_WORDS = setOf("the", "a", "an", "and", "of", "in", "to", "for", "with", "on", "at", "by", "from", "season", "episode")
+
 class SearchViewModel(
     private val activeProviderRepository: ActiveProviderRepository = AppContainerHolder.container.activeProviderRepository,
     private val pluginRepository: PluginRepository = AppContainerHolder.container.pluginRepository,
@@ -44,6 +48,8 @@ class SearchViewModel(
 ) {
 
     private var searchJob: kotlinx.coroutines.Job? = null
+    private var providerSearchJob: kotlinx.coroutines.Job? = null
+    private var loadMoreJob: kotlinx.coroutines.Job? = null
     private var lastSearchedQuery: String = ""
     private val searchSemaphore = kotlinx.coroutines.sync.Semaphore(8)
     private var suppressSuggestions: Boolean = false
@@ -341,8 +347,6 @@ class SearchViewModel(
         }
     }
 
-    private var providerSearchJob: kotlinx.coroutines.Job? = null
-
     private fun search(force: Boolean = false) {
         val query = uiState.value.searchQuery
         if (query.isBlank() || (!force && query == lastSearchedQuery)) return
@@ -387,7 +391,7 @@ class SearchViewModel(
     }
 
     private fun searchPlugins(query: String) {
-        searchJob = viewModelScope.launch {
+        searchJob = viewModelScope.launch(Dispatchers.IO) {
             updateState { copy(isLoadingSearch = true, isLoadingMore = false, canPaginate = true, searchResultsGrouped = null) }
             try {
                 val selectedNames = uiState.value.selectedProviderNames
@@ -577,6 +581,8 @@ class SearchViewModel(
 
                 val cleanTitle = CardTitleSanitizer.sanitize(item.name).displayTitle
                 val searchTitle = cleanTitle.ifBlank { item.name }
+                val targetNorm = NON_ALPHA_REGEX.replace(searchTitle.lowercase(java.util.Locale.US), " ").trim()
+                val targetWords = targetNorm.split(WHITESPACE_REGEX).filter { it.length > 1 && it !in MATCH_STOP_WORDS }
                 val aggregatedMatches = CopyOnWriteArrayList<ProviderMatch>()
 
                 val jobs = realProviders.map { provider ->
@@ -595,7 +601,7 @@ class SearchViewModel(
                                 if (!searchItems.isNullOrEmpty()) {
                                     val validMatches = mutableListOf<ProviderMatch>()
                                     for (searchRes in searchItems) {
-                                        if (isTitleMatch(searchTitle, searchRes.name)) {
+                                        if (isTitleMatch(targetNorm, targetWords, searchRes.name)) {
                                             val meta = CardTitleSanitizer.sanitize(searchRes.name)
                                             validMatches.add(
                                                 ProviderMatch(
@@ -648,13 +654,12 @@ class SearchViewModel(
         }
     }
 
-    private fun isTitleMatch(targetTitle: String, candidateTitle: String): Boolean {
-        val nonAlpha = Regex("[^a-z0-9]")
-        val targetNorm = nonAlpha.replace(
-            CardTitleSanitizer.sanitize(targetTitle).displayTitle.lowercase(java.util.Locale.US),
-            " ",
-        ).trim()
-        val candidateNorm = nonAlpha.replace(
+    private fun isTitleMatch(
+        targetNorm: String,
+        targetWords: List<String>,
+        candidateTitle: String,
+    ): Boolean {
+        val candidateNorm = NON_ALPHA_REGEX.replace(
             CardTitleSanitizer.sanitize(candidateTitle).displayTitle.lowercase(java.util.Locale.US),
             " ",
         ).trim()
@@ -662,9 +667,6 @@ class SearchViewModel(
         if (targetNorm.isBlank() || candidateNorm.isBlank()) return false
         if (targetNorm == candidateNorm) return true
         if (candidateNorm.contains(targetNorm) || targetNorm.contains(candidateNorm)) return true
-
-        val stopWords = setOf("the", "a", "an", "and", "of", "in", "to", "for", "with", "on", "at", "by", "from", "season", "episode")
-        val targetWords = targetNorm.split(Regex("\\s+")).filter { it.length > 1 && it !in stopWords }
 
         return targetWords.isNotEmpty() && targetWords.all { candidateNorm.contains(it) }
     }
@@ -688,7 +690,8 @@ class SearchViewModel(
         val currentItems = currentPair.second
 
         val nextPage = currentPage + 1
-        viewModelScope.launch {
+        loadMoreJob?.cancel()
+        loadMoreJob = viewModelScope.launch(Dispatchers.IO) {
             updateState { copy(isLoadingMore = true) }
             try {
                 com.lagradost.common.logging.AppLogger.i("Plugin:${activeProvider.name}", "Loading more search results (page $nextPage) for '$query'")
@@ -721,5 +724,15 @@ class SearchViewModel(
                 updateState { copy(isLoadingMore = false) }
             }
         }
+    }
+
+    override fun dispose() {
+        searchJob?.cancel()
+        searchJob = null
+        providerSearchJob?.cancel()
+        providerSearchJob = null
+        loadMoreJob?.cancel()
+        loadMoreJob = null
+        super.dispose()
     }
 }

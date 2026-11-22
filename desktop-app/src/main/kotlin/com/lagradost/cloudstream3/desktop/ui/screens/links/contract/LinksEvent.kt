@@ -32,6 +32,7 @@ sealed interface LinksUiEvent : UiEvent {
     data class OnFilterQuality(val quality: Int?) : LinksUiEvent
     data class OnFilterFormat(val format: com.lagradost.cloudstream3.desktop.ui.screens.StreamFormatFilter) : LinksUiEvent
     data class OnFilterSource(val source: String?) : LinksUiEvent
+    data class OnFilterSpec(val spec: StreamSpecFilter) : LinksUiEvent
     data class OnPlayerLaunchFinished(val error: String? = null) : LinksUiEvent
     data class OnP2pEnabledChanged(val enabled: Boolean) : LinksUiEvent
     data class OnSetEmbeddedError(val error: String?) : LinksUiEvent

@@ -68,6 +68,7 @@ class LinksViewModel : BaseMviViewModel<LinksUiState, LinksUiEvent, LinksUiEffec
             is LinksUiEvent.OnFilterQuality -> updateState { copy(selectedQuality = event.quality) }
             is LinksUiEvent.OnFilterFormat -> updateState { copy(selectedFormat = event.format) }
             is LinksUiEvent.OnFilterSource -> updateState { copy(selectedSource = event.source) }
+            is LinksUiEvent.OnFilterSpec -> updateState { copy(selectedSpecFilter = event.spec) }
             is LinksUiEvent.OnPlayerLaunchFinished -> updateState {
                 copy(
                     isLaunchingPlayer = false,
@@ -207,7 +208,7 @@ class LinksViewModel : BaseMviViewModel<LinksUiState, LinksUiEvent, LinksUiEffec
                 }
             }
 
-            val flusherJob = viewModelScope.launch(Dispatchers.Default) {
+            val flusherJob = launch(Dispatchers.Default) {
                 while (isActive) {
                     delay(150L)
                     flushBatch()
@@ -259,7 +260,7 @@ class LinksViewModel : BaseMviViewModel<LinksUiState, LinksUiEvent, LinksUiEffec
                 return@launch
             }
 
-            val stremioJob = viewModelScope.launch(Dispatchers.IO) {
+            val stremioJob = launch(Dispatchers.IO) {
                 com.lagradost.cloudstream3.desktop.stremio.StremioAddonManager.searchStreams(
                     imdbId = cleanImdb,
                     season = season,

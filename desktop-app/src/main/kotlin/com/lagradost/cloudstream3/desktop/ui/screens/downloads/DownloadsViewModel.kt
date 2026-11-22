@@ -18,11 +18,16 @@ typealias DownloadsUiState = com.lagradost.cloudstream3.desktop.ui.screens.downl
 class DownloadsViewModel : BaseMviViewModel<DownloadsUiState, DownloadsUiEvent, DownloadsUiEffect>(
     initialState = DownloadsUiState(
         downloadPath = DesktopDownloadManager.downloadsDir.absolutePath,
-        downloadThreads = com.lagradost.common.storage.DesktopDataStore.getKey<Float>(com.lagradost.common.storage.DesktopDataStore.PREF_DOWNLOAD_THREADS) ?: 8f,
-        maxConcurrent = com.lagradost.common.storage.DesktopDataStore.getKey<Float>(com.lagradost.common.storage.DesktopDataStore.PREF_DOWNLOAD_MAX_CONCURRENT) ?: 2f,
+        downloadThreads = 8f,
+        maxConcurrent = 2f,
     ),
 ) {
     init {
+        viewModelScope.launch(Dispatchers.IO) {
+            val threads = com.lagradost.common.storage.DesktopDataStore.getKey<Float>(com.lagradost.common.storage.DesktopDataStore.PREF_DOWNLOAD_THREADS) ?: 8f
+            val max = com.lagradost.common.storage.DesktopDataStore.getKey<Float>(com.lagradost.common.storage.DesktopDataStore.PREF_DOWNLOAD_MAX_CONCURRENT) ?: 2f
+            updateState { copy(downloadThreads = threads, maxConcurrent = max) }
+        }
         viewModelScope.launch {
             DesktopDownloadManager.tasks.collect { taskList ->
                 updateState { copy(tasks = taskList) }
@@ -106,15 +111,21 @@ class DownloadsViewModel : BaseMviViewModel<DownloadsUiState, DownloadsUiEvent, 
     private fun toggleSettings(open: Boolean) {
         if (open) {
             val currentPath = DesktopDownloadManager.downloadsDir.absolutePath
-            val threads = com.lagradost.common.storage.DesktopDataStore.getKey<Float>(com.lagradost.common.storage.DesktopDataStore.PREF_DOWNLOAD_THREADS) ?: 8f
-            val maxConcurrent = com.lagradost.common.storage.DesktopDataStore.getKey<Float>(com.lagradost.common.storage.DesktopDataStore.PREF_DOWNLOAD_MAX_CONCURRENT) ?: 2f
             updateState {
                 copy(
                     isSettingsOpen = true,
                     downloadPath = currentPath,
-                    downloadThreads = threads,
-                    maxConcurrent = maxConcurrent,
                 )
+            }
+            viewModelScope.launch(Dispatchers.IO) {
+                val threads = com.lagradost.common.storage.DesktopDataStore.getKey<Float>(com.lagradost.common.storage.DesktopDataStore.PREF_DOWNLOAD_THREADS) ?: 8f
+                val maxConcurrent = com.lagradost.common.storage.DesktopDataStore.getKey<Float>(com.lagradost.common.storage.DesktopDataStore.PREF_DOWNLOAD_MAX_CONCURRENT) ?: 2f
+                updateState {
+                    copy(
+                        downloadThreads = threads,
+                        maxConcurrent = maxConcurrent,
+                    )
+                }
             }
         } else {
             updateState { copy(isSettingsOpen = false) }
@@ -151,5 +162,9 @@ class DownloadsViewModel : BaseMviViewModel<DownloadsUiState, DownloadsUiEvent, 
         if (mb < 1024) return "%.1f MB".format(mb)
         val gb = mb / 1024.0
         return "%.2f GB".format(gb)
+    }
+
+    override fun dispose() {
+        super.dispose()
     }
 }

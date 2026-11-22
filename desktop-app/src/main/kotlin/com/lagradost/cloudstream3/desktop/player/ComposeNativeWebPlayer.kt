@@ -4,36 +4,26 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.awt.SwingPanel
+import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.lagradost.cloudstream3.desktop.player.ipc.PlayerInboundEvent
 import com.lagradost.cloudstream3.desktop.player.webview.NativePlayerBridge
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.awt.event.*
 import java.io.File
 
-private val playerObjectMapper = com.fasterxml.jackson.module.kotlin.jacksonObjectMapper()
+private val playerObjectMapper = jacksonObjectMapper()
 
-private val EMPTY_LIST_FLOW = kotlinx.coroutines.flow.flowOf(emptyList<Nothing>())
-private val FALSE_FLOW = kotlinx.coroutines.flow.flowOf(false)
-private val MINUS_ONE_FLOW = kotlinx.coroutines.flow.flowOf(-1)
-private val NONE_FLOW = kotlinx.coroutines.flow.flowOf("None")
-private val NULL_STRING_FLOW = kotlinx.coroutines.flow.flowOf<String?>(null)
-private val NULL_SKIP_INTERVAL_FLOW = kotlinx.coroutines.flow.flowOf<com.lagradost.cloudstream3.desktop.player.skip.SkipInterval?>(null)
-private val ZERO_LONG_FLOW = kotlinx.coroutines.flow.flowOf(0L)
-private val LINK_SIZE_REGEX = Regex("""(?i)\[\s*(\d+(?:\.\d+)?\s*(?:GB|MB|GiB|MiB))\s*\]|\((\d+(?:\.\d+)?\s*(?:GB|MB|GiB|MiB))\)|\b(\d+(?:\.\d+)?\s*(?:GB|MB|GiB|MiB))\b""")
-
-private fun formatByteSize(bytes: Long): String? {
-    if (bytes < 1024L * 1024L) return null
-    val gb = bytes.toDouble() / (1024.0 * 1024.0 * 1024.0)
-    return if (gb >= 1.0) {
-        String.format(java.util.Locale.US, "%.1f GB", gb)
-    } else {
-        val mb = bytes.toDouble() / (1024.0 * 1024.0)
-        String.format(java.util.Locale.US, "%.0f MB", mb)
-    }
-}
+private val EMPTY_LIST_FLOW = flowOf(emptyList<Nothing>())
+private val FALSE_FLOW = flowOf(false)
+private val MINUS_ONE_FLOW = flowOf(-1)
+private val NONE_FLOW = flowOf("None")
+private val NULL_STRING_FLOW = flowOf<String?>(null)
+private val NULL_SKIP_INTERVAL_FLOW = flowOf<com.lagradost.cloudstream3.desktop.player.skip.SkipInterval?>(null)
+private val ZERO_LONG_FLOW = flowOf(0L)
 
 @Composable
 fun ComposeNativeWebPlayer(
@@ -91,7 +81,7 @@ fun ComposeNativeWebPlayer(
     providerName: String? = null,
 ) {
     val scope = rememberCoroutineScope()
-    val persistentSubtitles = remember { androidx.compose.runtime.mutableStateListOf<String>() }
+    val persistentSubtitles = remember { mutableStateListOf<String>() }
     val window = com.lagradost.cloudstream3.desktop.ui.LocalComposeWindow.current
 
     val primaryColor = androidx.compose.material3.MaterialTheme.colorScheme.primary
@@ -129,6 +119,7 @@ fun ComposeNativeWebPlayer(
     }
 
     var isUiReady by remember { mutableStateOf(false) }
+    var currentHandleValue by remember { mutableStateOf(0L) }
     val globalUiScale by com.lagradost.cloudstream3.desktop.ui.theme.AppearanceConfig.globalUiScale.collectAsState()
     LaunchedEffect(globalUiScale, isUiReady) {
         if (isUiReady) {
@@ -161,77 +152,77 @@ fun ComposeNativeWebPlayer(
     var activeSubtitleOverrideEnabled by remember {
         mutableStateOf(
             com.lagradost.common.storage.DesktopDataStore.getKey<Boolean>(
-                com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_ENABLE_SUB_OVERRIDE,
+                PlayerConfig.PREF_ENABLE_SUB_OVERRIDE,
             ) ?: true,
         )
     }
 
     LaunchedEffect(playerState) {
         com.lagradost.common.storage.DesktopDataStore.keyUpdates.collect { key ->
-            if (key.startsWith("player_sub_") || key == com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_ENABLE_SUB_OVERRIDE) {
+            if (key.startsWith("player_sub_") || key == PlayerConfig.PREF_ENABLE_SUB_OVERRIDE) {
                 when (key) {
-                    com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_ENABLE_SUB_OVERRIDE -> {
+                    PlayerConfig.PREF_ENABLE_SUB_OVERRIDE -> {
                         val v = com.lagradost.common.storage.DesktopDataStore.getKey<Boolean>(key) ?: true
                         activeSubtitleOverrideEnabled = v
                         playerState?.setSubtitleOverrideEnabled(v)
                     }
-                    com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_SUB_COLOR -> {
+                    PlayerConfig.PREF_SUB_COLOR -> {
                         val v = com.lagradost.common.storage.DesktopDataStore.getKey<String>(key) ?: "#FFFFFF"
                         playerState?.setMpvProperty("sub-color", v)
                     }
-                    com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_SUB_SIZE -> {
+                    PlayerConfig.PREF_SUB_SIZE -> {
                         val v = com.lagradost.common.storage.DesktopDataStore.getKey<String>(key) ?: "45"
                         playerState?.setMpvProperty("sub-font-size", v)
                     }
-                    com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_SUB_FONT -> {
+                    PlayerConfig.PREF_SUB_FONT -> {
                         val v = com.lagradost.common.storage.DesktopDataStore.getKey<String>(key)
                         playerState?.setSubtitleFont(v)
                     }
-                    com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_SUB_BG -> {
+                    PlayerConfig.PREF_SUB_BG -> {
                         val v = com.lagradost.common.storage.DesktopDataStore.getKey<String>(key) ?: "#00000000"
                         playerState?.setSubtitleBackground(v)
                     }
-                    com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_SUB_BORDER_COLOR -> {
+                    PlayerConfig.PREF_SUB_BORDER_COLOR -> {
                         val v = com.lagradost.common.storage.DesktopDataStore.getKey<String>(key) ?: "#000000"
                         playerState?.setMpvProperty("sub-border-color", v)
                     }
-                    com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_SUB_BORDER_SIZE -> {
+                    PlayerConfig.PREF_SUB_BORDER_SIZE -> {
                         val v = com.lagradost.common.storage.DesktopDataStore.getKey<String>(key) ?: "3"
                         playerState?.setMpvProperty("sub-border-size", v)
                     }
-                    com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_SUB_SHADOW_COLOR -> {
+                    PlayerConfig.PREF_SUB_SHADOW_COLOR -> {
                         val v = com.lagradost.common.storage.DesktopDataStore.getKey<String>(key) ?: "#00000000"
                         playerState?.setMpvProperty("sub-shadow-color", v)
                     }
-                    com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_SUB_SHADOW_OFFSET -> {
+                    PlayerConfig.PREF_SUB_SHADOW_OFFSET -> {
                         val v = com.lagradost.common.storage.DesktopDataStore.getKey<String>(key) ?: "0"
                         playerState?.setMpvProperty("sub-shadow-offset", v)
                     }
-                    com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_SUB_BLUR -> {
+                    PlayerConfig.PREF_SUB_BLUR -> {
                         val v = com.lagradost.common.storage.DesktopDataStore.getKey<String>(key) ?: "0"
                         playerState?.setMpvProperty("sub-blur", v)
                     }
-                    com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_SUB_BOLD -> {
+                    PlayerConfig.PREF_SUB_BOLD -> {
                         val v = com.lagradost.common.storage.DesktopDataStore.getKey<String>(key) ?: "no"
                         playerState?.setMpvProperty("sub-bold", v)
                     }
-                    com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_SUB_ITALIC -> {
+                    PlayerConfig.PREF_SUB_ITALIC -> {
                         val v = com.lagradost.common.storage.DesktopDataStore.getKey<String>(key) ?: "no"
                         playerState?.setMpvProperty("sub-italic", v)
                     }
-                    com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_SUB_POS -> {
+                    PlayerConfig.PREF_SUB_POS -> {
                         val v = com.lagradost.common.storage.DesktopDataStore.getKey<String>(key) ?: "100"
                         playerState?.setSubtitlePosition(v.toIntOrNull() ?: 100)
                     }
-                    com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_SUB_REMOVE_CAPTIONS -> {
+                    PlayerConfig.PREF_SUB_REMOVE_CAPTIONS -> {
                         val v = com.lagradost.common.storage.DesktopDataStore.getKey<Boolean>(key) ?: false
                         playerState?.setSubFilterSdh(v)
                     }
-                    com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_SUB_REMOVE_BLOAT -> {
+                    PlayerConfig.PREF_SUB_REMOVE_BLOAT -> {
                         val v = com.lagradost.common.storage.DesktopDataStore.getKey<Boolean>(key) ?: true
                         playerState?.setSubFilterBloat(v)
                     }
-                    com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_SUB_UPPERCASE -> {
+                    PlayerConfig.PREF_SUB_UPPERCASE -> {
                         val v = com.lagradost.common.storage.DesktopDataStore.getKey<Boolean>(key) ?: false
                         playerState?.setSubUppercase(v)
                     }
@@ -292,7 +283,6 @@ fun ComposeNativeWebPlayer(
     LaunchedEffect(proxyVideoTracks, link) {
         if (!hasAutoSelectedQuality && proxyVideoTracks.isNotEmpty() && link?.quality != null && link.quality != com.lagradost.cloudstream3.utils.Qualities.Unknown.value) {
             val targetRes = link.quality
-            // Try to find exact match first, fallback to closest resolution
             val match = proxyVideoTracks.find { it.name.contains("${targetRes}p") }
                 ?: proxyVideoTracks.minByOrNull {
                     val res = it.name.substringBefore("p").toIntOrNull() ?: Int.MAX_VALUE
@@ -309,68 +299,7 @@ fun ComposeNativeWebPlayer(
 
     fun pushSyncStateToWebView() {
         try {
-            val rawBackdrop = backdropUrl?.let { raw -> if (raw.startsWith("//")) "https:$raw" else raw }
-            val rawLogo = logoUrl?.let { raw -> if (raw.startsWith("//")) "https:$raw" else raw }
-            val safeBackdrop = com.lagradost.cloudstream3.desktop.utils.ImageUtils.getCachedDiskFileUri(rawBackdrop, isBackdrop = true) ?: rawBackdrop
-            val safeLogo = com.lagradost.cloudstream3.desktop.utils.ImageUtils.getCachedDiskFileUri(rawLogo, isBackdrop = false) ?: rawLogo
-
-            val starringCast = actors.filter { actorData ->
-                val role = actorData.roleString ?: actorData.role?.name
-                role?.equals("Director", ignoreCase = true) != true &&
-                    role?.equals("Creator", ignoreCase = true) != true &&
-                    role?.equals("Writer", ignoreCase = true) != true &&
-                    role?.equals("Producer", ignoreCase = true) != true &&
-                    role?.equals("Executive Producer", ignoreCase = true) != true
-            }
-
-            val isAnimationTitle = isAnime ||
-                tags?.any { it.contains("Animation", ignoreCase = true) || it.contains("Anime", ignoreCase = true) } == true
-
-
-            val safeActors = starringCast.take(8).map { actorData ->
-                val rawImg = actorData.actor.image?.let { raw -> if (raw.startsWith("//")) "https:$raw" else raw }
-                val enhancedImg = com.lagradost.cloudstream3.desktop.utils.ImageUtils.enhanceProfileUrl(rawImg) ?: rawImg
-                val safeImg = enhancedImg?.let { com.lagradost.cloudstream3.desktop.utils.ImageUtils.getCachedDiskFileUri(it) ?: it }
-
-                val rawVaImg = actorData.voiceActor?.image?.let { raw -> if (raw.startsWith("//")) "https:$raw" else raw }
-                val enhancedVaImg = com.lagradost.cloudstream3.desktop.utils.ImageUtils.enhanceProfileUrl(rawVaImg) ?: rawVaImg
-                val safeVaImg = enhancedVaImg?.let { com.lagradost.cloudstream3.desktop.utils.ImageUtils.getCachedDiskFileUri(it) ?: it }
-
-                ActorPayload(
-                    name = actorData.actor.name,
-                    role = actorData.roleString ?: actorData.role?.name,
-                    image = safeImg,
-                    voiceActorName = actorData.voiceActor?.name,
-                    voiceActorImage = safeVaImg,
-                    isAnime = actorData.voiceActor != null || (isAnimationTitle && isAnime),
-                )
-            }
-
-            val availableShaders = com.lagradost.cloudstream3.desktop.player.ShaderManager.getAvailableShaders()
-            val availableFonts = com.lagradost.cloudstream3.desktop.ui.theme.CustomFontManager.getAvailableFonts()
-            val activeSubtitleFont = com.lagradost.common.storage.DesktopDataStore.getKey<String>(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_SUB_FONT)?.takeIf { it.isNotBlank() } ?: "Inter"
-            val activeSubtitleBackground = com.lagradost.common.storage.DesktopDataStore.getKey<String>(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_SUB_BG)
-            val activeSubtitleBorderColor = com.lagradost.common.storage.DesktopDataStore.getKey<String>(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_SUB_BORDER_COLOR)
-            val activeSubtitleBorderSize = com.lagradost.common.storage.DesktopDataStore.getKey<String>(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_SUB_BORDER_SIZE)
-            val activeSubtitleShadowColor = com.lagradost.common.storage.DesktopDataStore.getKey<String>(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_SUB_SHADOW_COLOR)
-            val activeSubtitleShadowOffset = com.lagradost.common.storage.DesktopDataStore.getKey<String>(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_SUB_SHADOW_OFFSET)
-            val activeSubtitleBlur = com.lagradost.common.storage.DesktopDataStore.getKey<String>(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_SUB_BLUR)
-            val activeSubtitleBold = com.lagradost.common.storage.DesktopDataStore.getKey<String>(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_SUB_BOLD)
-            val activeSubtitleItalic = com.lagradost.common.storage.DesktopDataStore.getKey<String>(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_SUB_ITALIC)
-            val activeSubtitleColor = com.lagradost.common.storage.DesktopDataStore.getKey<String>(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_SUB_COLOR) ?: "#FFFFFF"
-            val activeSubtitleSize = com.lagradost.common.storage.DesktopDataStore.getKey<String>(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_SUB_SIZE) ?: "45"
-            val activeSubtitlePos = com.lagradost.common.storage.DesktopDataStore.getKey<String>(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_SUB_POS) ?: "100"
-            val activeSubtitleRemoveCaptions = com.lagradost.common.storage.DesktopDataStore.getKey<Boolean>(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_SUB_REMOVE_CAPTIONS) ?: false
-            val activeSubtitleRemoveBloat = com.lagradost.common.storage.DesktopDataStore.getKey<Boolean>(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_SUB_REMOVE_BLOAT) ?: true
-            val activeSubtitleUppercase = com.lagradost.common.storage.DesktopDataStore.getKey<Boolean>(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_SUB_UPPERCASE) ?: false
-            val audioNormalization = com.lagradost.common.storage.DesktopDataStore.getKey<Boolean>(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_AUDIO_NORMALIZATION) ?: false
-            val audioNormStrength = com.lagradost.common.storage.DesktopDataStore.getKey<String>(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_AUDIO_NORM_STRENGTH) ?: "Medium"
-            val audioSpatial = com.lagradost.common.storage.DesktopDataStore.getKey<Boolean>(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_AUDIO_SPATIAL) ?: false
-            val audioEqPreset = com.lagradost.common.storage.DesktopDataStore.getKey<String>(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_AUDIO_EQ_PRESET) ?: "Flat"
-            val audioVolumeMax = com.lagradost.common.storage.DesktopDataStore.getKey<Boolean>(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_AUDIO_VOLUME_MAX) ?: false
-            val audioDelay = com.lagradost.common.storage.DesktopDataStore.getKey<Float>(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_AUDIO_DELAY) ?: 0f
-
-            val payload = PlayerUiSyncState(
+            val payload = PlayerSyncStateBuilder.buildPlayerUiSyncState(
                 plot = plot,
                 year = year,
                 tags = tags,
@@ -378,177 +307,72 @@ fun ComposeNativeWebPlayer(
                 rating = rating,
                 isProbing = isProbing,
                 isScraping = isScraping,
-                backdropUrl = safeBackdrop,
-                logoUrl = safeLogo,
+                backdropUrl = backdropUrl,
+                logoUrl = logoUrl,
                 currentLinkIndex = currentLinkIndex,
-                failedLinks = failedLinks.map { FailedLinkPayload(it.key, it.value, links.getOrNull(it.key)?.url) },
-                links = links.mapIndexed { index, l ->
-                    val isTorrent = com.lagradost.cloudstream3.desktop.torrent.DesktopTorrentEngine.isTorrentLink(l)
-                    val nameSize = LINK_SIZE_REGEX.find(l.name)?.let { mr ->
-                        val matched = mr.groupValues[1].ifBlank { mr.groupValues[2].ifBlank { mr.groupValues[3] } }.trim()
-                        val num = matched.replace(Regex("""(?i)[^\d.]"""), "").toDoubleOrNull() ?: 0.0
-                        if (num > 0.0) matched else null
-                    }
-                    val isAdaptiveStream = l.isM3u8 || l.isDash || l.url.contains(".m3u8", ignoreCase = true) || l.url.contains(".mpd", ignoreCase = true)
-                    val currentLiveSize = if (index == currentLinkIndex && liveFileSize > 0L && !isAdaptiveStream) formatByteSize(liveFileSize) else null
-                    val effectiveSize = currentLiveSize ?: nameSize
-
-                    val addonSource = l.source.trim().ifBlank { null }
-                    val hostSource = if (l.source.isNotBlank() && l.source != l.name) l.source else com.lagradost.cloudstream3.desktop.ui.screens.links.extractCleanServer(l.name, "")
-                    val targetName = addonSource ?: hostSource.takeIf { it.isNotBlank() } ?: providerName
-                    val resolvedLogo = if (!targetName.isNullOrBlank()) {
-                        com.lagradost.cloudstream3.desktop.repo.DesktopRepositoryManager.getPluginIcon(targetName)
-                            ?: com.lagradost.cloudstream3.desktop.stremio.StremioAddonManager.addons.value.firstOrNull {
-                                it.name.equals(targetName, ignoreCase = true) ||
-                                    targetName.contains(it.name, ignoreCase = true) ||
-                                    it.name.contains(targetName, ignoreCase = true)
-                            }?.logoUrl
-                            ?: providerName?.let { com.lagradost.cloudstream3.desktop.repo.DesktopRepositoryManager.getPluginIcon(it) }
-                    } else null
-                    val safeStreamLogo = resolvedLogo?.let { com.lagradost.cloudstream3.desktop.utils.ImageUtils.getCachedDiskFileUri(it) ?: it }
-
-                    LinkPayload(
-                        index = index,
-                        name = l.name,
-                        quality = l.quality,
-                        isActive = (index == currentLinkIndex),
-                        isM3u8 = l.isM3u8,
-                        isDash = l.isDash,
-                        url = l.url,
-                        isTorrent = isTorrent,
-                        source = l.source,
-                        size = effectiveSize,
-                        logoUrl = safeStreamLogo,
-                    )
-                },
-                episodes = episodes.map {
-                    val epRawPoster = it.posterUrl?.takeIf { p -> p.isNotBlank() }
-                    val resolvedEpPoster = if (epRawPoster != null) {
-                        if (epRawPoster.startsWith("//")) "https:$epRawPoster" else epRawPoster
-                    } else {
-                        seriesPosterUrl
-                    }
-                    val isCurrent = (currentEpisodeId != null && it.data == currentEpisodeId) ||
-                        (currentEpisodeNumber != null && it.episode == currentEpisodeNumber && (currentSeasonNumber == null || it.season == null || it.season == currentSeasonNumber))
-                    val hist = episodeHistoryLookup.find(it)
-                    val progress = if (hist != null && hist.duration > 0) {
-                        if (com.lagradost.player.impl.PlayerLinkHandler.isCompleted(hist.position, hist.duration)) {
-                            1.0
-                        } else {
-                            (hist.position.toDouble() / hist.duration.toDouble()).coerceIn(0.0, 1.0)
-                        }
-                    } else {
-                        null
-                    }
-                    val isWatched = progress != null && (progress >= 0.9 || (hist != null && com.lagradost.player.impl.PlayerLinkHandler.isCompleted(hist.position, hist.duration)))
-
-                    val normalizedPoster = resolvedEpPoster?.let { url -> if (url.startsWith("//")) "https:$url" else url }
-                    val safePoster = com.lagradost.cloudstream3.desktop.utils.ImageUtils.getCachedDiskFileUri(normalizedPoster) ?: normalizedPoster
-
-                    val lockUnreleased = com.lagradost.cloudstream3.desktop.ui.theme.AppearanceConfig.lockUnreleasedEpisodes.value
-                    val releaseStatus = com.lagradost.cloudstream3.desktop.ui.screens.details.parseEpisodeReleaseStatus(it, providerName)
-                    val hasPlayableData = it.data.isNotBlank() &&
-                        !it.data.startsWith("unreleased_") &&
-                        !it.data.startsWith("synthetic_") &&
-                        it.data != "null" && it.data != "{}" && it.data != "[]"
-                    val hasCachedLinks = com.lagradost.cloudstream3.desktop.ui.screens.player.LinkCache.get(it.data) != null
-                    val isLocked = !hasCachedLinks && (
-                        (releaseStatus.isUnreleased && lockUnreleased) || releaseStatus.isMissingFromProvider || !hasPlayableData
-                    )
-                    val releaseText = releaseStatus.statusBadgeText ?: releaseStatus.formattedDate
-
-                    EpisodePayload(
-                        id = it.data,
-                        title = it.name ?: "Episode ${it.episode}",
-                        season = it.season,
-                        episode = it.episode,
-                        isActive = isCurrent,
-                        posterUrl = safePoster,
-                        description = it.description,
-                        runTime = it.runTime,
-                        score = it.score?.toFloat(10)?.toDouble(),
-                        watchedPercentage = progress?.let { p -> p * 100.0 },
-                        isSeen = isWatched,
-                        isLocked = isLocked,
-                        releaseDateText = releaseText,
-                    )
-                },
-                audioTracks = audioTracks.map {
-                    SubtitleTrackPayload(it.id, it.name, it.isSelected)
-                },
-                subTracks = subtitleTracks.map {
-                    val safeName = it.name.replace(Regex("""[\r\n]+"""), " | ").trim().let { name -> if (name.length > 150) name.take(147) + "..." else name }
-                    SubtitleTrackPayload(it.id, safeName, it.isSelected)
-                },
-                videoTracks = videoTracks.map {
-                    SubtitleTrackPayload(it.id, it.name, it.isSelected)
-                },
-                lazyAudioTracks = proxyAudioTracks.map {
-                    LazyTrackPayload(it.url, it.name, it.language)
-                },
-                lazySubTracks = (
-                    proxySubtitleTracks.map {
-                        val safeName = it.name.replace(Regex("""[\r\n]+"""), " | ").trim().let { name -> if (name.length > 150) name.take(147) + "..." else name }
-                        LazyTrackPayload(it.url, safeName, it.language)
-                    } + autoFetchedSubtitleTracks
-                    ).distinctBy { it.url },
-                lazyVideoTracks = proxyVideoTracks.map {
-                    LazyTrackPayload(it.url, it.name, it.language)
-                },
+                failedLinks = failedLinks,
+                links = links,
+                liveFileSize = liveFileSize,
+                providerName = providerName,
+                episodes = episodes,
+                currentEpisodeId = currentEpisodeId,
+                currentEpisodeNumber = currentEpisodeNumber,
+                currentSeasonNumber = currentSeasonNumber,
+                seriesPosterUrl = seriesPosterUrl,
+                episodeHistoryLookup = episodeHistoryLookup,
+                audioTracks = audioTracks,
+                subtitleTracks = subtitleTracks,
+                videoTracks = videoTracks,
+                proxyAudioTracks = proxyAudioTracks,
+                proxySubtitleTracks = proxySubtitleTracks,
+                proxyVideoTracks = proxyVideoTracks,
+                autoFetchedSubtitleTracks = autoFetchedSubtitleTracks,
                 startPositionMs = startPositionMs,
-                title = title ?: "",
-                shaders = availableShaders,
+                title = title,
                 activeShader = activeShader,
-                activeSubtitleFont = activeSubtitleFont,
-                availableSubtitleFonts = availableFonts,
-                activeSubtitleBackground = activeSubtitleBackground,
-                activeSubtitleBorderColor = activeSubtitleBorderColor,
-                activeSubtitleBorderSize = activeSubtitleBorderSize,
-                activeSubtitleShadowColor = activeSubtitleShadowColor,
-                activeSubtitleShadowOffset = activeSubtitleShadowOffset,
-                activeSubtitleBlur = activeSubtitleBlur,
-                activeSubtitleBold = activeSubtitleBold,
-                activeSubtitleItalic = activeSubtitleItalic,
                 activeLazyVideoTrackUrl = activeLazyVideoTrackUrl,
                 activeLazyAudioTrackUrl = activeLazyAudioTrackUrl,
                 resolution = resolution,
                 activeSubtitleOverrideEnabled = activeSubtitleOverrideEnabled,
-                activeSubtitleColor = activeSubtitleColor,
-                activeSubtitleSize = activeSubtitleSize,
-                activeSubtitlePos = activeSubtitlePos,
-                activeSubtitleRemoveCaptions = activeSubtitleRemoveCaptions,
-                activeSubtitleRemoveBloat = activeSubtitleRemoveBloat,
-                activeSubtitleUppercase = activeSubtitleUppercase,
                 isLive = isLive,
                 isAudioOnlyStream = isAudioOnlyStream,
                 isAudioMode = isAudioMode,
-                chapters = chapters.map { ChapterPayload(it.index, it.title, it.timeMs) },
+                chapters = chapters,
                 currentChapterIndex = currentChapterIndex,
-                activeSkipInterval = activeSkipInterval?.let {
-                    SkipIntervalPayload(it.startMs, it.endMs, it.type.name, it.label, it.providerId)
-                },
-                skipIntervals = skipIntervals.map {
-                    SkipIntervalPayload(it.startMs, it.endMs, it.type.name, it.label, it.providerId)
-                },
-                actors = safeActors,
+                activeSkipInterval = activeSkipInterval,
+                skipIntervals = skipIntervals,
+                actors = actors,
+                isAnime = isAnime,
                 isExhausted = isExhausted,
                 exhaustionReason = exhaustionReason,
                 exhaustionDiagnostics = exhaustionDiagnostics,
-                audioNormalization = audioNormalization,
-                audioNormStrength = audioNormStrength,
-                audioSpatial = audioSpatial,
-                audioEqPreset = audioEqPreset,
-                audioVolumeMax = audioVolumeMax,
-                audioDelay = audioDelay,
-                imdbId = resolvedImdbId,
+                resolvedImdbId = resolvedImdbId,
             )
 
-            val wrapper = MetadataUpdatePayloadWrapper(
-                value = payload,
-            )
+            val wrapper = MetadataUpdatePayloadWrapper(value = payload)
             NativePlayerBridge.postMessage(playerObjectMapper.writeValueAsString(wrapper))
         } catch (e: Throwable) {
             com.lagradost.common.logging.AppLogger.e("pushSyncStateToWebView error: ${e.message}")
+        }
+    }
+
+    fun pushMetadataToWebView() {
+        try {
+            val vol = playerState?._volume?.value ?: 100f
+            val isMuted = playerState?._isMuted?.value ?: false
+            val isBuf = playerState?._isBuffering?.value == true
+
+            val payload = PlayerSyncStateBuilder.buildAppStateUpdatePayload(
+                volume = vol,
+                isMuted = isMuted,
+                isBuffering = isBuf,
+                isLoading = currentIsLoading,
+                loadingStatusText = currentLoadingStatusText,
+                fileSizeBytes = playerState?._fileSize?.value ?: 0L,
+            )
+            NativePlayerBridge.postMessage(playerObjectMapper.writeValueAsString(payload))
+        } catch (e: Throwable) {
+            com.lagradost.common.logging.AppLogger.e("pushMetadataToWebView error: ${e.message}")
         }
     }
 
@@ -579,7 +403,7 @@ fun ComposeNativeWebPlayer(
         }
     }
 
-    val toastMessage by (playerState?.toastMessage ?: kotlinx.coroutines.flow.flowOf(null)).collectAsState(null)
+    val toastMessage by (playerState?.toastMessage ?: flowOf(null)).collectAsState(null)
     LaunchedEffect(toastMessage) {
         if (isUiReady && toastMessage != null) {
             val payload = mapOf(
@@ -593,7 +417,7 @@ fun ComposeNativeWebPlayer(
     val p2pTelemetry by com.lagradost.cloudstream3.desktop.torrent.DesktopTorrentEngine.telemetry.collectAsState()
     LaunchedEffect(isUiReady, p2pTelemetry) {
         if (isUiReady) {
-            val payload = com.lagradost.cloudstream3.desktop.player.P2pStatsUpdatePayload(
+            val payload = P2pStatsUpdatePayload(
                 active = p2pTelemetry.active,
                 downloadSpeed = p2pTelemetry.downloadSpeed,
                 uploadSpeed = p2pTelemetry.uploadSpeed,
@@ -612,70 +436,48 @@ fun ComposeNativeWebPlayer(
         }
     }
 
-    fun pushMetadataToWebView() {
-        try {
-            val vol = playerState?._volume?.value ?: 100f
-            val isMuted = playerState?._isMuted?.value ?: false
-            val isBuf = playerState?._isBuffering?.value == true
-
-            var currentlyLoading = isBuf
-            var isAppScraping = false
-            var escapedLoadingText: String? = null
-            try {
-                currentlyLoading = isBuf
-                isAppScraping = currentIsLoading
-                escapedLoadingText = currentLoadingStatusText?.replace("\"", "\\\"")?.replace("\n", "\\n")
-            } catch (e: Throwable) {
-                com.lagradost.common.logging.AppLogger.e("Error escaping loading text", e)
-            }
-
-            val loadingTextJson = if (escapedLoadingText != null) "\"$escapedLoadingText\"" else "null"
-
-            val interpolationEnabled = com.lagradost.common.storage.DesktopDataStore.getKey<Boolean>(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_INTERPOLATION) ?: false
-            val autoPlayEnabled = com.lagradost.common.storage.DesktopDataStore.getKey<Boolean>(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_AUTO_PLAY) ?: true
-            val showEndTime = com.lagradost.common.storage.DesktopDataStore.getKey<Boolean>(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_SHOW_END_TIME) ?: false
-            val showClock = com.lagradost.common.storage.DesktopDataStore.getKey<Boolean>(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_SHOW_CLOCK) ?: false
-            val showServerQuality = com.lagradost.common.storage.DesktopDataStore.getKey<Boolean>(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_SHOW_SERVER_QUALITY) ?: false
-            val pauseInfoMode = com.lagradost.common.storage.DesktopDataStore.getKey<String>(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_PAUSE_INFO_MODE) ?: "delay_5s"
-            val showPauseCast = com.lagradost.common.storage.DesktopDataStore.getKey<Boolean>(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_PAUSE_SHOW_CAST) ?: true
-            val seekDurationMs = (com.lagradost.cloudstream3.desktop.player.PlayerConfig.getSeekDurationSeconds() * 1000).toLong()
-            val hdrToneMapping = com.lagradost.common.storage.DesktopDataStore.getKey<String>(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_HDR_TONE_MAPPING) ?: "spline"
-            val hdrComputePeak = com.lagradost.common.storage.DesktopDataStore.getKey<Boolean>(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_HDR_COMPUTE_PEAK) ?: true
-            val debandQuality = com.lagradost.common.storage.DesktopDataStore.getKey<String>(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_DEBAND_QUALITY) ?: "off"
-            val dithering = com.lagradost.common.storage.DesktopDataStore.getKey<String>(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_DITHERING) ?: "fruit"
-
-            val payload = AppStateUpdatePayload(
-                volume = vol,
-                isMuted = isMuted,
-                isAppLoading = isAppScraping,
-                loadingStatusText = currentLoadingStatusText,
-                debugWait = false,
-                debugHasEver = true,
-                debugPos = 0.0,
-                interpolationEnabled = interpolationEnabled,
-                autoPlayEnabled = autoPlayEnabled,
-                showEndTime = showEndTime,
-                showClock = showClock,
-                showServerQuality = showServerQuality,
-                pauseInfoMode = pauseInfoMode,
-                showPauseCast = showPauseCast,
-                seekDurationMs = seekDurationMs,
-                fileSize = (playerState?._fileSize?.value ?: 0L).takeIf { it > 0L }?.let { formatByteSize(it) },
-                hdrToneMapping = hdrToneMapping,
-                hdrComputePeak = hdrComputePeak,
-                debandQuality = debandQuality,
-                dithering = dithering,
-            )
-            NativePlayerBridge.postMessage(playerObjectMapper.writeValueAsString(payload))
-        } catch (e: Throwable) {
-            com.lagradost.common.logging.AppLogger.e("pushMetadataToWebView error: ${e.message}")
-        }
-    }
-
     LaunchedEffect(isLoading, isBuffering, loadingStatusText) {
         if (isUiReady && playerState?.getNativeHandleValue() != null) {
             pushMetadataToWebView()
         }
+    }
+
+    val inboundDispatcher = remember(window, playerState, resolvedImdbId, scope) {
+        PlayerInboundDispatcher(
+            scope = scope,
+            window = window,
+            playerState = playerState,
+            persistentSubtitles = persistentSubtitles,
+            resolvedImdbId = resolvedImdbId,
+            getGlobalUiScale = { globalUiScale },
+            getAutoFetchedSubtitleTracks = { autoFetchedSubtitleTracks },
+            getTrickplayEngine = { currentTrickplayEngine },
+            pushMetadataToWebView = ::pushMetadataToWebView,
+            pushSyncStateToWebView = ::pushSyncStateToWebView,
+            onUiReady = {
+                isUiReady = true
+                pushMetadataToWebView()
+                pushSyncStateToWebView()
+                NativePlayerBridge.syncUiScale(globalUiScale)
+                val nativeHandle = playerState?.getNativeHandleValue() ?: currentHandleValue
+                if (nativeHandle != 0L) {
+                    NativePlayerBridge.startMpvSync(nativeHandle)
+                }
+                NativePlayerBridge.focusWebView()
+            },
+            onFullscreenToggle = currentOnFullscreenToggle,
+            onCloseRequest = currentOnCloseRequest,
+            onRetryPlayback = onRetryPlayback,
+            onLinkChange = onLinkChange,
+            onEpisodeChange = onEpisodeChange,
+            onNextEpisode = onNextEpisode,
+            onCancelCountdown = onCancelCountdown,
+            onReplayEpisode = onReplayEpisode,
+            onUserInteraction = onUserInteraction,
+            onSetSleepTimer = onSetSleepTimer,
+            onContinueFromInactivity = onContinueFromInactivity,
+            onSkipScraping = onSkipScraping,
+        )
     }
 
     BaseMpvPlayer(
@@ -687,7 +489,7 @@ fun ComposeNativeWebPlayer(
         startPositionMs = startPositionMs,
         shouldPauseForResume = shouldPauseForResume,
         onPlaybackReady = {
-            com.lagradost.cloudstream3.desktop.player.webview.NativePlayerBridge.executeScript("if (window.__dismissProbingOverlay) window.__dismissProbingOverlay();")
+            NativePlayerBridge.executeScript("if (window.__dismissProbingOverlay) window.__dismissProbingOverlay();")
             currentOnPlaybackReady()
         },
         onPlaybackError = currentOnPlaybackError,
@@ -711,20 +513,21 @@ fun ComposeNativeWebPlayer(
             val childHwnd = NativePlayerBridge.safeInitWebView(canvasWid, w, h)
             NativePlayerBridge.syncUiScale(globalUiScale)
             MpvLibrary.INSTANCE.mpv_set_option_string(handle, "wid", childHwnd.toString())
-            val voDriver = com.lagradost.common.storage.DesktopDataStore.getKey<String>(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_VO_DRIVER) ?: "gpu"
+            val voDriver = com.lagradost.common.storage.DesktopDataStore.getKey<String>(PlayerConfig.PREF_VO_DRIVER) ?: "gpu"
             MpvLibrary.INSTANCE.mpv_set_option_string(handle, "vo", voDriver)
-            val gpuApi = com.lagradost.common.storage.DesktopDataStore.getKey<String>(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_GPU_API) ?: "d3d11"
+            val gpuApi = com.lagradost.common.storage.DesktopDataStore.getKey<String>(PlayerConfig.PREF_GPU_API) ?: "d3d11"
             MpvLibrary.INSTANCE.mpv_set_option_string(handle, "gpu-api", gpuApi)
 
-            val delaySec = com.lagradost.common.storage.DesktopDataStore.getKey<Float>(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_AUDIO_DELAY) ?: 0f
+            val delaySec = com.lagradost.common.storage.DesktopDataStore.getKey<Float>(PlayerConfig.PREF_AUDIO_DELAY) ?: 0f
             MpvLibrary.INSTANCE.mpv_set_option_string(handle, "audio-delay", delaySec.toString())
 
-            val audioMax = com.lagradost.common.storage.DesktopDataStore.getKey<Boolean>(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_AUDIO_VOLUME_MAX) ?: false
+            val audioMax = com.lagradost.common.storage.DesktopDataStore.getKey<Boolean>(PlayerConfig.PREF_AUDIO_VOLUME_MAX) ?: false
             if (audioMax) {
                 MpvLibrary.INSTANCE.mpv_set_option_string(handle, "volume-max", "200")
             }
         },
         onPostInitialize = { handle ->
+            currentHandleValue = com.sun.jna.Pointer.nativeValue(handle)
             val webView2DataDir = File(System.getProperty("java.io.tmpdir"), "CloudStreamWebView2")
             webView2DataDir.mkdirs()
             val tempFile = File(webView2DataDir, "cloudstream_controls.html")
@@ -738,7 +541,6 @@ fun ComposeNativeWebPlayer(
             val initialBackdropClass = if (initialBackdropUrl.isNotEmpty()) "loaded" else ""
             val rawInitialLogo = logoUrl ?: ""
             val initialLogoUrl = com.lagradost.cloudstream3.desktop.utils.ImageUtils.getCachedDiskFileUri(rawInitialLogo, isBackdrop = false) ?: rawInitialLogo
-            // Only show logo immediately if already disk-cached locally; show title text first otherwise
             val hasLocalLogo = initialLogoUrl.isNotEmpty() && initialLogoUrl.startsWith("file:")
             val initialLogoStyle = if (hasLocalLogo) "display: block;" else "display: none;"
             val initialTitleStyle = if (hasLocalLogo) "display: none;" else "display: block;"
@@ -757,7 +559,7 @@ fun ComposeNativeWebPlayer(
 
             val dynamicFontsCss = com.lagradost.cloudstream3.desktop.ui.theme.CustomFontManager.getDynamicFontFaceCss()
             val finalCss = if (dynamicFontsCss.isNotEmpty()) "$dynamicFontsCss\n$cssContent" else cssContent
-            val initialTheme = com.lagradost.common.storage.DesktopDataStore.getKey<String>(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_PLAYER_UI_THEME) ?: "modern_default"
+            val initialTheme = com.lagradost.common.storage.DesktopDataStore.getKey<String>(PlayerConfig.PREF_PLAYER_UI_THEME) ?: "modern_default"
 
             val badgesBaseUrl = com.lagradost.cloudstream3.desktop.ui.badges.BadgeManager.getBadgesBaseUri()
             val injectedJs = "window.__BADGES_BASE_URL__ = '$badgesBaseUrl';\n$jsContent"
@@ -786,698 +588,13 @@ fun ComposeNativeWebPlayer(
             NativePlayerBridge.setEventListener(object : NativePlayerBridge.NativePlayerEventListener {
                 override fun onPlayerEvent(type: String, value: String) {
                     if (type != "message") return
-
                     val rootNode = try {
                         playerObjectMapper.readTree(value)
-
-
                     } catch (t: Throwable) {
                         null
                     }
-                    when (val event = PlayerInboundEvent.fromJson(rootNode, value)) {
-                        is PlayerInboundEvent.ClientError -> {
-                            com.lagradost.common.logging.AppLogger.e("Player:Web", event.message)
-                        }
-                        is PlayerInboundEvent.ClientLog -> {
-                            com.lagradost.common.logging.AppLogger.i("Player:JS", event.message)
-                        }
-                        is PlayerInboundEvent.UiReady -> {
-                            isUiReady = true
-                            pushMetadataToWebView()
-                            pushSyncStateToWebView()
-                            NativePlayerBridge.syncUiScale(globalUiScale)
-                            val nativeHandle = playerState?.getNativeHandleValue() ?: com.sun.jna.Pointer.nativeValue(handle)
-                            if (nativeHandle != 0L) {
-                                NativePlayerBridge.startMpvSync(nativeHandle)
-                            }
-                            NativePlayerBridge.focusWebView()
-                        }
-                        is PlayerInboundEvent.SelectShader -> {
-                            playerState?.setShader(event.name)
-                        }
-                        is PlayerInboundEvent.SearchSubtitles -> {
-                            scope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                                try {
-                                    val effectiveImdbId = event.imdbId?.takeIf { it.isNotBlank() } ?: resolvedImdbId
-                                    com.lagradost.common.logging.AppLogger.i("Player:Web", "Searching online subtitles: query='${event.query}', lang='${event.lang}', season=${event.season}, episode=${event.episode}, imdbId=$effectiveImdbId")
-                                    val allResults = SubtitleExtractionService.searchSubtitles(event.query, event.lang, event.season, event.episode, effectiveImdbId)
-                                    com.lagradost.common.logging.AppLogger.i("Player:Web", "Subtitle search complete: returned ${allResults.size} tracks")
-
-                                    val json = playerObjectMapper.writeValueAsString(
-                                        mapOf("type" to "subtitle_search_results", "results" to allResults),
-                                    )
-                                    NativePlayerBridge.postMessage(json)
-                                } catch (e: Exception) {
-                                    com.lagradost.common.logging.AppLogger.e("Player:Web", "searchSubtitles error: ${e.message}", e)
-                                }
-                            }
-                        }
-                        is PlayerInboundEvent.DownloadSubtitle -> {
-                            scope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                                try {
-                                    val idPrefix = event.idPrefix.takeIf { it.isNotBlank() }
-                                    val data = event.data.takeIf { it.isNotBlank() }
-                                    val name = event.name
-                                    val lang = event.lang
-                                    val source = event.source
-
-                                    com.lagradost.common.logging.AppLogger.i("Player:Web", "Received downloadSubtitle event: idPrefix=$idPrefix, name=$name, lang=$lang, source=$source, dataLen=${data?.length}")
-
-                                    if (idPrefix == null || data == null) {
-                                        com.lagradost.common.logging.AppLogger.w("Player:Web", "downloadSubtitle aborted: idPrefix=$idPrefix, data=$data")
-                                        return@launch
-                                    }
-
-                                    com.lagradost.common.logging.AppLogger.i("Player:Web", "Downloading subtitle '$name' from provider prefix '$idPrefix'...")
-                                    val safeUrl = SubtitleExtractionService.downloadAndExtractSubtitle(
-                                        idPrefix = idPrefix,
-                                        data = data,
-                                        name = name,
-                                        lang = lang,
-                                        source = source,
-                                    )
-
-                                    if (safeUrl != null) {
-                                        if (!persistentSubtitles.contains(safeUrl)) {
-                                            persistentSubtitles.add(safeUrl)
-                                        }
-                                        val cleanPath = safeUrl.replace("\\", "/")
-                                        val cleanName = name.replace("\"", "").replace("\n", "").trim()
-                                        val cleanLang = lang.replace("\"", "").trim()
-
-                                        com.lagradost.common.logging.AppLogger.i("Player:Web", "Applying subtitle to MPV: path='$cleanPath', name='$cleanName', lang='$cleanLang'")
-                                        playerState?.executeCommand("sub-add \"$cleanPath\" select \"$cleanName\" \"$cleanLang\"")
-                                        playerState?.setMpvProperty("sub-visibility", "yes")
-
-                                        kotlinx.coroutines.delay(250)
-                                        pushMetadataToWebView()
-
-                                        val toastJson = playerObjectMapper.writeValueAsString(
-                                            mapOf("type" to "show_toast", "message" to "Loaded subtitle: $cleanName"),
-                                        )
-                                        NativePlayerBridge.postMessage(toastJson)
-                                    } else {
-                                        com.lagradost.common.logging.AppLogger.w("Player:Web", "Failed to extract/download subtitle for '$name'")
-                                        val errToastJson = playerObjectMapper.writeValueAsString(
-                                            mapOf("type" to "show_toast", "message" to "Failed to download subtitle: $name"),
-                                        )
-                                        NativePlayerBridge.postMessage(errToastJson)
-                                    }
-                                } catch (e: Exception) {
-                                    com.lagradost.common.logging.AppLogger.e("Player:Web", "downloadSubtitle error: ${e.message}", e)
-                                }
-                            }
-                        }
-                        is PlayerInboundEvent.SetSubsourceApiKey -> {
-                            scope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                                try {
-                                    val key = event.apiKey.trim()
-                                    com.lagradost.common.storage.DesktopDataStore.setKey(
-                                        com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_SUBSOURCE_API_KEY,
-                                        key,
-                                    )
-                                    com.lagradost.common.logging.AppLogger.i("Player:Web", "Updated SubSource API key (len=${key.length})")
-                                    val msg = if (key.isNotBlank()) "SubSource API key saved" else "SubSource API key cleared"
-                                    val toastJson = playerObjectMapper.writeValueAsString(
-                                        mapOf("type" to "show_toast", "message" to msg),
-                                    )
-                                    NativePlayerBridge.postMessage(toastJson)
-                                } catch (e: Exception) {
-                                    com.lagradost.common.logging.AppLogger.e("Player:Web", "Failed to save SubSource API key: ${e.message}", e)
-                                }
-                            }
-                        }
-                        is PlayerInboundEvent.OpenLocalSubtitlePicker -> {
-                            scope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                                try {
-                                    val chosenFile = com.lagradost.cloudstream3.desktop.utils.NativeFileDialog.open(
-                                        title = "Select Subtitle File",
-                                        category = com.lagradost.cloudstream3.desktop.utils.NativeFileDialog.Category.SUBTITLES,
-                                        allowedExtensions = listOf("srt", "vtt", "ass", "ssa", "sub"),
-                                    )
-                                    if (chosenFile != null && chosenFile.exists()) {
-                                        val cleanPath = chosenFile.absolutePath.replace("\\", "/")
-                                        val cleanName = chosenFile.nameWithoutExtension.replace("\"", "").replace("\n", "").trim()
-                                        if (!persistentSubtitles.contains(cleanPath)) {
-                                            persistentSubtitles.add(cleanPath)
-                                        }
-                                        com.lagradost.common.logging.AppLogger.i("Player:Web", "Applying local subtitle to MPV: '$cleanPath' ($cleanName)")
-                                        playerState?.executeCommand("sub-add \"$cleanPath\" select \"$cleanName\"")
-                                        playerState?.setMpvProperty("sub-visibility", "yes")
-
-                                        kotlinx.coroutines.delay(250)
-                                        pushMetadataToWebView()
-
-                                        val toastJson = playerObjectMapper.writeValueAsString(
-                                            mapOf("type" to "show_toast", "message" to "Loaded subtitle: ${chosenFile.name}"),
-                                        )
-                                        NativePlayerBridge.postMessage(toastJson)
-                                    }
-                                } catch (e: Exception) {
-                                    com.lagradost.common.logging.AppLogger.e("Player:Web", "openLocalSubtitlePicker error: ${e.message}", e)
-                                }
-                            }
-                        }
-                        is PlayerInboundEvent.LoadLocalSubtitleFile -> {
-                            scope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                                try {
-                                    val file = java.io.File(event.path)
-                                    if (file.exists() && file.length() > 0L) {
-                                        val cleanPath = file.absolutePath.replace("\\", "/")
-                                        val cleanName = file.nameWithoutExtension.replace("\"", "").replace("\n", "").trim()
-                                        if (!persistentSubtitles.contains(cleanPath)) {
-                                            persistentSubtitles.add(cleanPath)
-                                        }
-                                        com.lagradost.common.logging.AppLogger.i("Player:Web", "Applying dropped subtitle to MPV: '$cleanPath' ($cleanName)")
-                                        playerState?.executeCommand("sub-add \"$cleanPath\" select \"$cleanName\"")
-                                        playerState?.setMpvProperty("sub-visibility", "yes")
-
-                                        kotlinx.coroutines.delay(250)
-                                        pushMetadataToWebView()
-
-                                        val toastJson = playerObjectMapper.writeValueAsString(
-                                            mapOf("type" to "show_toast", "message" to "Loaded subtitle: ${file.name}"),
-                                        )
-                                        NativePlayerBridge.postMessage(toastJson)
-                                    }
-                                } catch (e: Exception) {
-                                    com.lagradost.common.logging.AppLogger.e("Player:Web", "loadLocalSubtitleFile error: ${e.message}", e)
-                                }
-                            }
-                        }
-                        is PlayerInboundEvent.SkipInterval -> {
-                            playerState?.skipCurrentInterval()
-                        }
-                        is PlayerInboundEvent.SeekTo -> {
-                            playerState?.notifySeekTo(event.positionMs.toLong())
-                        }
-                        is PlayerInboundEvent.SeekBy -> {
-                            playerState?.notifySeekBy(event.deltaMs.toLong())
-                        }
-                        is PlayerInboundEvent.SeekLive -> {
-                            playerState?.seekLive()
-                        }
-                        is PlayerInboundEvent.TogglePlay -> {
-                            val isPaused = playerState?.isPaused?.value ?: false
-                            com.lagradost.common.logging.AppLogger.i("BaseMpvPlayer: Received togglePlay event. isPaused=$isPaused")
-                            if (isPaused) {
-                                playerState.play()
-                            } else {
-                                playerState?.pause()
-                            }
-                        }
-                        is PlayerInboundEvent.Play -> {
-                            com.lagradost.common.logging.AppLogger.i("BaseMpvPlayer: Received play event")
-                            playerState?.play()
-                        }
-                        is PlayerInboundEvent.Pause -> {
-                            com.lagradost.common.logging.AppLogger.i("BaseMpvPlayer: Received pause event")
-                            playerState?.pause()
-                        }
-                        is PlayerInboundEvent.ToggleMute -> {
-                            val currentMuted = playerState?.isMuted?.value ?: false
-                            val nextMuted = event.forcedState ?: !currentMuted
-                            playerState?.setMute(nextMuted)
-                            pushMetadataToWebView()
-                        }
-                        is PlayerInboundEvent.SetVolume -> {
-                            playerState?.setVolume(event.volume.toFloat())
-                        }
-                        is PlayerInboundEvent.SetSpeed -> {
-                            playerState?.setSpeed(event.speed.toFloat())
-                        }
-                        is PlayerInboundEvent.SetSubDelay -> {
-                            playerState?.executeCommand("add sub-delay ${event.delaySeconds}")
-                        }
-                        is PlayerInboundEvent.CycleSubtitles -> {
-                            playerState?.cycleSubtitles()
-                        }
-                        is PlayerInboundEvent.ToggleSubVisibility -> {
-                            playerState?.toggleSubtitleVisibility()
-                        }
-                        is PlayerInboundEvent.ToggleLoop -> {
-                            val loopVal = if (event.loop) "inf" else "no"
-                            playerState?.setMpvProperty("loop-file", loopVal)
-                        }
-                        is PlayerInboundEvent.ToggleAudioMode -> {
-                            playerState?.toggleAudioMode(event.enabled)
-                            pushSyncStateToWebView()
-                            NativePlayerBridge.syncUiScale(globalUiScale)
-                        }
-                        is PlayerInboundEvent.SetPauseInfoMode -> {
-                            scope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                                com.lagradost.common.storage.DesktopDataStore.setKey(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_PAUSE_INFO_MODE, event.mode)
-                                pushMetadataToWebView()
-                            }
-                        }
-                        is PlayerInboundEvent.SetPauseShowCast -> {
-                            scope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                                val currentVal = com.lagradost.common.storage.DesktopDataStore.getKey<Boolean>(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_PAUSE_SHOW_CAST) ?: true
-                                val nextVal = event.forcedState ?: !currentVal
-                                com.lagradost.common.storage.DesktopDataStore.setKey(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_PAUSE_SHOW_CAST, nextVal)
-                                pushMetadataToWebView()
-                            }
-                        }
-                        is PlayerInboundEvent.Screenshot -> {
-                            playerState?.executeCommand("screenshot video")
-                            val dirName = com.lagradost.common.platform.PlatformPaths.screenshotsDir.name
-                            playerState?.showToast("Screenshot saved to $dirName")
-                        }
-                        is PlayerInboundEvent.TogglePip -> {
-                            val nextPip = !com.lagradost.cloudstream3.desktop.ui.PipState.isPipMode.value
-                            com.lagradost.cloudstream3.desktop.ui.PipState.setPipMode(nextPip)
-                            NativePlayerBridge.executeScript("if(window.setPipUi) window.setPipUi($nextPip);")
-                        }
-                        is PlayerInboundEvent.StartWindowDrag -> {
-                            val hwnd = com.sun.jna.Native.getComponentID(window)
-                            val hWin = com.sun.jna.platform.win32.WinDef.HWND(com.sun.jna.Pointer(hwnd))
-                            com.lagradost.cloudstream3.desktop.init.ExtUser32.INSTANCE.ReleaseCapture()
-                            com.sun.jna.platform.win32.User32.INSTANCE.PostMessage(
-                                hWin,
-                                0x0112,
-                                com.sun.jna.platform.win32.WinDef.WPARAM(0xF012),
-                                com.sun.jna.platform.win32.WinDef.LPARAM(0),
-                            )
-                        }
-                        is PlayerInboundEvent.StartWindowResize -> {
-                            val hwnd = com.sun.jna.Native.getComponentID(window)
-                            val hWin = com.sun.jna.platform.win32.WinDef.HWND(com.sun.jna.Pointer(hwnd))
-                            com.lagradost.cloudstream3.desktop.init.ExtUser32.INSTANCE.ReleaseCapture()
-
-                            val hitTest = when (event.direction) {
-                                "left" -> 1
-                                "right" -> 2
-                                "top" -> 3
-                                "top-left" -> 4
-                                "top-right" -> 5
-                                "bottom" -> 6
-                                "bottom-left" -> 7
-                                "bottom-right" -> 8
-                                else -> 8
-                            }
-
-                            com.sun.jna.platform.win32.User32.INSTANCE.PostMessage(
-                                hWin,
-                                0x0112,
-                                com.sun.jna.platform.win32.WinDef.WPARAM((0xF000 + hitTest).toLong()),
-                                com.sun.jna.platform.win32.WinDef.LPARAM(0),
-                            )
-                        }
-                        is PlayerInboundEvent.ToggleFullscreen -> {
-                            scope.launch(kotlinx.coroutines.Dispatchers.Main) {
-                                currentOnFullscreenToggle?.invoke()
-                            }
-                        }
-                        is PlayerInboundEvent.FocusWebView -> {
-                            NativePlayerBridge.focusWebView()
-                        }
-                        is PlayerInboundEvent.ExitPlayer -> {
-                            scope.launch(kotlinx.coroutines.Dispatchers.Main) {
-                                currentOnCloseRequest()
-                            }
-                        }
-                        is PlayerInboundEvent.RetryPlayback -> {
-                            scope.launch(kotlinx.coroutines.Dispatchers.Main) {
-                                onRetryPlayback?.invoke()
-                            }
-                        }
-                        is PlayerInboundEvent.CopyDiagnostics -> {
-                            scope.launch(kotlinx.coroutines.Dispatchers.Main) {
-                                com.lagradost.cloudstream3.desktop.utils.ExternalLinkHandler.copyToClipboard(event.text)
-                                val toastJson = playerObjectMapper.writeValueAsString(
-                                    mapOf("type" to "show_toast", "message" to "Diagnostics copied to clipboard"),
-                                )
-                                NativePlayerBridge.postMessage(toastJson)
-                            }
-                        }
-                        is PlayerInboundEvent.ChangeLink -> {
-                            scope.launch(kotlinx.coroutines.Dispatchers.Main) {
-                                if (event.linkUrl.isNotEmpty()) onLinkChange?.invoke(event.linkUrl)
-                            }
-                        }
-                        is PlayerInboundEvent.LoadEpisode -> {
-                            scope.launch(kotlinx.coroutines.Dispatchers.Main) {
-                                onEpisodeChange?.invoke(event.episodeId)
-                            }
-                        }
-                        is PlayerInboundEvent.SetAudioTrack -> {
-                            scope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                                playerState?.setAudioTrack(event.id)
-                            }
-                        }
-                        is PlayerInboundEvent.SetVideoTrack -> {
-                            scope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                                playerState?.setVideoTrack(event.id)
-                            }
-                        }
-                        is PlayerInboundEvent.NextChapter -> {
-                            scope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                                playerState?.nextChapter()
-                            }
-                        }
-                        is PlayerInboundEvent.PreviousChapter -> {
-                            scope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                                playerState?.previousChapter()
-                            }
-                        }
-                        is PlayerInboundEvent.SeekToChapter -> {
-                            scope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                                playerState?.seekToChapter(event.index)
-                            }
-                        }
-                        is PlayerInboundEvent.LazyAudioTrack -> {
-                            val track = com.lagradost.player.impl.proxy.LocalStreamProxyState.lazyAudioTracks.value.find { it.url == event.url }
-                            if (track != null) {
-                                scope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                                    playerState?.loadLazyAudioTrack(
-                                        com.lagradost.cloudstream3.desktop.ui.screens.player.PlayerState.LazyTrack(track.url, track.name, track.language),
-                                    )
-                                }
-                            }
-                        }
-                        is PlayerInboundEvent.LazySubtitleTrack -> {
-                            val proxyTrack = com.lagradost.player.impl.proxy.LocalStreamProxyState.lazySubtitleTracks.value.find { it.url == event.url }
-                            val lazyTrack = if (proxyTrack != null) {
-                                com.lagradost.cloudstream3.desktop.ui.screens.player.PlayerState.LazyTrack(proxyTrack.url, proxyTrack.name, proxyTrack.language)
-                            } else {
-                                autoFetchedSubtitleTracks.find { it.url == event.url }?.let {
-                                    com.lagradost.cloudstream3.desktop.ui.screens.player.PlayerState.LazyTrack(it.url, it.name, it.language ?: "en")
-                                }
-                            }
-                            if (lazyTrack != null) {
-                                scope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                                    playerState?.loadLazySubtitleTrack(lazyTrack)
-                                }
-                            }
-                        }
-                        is PlayerInboundEvent.LazyVideoTrack -> {
-                            val track = com.lagradost.player.impl.proxy.LocalStreamProxyState.lazyVideoTracks.value.find { it.url == event.url }
-                            if (track != null) {
-                                scope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                                    playerState?.loadLazyVideoTrack(
-                                        com.lagradost.cloudstream3.desktop.ui.screens.player.PlayerState.LazyTrack(track.url, track.name, track.language, track.bitrate),
-                                    )
-                                }
-                            }
-                        }
-                        is PlayerInboundEvent.SetSubtitleTrack -> {
-                            scope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                                playerState?.setSubtitleTrack(event.id)
-                            }
-                        }
-                        is PlayerInboundEvent.SetSubtitleFont -> {
-                            scope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                                val font = event.fontName?.takeIf { it.isNotBlank() } ?: "Inter"
-                                com.lagradost.common.storage.DesktopDataStore.setKey(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_SUB_FONT, font)
-                                playerState?.setSubtitleFont(font)
-                            }
-                        }
-                        is PlayerInboundEvent.SetSubtitleOverrideEnabled -> {
-                            scope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                                com.lagradost.common.storage.DesktopDataStore.setKey(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_ENABLE_SUB_OVERRIDE, event.enabled)
-                                playerState?.setSubtitleOverrideEnabled(event.enabled)
-                            }
-                        }
-                        is PlayerInboundEvent.SetSubFilterCaptions -> {
-                            scope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                                com.lagradost.common.storage.DesktopDataStore.setKey(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_SUB_REMOVE_CAPTIONS, event.enabled)
-                                playerState?.setSubFilterSdh(event.enabled)
-                            }
-                        }
-                        is PlayerInboundEvent.SetSubFilterBloat -> {
-                            scope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                                com.lagradost.common.storage.DesktopDataStore.setKey(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_SUB_REMOVE_BLOAT, event.enabled)
-                                playerState?.setSubFilterBloat(event.enabled)
-                            }
-                        }
-                        is PlayerInboundEvent.SetSubUppercase -> {
-                            scope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                                com.lagradost.common.storage.DesktopDataStore.setKey(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_SUB_UPPERCASE, event.enabled)
-                                playerState?.setSubUppercase(event.enabled)
-                            }
-                        }
-                        is PlayerInboundEvent.ResetSubtitleSettings -> {
-                            scope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                                com.lagradost.common.storage.DesktopDataStore.setKey(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_SUB_FONT, "Inter")
-                                com.lagradost.common.storage.DesktopDataStore.removeKey(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_SUB_COLOR)
-                                com.lagradost.common.storage.DesktopDataStore.removeKey(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_SUB_SIZE)
-                                com.lagradost.common.storage.DesktopDataStore.removeKey(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_SUB_BG)
-                                com.lagradost.common.storage.DesktopDataStore.removeKey(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_SUB_BORDER_COLOR)
-                                com.lagradost.common.storage.DesktopDataStore.removeKey(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_SUB_BORDER_SIZE)
-                                com.lagradost.common.storage.DesktopDataStore.removeKey(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_SUB_SHADOW_COLOR)
-                                com.lagradost.common.storage.DesktopDataStore.removeKey(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_SUB_SHADOW_OFFSET)
-                                com.lagradost.common.storage.DesktopDataStore.removeKey(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_SUB_BLUR)
-                                com.lagradost.common.storage.DesktopDataStore.removeKey(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_SUB_BOLD)
-                                com.lagradost.common.storage.DesktopDataStore.removeKey(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_SUB_ITALIC)
-                                com.lagradost.common.storage.DesktopDataStore.removeKey(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_ENABLE_SUB_OVERRIDE)
-                                com.lagradost.common.storage.DesktopDataStore.removeKey(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_SUB_REMOVE_CAPTIONS)
-                                com.lagradost.common.storage.DesktopDataStore.removeKey(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_SUB_REMOVE_BLOAT)
-                                com.lagradost.common.storage.DesktopDataStore.removeKey(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_SUB_UPPERCASE)
-                                com.lagradost.common.storage.DesktopDataStore.removeKey(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_SUB_POS)
-
-                                playerState?.setSubtitleFont("Inter")
-                                playerState?.setSubtitleOverrideEnabled(true)
-                                playerState?.setSubFilterSdh(false)
-                                playerState?.setSubFilterBloat(true)
-                                playerState?.setSubUppercase(false)
-                                playerState?.setSubtitlePosition(100)
-                                playerState?.setMpvProperty("sub-color", "#FFFFFF")
-                                playerState?.setMpvProperty("sub-font-size", "45")
-                                val (defMpvBg, defBorderStyle) = com.lagradost.cloudstream3.desktop.player.PlayerConfig.toMpvBackgroundColor(null)
-                                playerState?.setMpvProperty("sub-back-color", defMpvBg)
-                                playerState?.setMpvProperty("sub-border-style", defBorderStyle)
-                                playerState?.setMpvProperty("sub-border-color", "#000000")
-                                playerState?.setMpvProperty("sub-border-size", "3")
-                                playerState?.setMpvProperty("sub-shadow-color", "#000000")
-                                playerState?.setMpvProperty("sub-shadow-offset", "0")
-                                playerState?.setMpvProperty("sub-blur", "0")
-                                playerState?.setMpvProperty("sub-bold", "no")
-                                playerState?.setMpvProperty("sub-italic", "no")
-                                pushSyncStateToWebView()
-                            NativePlayerBridge.syncUiScale(globalUiScale)
-                            }
-                        }
-                        is PlayerInboundEvent.SetSubtitleBackground -> {
-                            scope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                                com.lagradost.common.storage.DesktopDataStore.setKey(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_SUB_BG, event.backgroundKey)
-                                playerState?.setSubtitleBackground(event.backgroundKey)
-                            }
-                        }
-                        is PlayerInboundEvent.SetSubtitleBorderColor -> {
-                            scope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                                com.lagradost.common.storage.DesktopDataStore.setKey(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_SUB_BORDER_COLOR, event.color)
-                                playerState?.setMpvProperty("sub-border-color", event.color)
-                            }
-                        }
-                        is PlayerInboundEvent.SetSubtitleBorderSize -> {
-                            scope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                                com.lagradost.common.storage.DesktopDataStore.setKey(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_SUB_BORDER_SIZE, event.size)
-                                playerState?.setMpvProperty("sub-border-size", event.size)
-                            }
-                        }
-                        is PlayerInboundEvent.SetSubtitleShadowColor -> {
-                            scope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                                com.lagradost.common.storage.DesktopDataStore.setKey(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_SUB_SHADOW_COLOR, event.color)
-                                playerState?.setMpvProperty("sub-shadow-color", event.color)
-                            }
-                        }
-                        is PlayerInboundEvent.SetSubtitleShadowOffset -> {
-                            scope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                                com.lagradost.common.storage.DesktopDataStore.setKey(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_SUB_SHADOW_OFFSET, event.offset)
-                                playerState?.setMpvProperty("sub-shadow-offset", event.offset)
-                            }
-                        }
-                        is PlayerInboundEvent.SetSubtitleBlur -> {
-                            scope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                                com.lagradost.common.storage.DesktopDataStore.setKey(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_SUB_BLUR, event.blur)
-                                playerState?.setMpvProperty("sub-blur", event.blur)
-                            }
-                        }
-                        is PlayerInboundEvent.SetSubtitleBold -> {
-                            scope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                                com.lagradost.common.storage.DesktopDataStore.setKey(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_SUB_BOLD, event.bold)
-                                playerState?.setMpvProperty("sub-bold", event.bold)
-                            }
-                        }
-                        is PlayerInboundEvent.SetSubtitleItalic -> {
-                            scope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                                com.lagradost.common.storage.DesktopDataStore.setKey(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_SUB_ITALIC, event.italic)
-                                playerState?.setMpvProperty("sub-italic", event.italic)
-                            }
-                        }
-                        is PlayerInboundEvent.ToggleInterpolation -> {
-                            playerState?.setInterpolation(event.enabled)
-                        }
-                        is PlayerInboundEvent.ToggleDeband -> {
-                            scope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                                com.lagradost.common.storage.DesktopDataStore.setKey(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_DEBAND, event.enabled)
-                                playerState?.setMpvProperty("deband", if (event.enabled) "yes" else "no")
-                            }
-                        }
-                        is PlayerInboundEvent.SetDebandQuality -> {
-                            scope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                                com.lagradost.common.storage.DesktopDataStore.setKey(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_DEBAND_QUALITY, event.quality)
-                                when (event.quality) {
-                                    "light" -> {
-                                        playerState?.setMpvProperty("deband", "yes")
-                                        playerState?.setMpvProperty("deband-iterations", "1")
-                                        playerState?.setMpvProperty("deband-threshold", "32")
-                                        playerState?.setMpvProperty("deband-range", "8")
-                                        playerState?.setMpvProperty("deband-grain", "16")
-                                    }
-                                    "medium" -> {
-                                        playerState?.setMpvProperty("deband", "yes")
-                                        playerState?.setMpvProperty("deband-iterations", "2")
-                                        playerState?.setMpvProperty("deband-threshold", "48")
-                                        playerState?.setMpvProperty("deband-range", "16")
-                                        playerState?.setMpvProperty("deband-grain", "32")
-                                    }
-                                    "strong" -> {
-                                        playerState?.setMpvProperty("deband", "yes")
-                                        playerState?.setMpvProperty("deband-iterations", "4")
-                                        playerState?.setMpvProperty("deband-threshold", "64")
-                                        playerState?.setMpvProperty("deband-range", "24")
-                                        playerState?.setMpvProperty("deband-grain", "48")
-                                    }
-                                    else -> {
-                                        playerState?.setMpvProperty("deband", "no")
-                                    }
-                                }
-                            }
-                        }
-                        is PlayerInboundEvent.SetAudioNormalization -> {
-                            scope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                                com.lagradost.common.storage.DesktopDataStore.setKey(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_AUDIO_NORMALIZATION, event.enabled)
-                                playerState?.updateAudioFilters()
-                            }
-                        }
-                        is PlayerInboundEvent.SetAudioNormStrength -> {
-                            scope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                                com.lagradost.common.storage.DesktopDataStore.setKey(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_AUDIO_NORM_STRENGTH, event.strength)
-                                playerState?.updateAudioFilters()
-                            }
-                        }
-                        is PlayerInboundEvent.SetAudioSpatial -> {
-                            scope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                                com.lagradost.common.storage.DesktopDataStore.setKey(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_AUDIO_SPATIAL, event.enabled)
-                                playerState?.updateAudioFilters()
-                            }
-                        }
-                        is PlayerInboundEvent.SetAudioEqPreset -> {
-                            scope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                                com.lagradost.common.storage.DesktopDataStore.setKey(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_AUDIO_EQ_PRESET, event.preset)
-                                playerState?.updateAudioFilters()
-                            }
-                        }
-                        is PlayerInboundEvent.SetAudioVolumeMax -> {
-                            scope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                                com.lagradost.common.storage.DesktopDataStore.setKey(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_AUDIO_VOLUME_MAX, event.enabled)
-                                playerState?.setMpvProperty("volume-max", if (event.enabled) "200" else "100")
-                                if (!event.enabled && (playerState?.volume?.value ?: 0f) > 100f) {
-                                    playerState?.setVolume(100f)
-                                }
-                                pushMetadataToWebView()
-                            }
-                        }
-                        is PlayerInboundEvent.SetAudioDelay -> {
-                            scope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                                com.lagradost.common.storage.DesktopDataStore.setKey(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_AUDIO_DELAY, event.delaySec)
-                                playerState?.setMpvProperty("audio-delay", event.delaySec.toString())
-                            }
-                        }
-                        is PlayerInboundEvent.ToggleAutoPlay -> {
-                            scope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                                com.lagradost.common.storage.DesktopDataStore.setKey(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_AUTO_PLAY, event.enabled)
-                            }
-                        }
-                        is PlayerInboundEvent.SetPrefShowEndTime -> {
-                            scope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                                com.lagradost.common.storage.DesktopDataStore.setKey(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_SHOW_END_TIME, event.enabled)
-                            }
-                        }
-                        is PlayerInboundEvent.SetPrefShowClock -> {
-                            scope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                                com.lagradost.common.storage.DesktopDataStore.setKey(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_SHOW_CLOCK, event.enabled)
-                            }
-                        }
-                        is PlayerInboundEvent.SetPrefShowServerQuality -> {
-                            scope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                                com.lagradost.common.storage.DesktopDataStore.setKey(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_SHOW_SERVER_QUALITY, event.enabled)
-                            }
-                        }
-                        is PlayerInboundEvent.SetPlayerTheme -> {
-                            scope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                                com.lagradost.common.storage.DesktopDataStore.setKey(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_PLAYER_UI_THEME, event.theme)
-                            }
-                        }
-                        is PlayerInboundEvent.LoadNextEpisode -> {
-                            scope.launch(kotlinx.coroutines.Dispatchers.Main) {
-                                onNextEpisode?.invoke()
-                            }
-                        }
-                        is PlayerInboundEvent.CancelCountdown -> {
-                            scope.launch(kotlinx.coroutines.Dispatchers.Main) {
-                                onCancelCountdown?.invoke()
-                            }
-                        }
-                        is PlayerInboundEvent.ReplayEpisode -> {
-                            scope.launch(kotlinx.coroutines.Dispatchers.Main) {
-                                onReplayEpisode?.invoke()
-                            }
-                        }
-                        is PlayerInboundEvent.SetMpvProperty -> {
-                            scope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                                playerState?.setMpvProperty(event.property, event.value)
-                                when (event.property) {
-                                    "sub-color" -> com.lagradost.common.storage.DesktopDataStore.setKey(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_SUB_COLOR, event.value)
-                                    "sub-font-size" -> com.lagradost.common.storage.DesktopDataStore.setKey(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_SUB_SIZE, event.value)
-                                    "tone-mapping" -> com.lagradost.common.storage.DesktopDataStore.setKey(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_HDR_TONE_MAPPING, event.value)
-                                    "hdr-compute-peak" -> com.lagradost.common.storage.DesktopDataStore.setKey(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_HDR_COMPUTE_PEAK, event.value == "yes")
-                                    "dither" -> com.lagradost.common.storage.DesktopDataStore.setKey(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_DITHERING, event.value)
-                                }
-                            }
-                        }
-                        is PlayerInboundEvent.SetSubtitlePosition -> {
-                            playerState?.setSubtitlePosition(event.pos)
-                        }
-                        is PlayerInboundEvent.UserInteraction -> {
-                            scope.launch(kotlinx.coroutines.Dispatchers.Main) {
-                                onUserInteraction?.invoke()
-                            }
-                        }
-                        is PlayerInboundEvent.SetSleepTimer -> {
-                            scope.launch(kotlinx.coroutines.Dispatchers.Main) {
-                                onSetSleepTimer?.invoke(event.value)
-                            }
-                        }
-                        is PlayerInboundEvent.ContinueFromInactivity -> {
-                            scope.launch(kotlinx.coroutines.Dispatchers.Main) {
-                                onContinueFromInactivity?.invoke()
-                            }
-                        }
-                        is PlayerInboundEvent.SkipScraping -> {
-                            scope.launch(kotlinx.coroutines.Dispatchers.Main) {
-                                onSkipScraping?.invoke()
-                            }
-                        }
-                        is PlayerInboundEvent.RequestSeekThumbnail -> {
-                            scope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                                val activeEngine = currentTrickplayEngine
-                                val dataUri = activeEngine?.requestThumbnail(event.timeMs)
-                                if (dataUri != null) {
-                                    val payload = mapOf(
-                                        "type" to "seek_thumbnail_response",
-                                        "timeMs" to event.timeMs,
-                                        "dataUri" to dataUri,
-                                    )
-                                    NativePlayerBridge.safePostMessage(playerObjectMapper.writeValueAsString(payload))
-                                }
-                            }
-                        }
-                        is PlayerInboundEvent.Unknown -> {
-                            com.lagradost.common.logging.AppLogger.w("Player:IPC", "Unhandled or unknown inbound player event: ${event.type} -> ${event.rawValue}")
-                        }
-                    }
+                    val event = PlayerInboundEvent.fromJson(rootNode, value)
+                    inboundDispatcher.dispatch(event)
                 }
             })
 
@@ -1510,26 +627,24 @@ fun ComposeNativeWebPlayer(
                 }
                 videoCanvas.addComponentListener(componentListener)
                 videoCanvas.addPropertyChangeListener("graphicsConfiguration", propertyListener)
-                // Force initial layout push so WebView isn't hidden until the first resize
                 NativePlayerBridge.resizeWebViewForComponent(videoCanvas)
                 onDispose {
                     videoCanvas.removeComponentListener(componentListener)
                     videoCanvas.removePropertyChangeListener("graphicsConfiguration", propertyListener)
 
                     if (isExiting) {
-                    videoCanvas.isVisible = false
-                    videoCanvas.removeComponentListener(componentListener)
-                    videoCanvas.removePropertyChangeListener("graphicsConfiguration", propertyListener)
-                    NativePlayerBridge.resizeWebView(0, 0)
-                    NativePlayerBridge.stopMpvSync()
-                    NativePlayerBridge.setEventListener(null)
+                        videoCanvas.isVisible = false
+                        videoCanvas.removeComponentListener(componentListener)
+                        videoCanvas.removePropertyChangeListener("graphicsConfiguration", propertyListener)
+                        NativePlayerBridge.resizeWebView(0, 0)
+                        NativePlayerBridge.stopMpvSync()
+                        NativePlayerBridge.setEventListener(null)
 
-                    if (com.lagradost.cloudstream3.desktop.ui.PipState.isPipMode.value) {
-                        com.lagradost.cloudstream3.desktop.ui.PipState.setPipMode(false)
-                    }
+                        if (com.lagradost.cloudstream3.desktop.ui.PipState.isPipMode.value) {
+                            com.lagradost.cloudstream3.desktop.ui.PipState.setPipMode(false)
+                        }
 
-                    // Synchronously tear down native WebView before AWT destroys the canvas HWND.
-                    NativePlayerBridge.safeDestroyWebView()
+                        NativePlayerBridge.safeDestroyWebView()
                     }
                 }
             }

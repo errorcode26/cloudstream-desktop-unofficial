@@ -165,4 +165,10 @@ class HistoryViewModel(
             )
         }
     }
+
+    override fun dispose() {
+        reLinkSearchJob?.cancel()
+        reLinkSearchJob = null
+        super.dispose()
+    }
 }

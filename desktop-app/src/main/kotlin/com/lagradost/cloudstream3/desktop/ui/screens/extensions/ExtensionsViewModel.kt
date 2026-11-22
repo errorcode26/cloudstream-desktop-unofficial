@@ -16,6 +16,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 
+private val REPO_CLEAN_REGEX = Regex("[^a-zA-Z0-9.-]")
+
 data class LocalPlugin(
     val file: File,
     val name: String,
@@ -41,6 +43,8 @@ class ExtensionsViewModel(
 ) : BaseMviViewModel<ExtensionsUiState, ExtensionsUiEvent, ExtensionsUiEffect>(
     initialState = ExtensionsUiState(),
 ) {
+    private var syncJob: kotlinx.coroutines.Job? = null
+    private var refreshJob: kotlinx.coroutines.Job? = null
     init {
         viewModelScope.launch {
             getPluginRepositories.subscribe().collect { repos ->
@@ -126,18 +130,17 @@ class ExtensionsViewModel(
     }
 
     private fun syncAllRepos() {
-        viewModelScope.launch {
+        syncJob?.cancel()
+        syncJob = viewModelScope.launch(Dispatchers.IO) {
             updateState { copy(isSyncing = true, isFetching = true, statusText = "Refreshing repositories...") }
             try {
-                withContext(Dispatchers.IO) {
-                    syncPluginRepositories.await { done, total ->
-                        val currentPlugins = getAvailablePlugins.get()
-                        updateState {
-                            copy(
-                                plugins = currentPlugins,
-                                statusText = "Refreshing repositories ($done/$total)...",
-                            )
-                        }
+                syncPluginRepositories.await { done, total ->
+                    val currentPlugins = getAvailablePlugins.get()
+                    updateState {
+                        copy(
+                            plugins = currentPlugins,
+                            statusText = "Refreshing repositories ($done/$total)...",
+                        )
                     }
                 }
                 val allPlugins = getAvailablePlugins.get()
@@ -155,18 +158,17 @@ class ExtensionsViewModel(
     }
 
     private fun fetchPlugins() {
+        syncJob?.cancel()
         updateState { copy(isFetching = true, statusText = "Fetching plugins from repositories...") }
-        viewModelScope.launch {
+        syncJob = viewModelScope.launch(Dispatchers.IO) {
             try {
-                withContext(Dispatchers.IO) {
-                    syncPluginRepositories.await { done, total ->
-                        val currentPlugins = getAvailablePlugins.get()
-                        updateState {
-                            copy(
-                                plugins = currentPlugins,
-                                statusText = "Fetching repositories ($done/$total)...",
-                            )
-                        }
+                syncPluginRepositories.await { done, total ->
+                    val currentPlugins = getAvailablePlugins.get()
+                    updateState {
+                        copy(
+                            plugins = currentPlugins,
+                            statusText = "Fetching repositories ($done/$total)...",
+                        )
                     }
                 }
                 val allPlugins = getAvailablePlugins.get()
@@ -187,59 +189,62 @@ class ExtensionsViewModel(
     }
 
     private fun refreshInstalled() {
-        val list = mutableListOf<LocalPlugin>()
-        val extensionsDir = pluginRepo.getExtensionsDir()
-        val allRemote = getAvailablePlugins.get()
-        val savedRepos = getPluginRepositories.get()
-        if (extensionsDir.exists()) {
-            extensionsDir.walkTopDown()
-                .filter { it.isFile && (it.extension == "jar" || it.extension == "cs3") }
-                .filter {
-                    !it.name.endsWith("-jvm.jar") &&
-                        !it.name.contains("-secure") &&
-                        !it.name.contains("-jvm") &&
-                        !it.name.endsWith(".dex") &&
-                        !it.name.contains(".pending_delete") &&
-                        !it.name.endsWith(".uninstalled") &&
-                        !File(it.parentFile, "${it.name}.uninstalled").exists() &&
-                        !File(it.parentFile, "${it.nameWithoutExtension}.uninstalled").exists()
-                }
-                .distinctBy { "${it.parentFile?.name}:${it.nameWithoutExtension.substringBefore("-jvm").substringBefore("-secure")}" }
-                .forEach { jar ->
-                    val manifest = pluginRepo.readPluginManifest(jar)
-                    val name = manifest?.get("name") as? String ?: jar.nameWithoutExtension
-                    val internalName = manifest?.get("internalName") as? String ?: name
-                    val version = manifest?.get("version")?.toString()?.toIntOrNull() ?: 0
-                    val iconUrl = manifest?.get("iconUrl") as? String
-
-                    // Exact repository matching based on folder structure on disk
-                    val folderName = jar.parentFile?.name ?: ""
-                    val matchingSavedRepo = savedRepos.find {
-                        val cleanName = it.name.replace(Regex("[^a-zA-Z0-9.-]"), "_")
-                        cleanName.equals(folderName, ignoreCase = true)
+        refreshJob?.cancel()
+        refreshJob = viewModelScope.launch(Dispatchers.IO) {
+            val list = mutableListOf<LocalPlugin>()
+            val extensionsDir = pluginRepo.getExtensionsDir()
+            val allRemote = getAvailablePlugins.get()
+            val savedRepos = getPluginRepositories.get()
+            if (extensionsDir.exists()) {
+                extensionsDir.walkTopDown()
+                    .filter { it.isFile && (it.extension == "jar" || it.extension == "cs3") }
+                    .filter {
+                        !it.name.endsWith("-jvm.jar") &&
+                            !it.name.contains("-secure") &&
+                            !it.name.contains("-jvm") &&
+                            !it.name.endsWith(".dex") &&
+                            !it.name.contains(".pending_delete") &&
+                            !it.name.endsWith(".uninstalled") &&
+                            !File(it.parentFile, "${it.name}.uninstalled").exists() &&
+                            !File(it.parentFile, "${it.nameWithoutExtension}.uninstalled").exists()
                     }
-                    val remoteMatch = allRemote.find { (rName, p) ->
-                        val cleanRName = rName.replace(Regex("[^a-zA-Z0-9.-]"), "_")
-                        p.internalName == internalName && cleanRName.equals(folderName, ignoreCase = true)
+                    .distinctBy { "${it.parentFile?.name}:${it.nameWithoutExtension.substringBefore("-jvm").substringBefore("-secure")}" }
+                    .forEach { jar ->
+                        val manifest = pluginRepo.readPluginManifest(jar)
+                        val name = manifest?.get("name") as? String ?: jar.nameWithoutExtension
+                        val internalName = manifest?.get("internalName") as? String ?: name
+                        val version = manifest?.get("version")?.toString()?.toIntOrNull() ?: 0
+                        val iconUrl = manifest?.get("iconUrl") as? String
+
+                        // Exact repository matching based on folder structure on disk
+                        val folderName = jar.parentFile?.name ?: ""
+                        val matchingSavedRepo = savedRepos.find {
+                            val cleanName = it.name.replace(REPO_CLEAN_REGEX, "_")
+                            cleanName.equals(folderName, ignoreCase = true)
+                        }
+                        val remoteMatch = allRemote.find { (rName, p) ->
+                            val cleanRName = rName.replace(REPO_CLEAN_REGEX, "_")
+                            p.internalName == internalName && cleanRName.equals(folderName, ignoreCase = true)
+                        }
+
+                        val repoName = matchingSavedRepo?.name
+                            ?: remoteMatch?.first
+                            ?: folderName.replace("_", " ").ifBlank { "Local" }
+
+                        val rawTvTypes = manifest?.get("tvTypes")
+                        val tvTypes = when (rawTvTypes) {
+                            is List<*> -> rawTvTypes.filterIsInstance<String>()
+                            is String -> listOf(rawTvTypes)
+                            else -> remoteMatch?.second?.tvTypes ?: emptyList()
+                        }
+                        val language = manifest?.get("language") as? String ?: remoteMatch?.second?.language
+
+                        val description = manifest?.get("description") as? String ?: remoteMatch?.second?.description
+                        list.add(LocalPlugin(jar, name, internalName, version, iconUrl, repoName, language, tvTypes, description, jar.length()))
                     }
-
-                    val repoName = matchingSavedRepo?.name
-                        ?: remoteMatch?.first
-                        ?: folderName.replace("_", " ").ifBlank { "Local" }
-
-                    val rawTvTypes = manifest?.get("tvTypes")
-                    val tvTypes = when (rawTvTypes) {
-                        is List<*> -> rawTvTypes.filterIsInstance<String>()
-                        is String -> listOf(rawTvTypes)
-                        else -> remoteMatch?.second?.tvTypes ?: emptyList()
-                    }
-                    val language = manifest?.get("language") as? String ?: remoteMatch?.second?.language
-
-                    val description = manifest?.get("description") as? String ?: remoteMatch?.second?.description
-                    list.add(LocalPlugin(jar, name, internalName, version, iconUrl, repoName, language, tvTypes, description, jar.length()))
-                }
+            }
+            updateState { copy(installedPlugins = list) }
         }
-        updateState { copy(installedPlugins = list) }
     }
 
     private suspend fun loadInstalledPlugin(file: File, bypassSecurity: Boolean = false) {
@@ -253,8 +258,8 @@ class ExtensionsViewModel(
     }
 
     private fun installPlugin(repoName: String, plugin: SitePlugin) {
-        viewModelScope.launch {
-            val repoCleanName = repoName.replace(Regex("[^a-zA-Z0-9.-]"), "_")
+        viewModelScope.launch(Dispatchers.IO) {
+            val repoCleanName = repoName.replace(REPO_CLEAN_REGEX, "_")
             val installKey = "$repoCleanName:${plugin.internalName}"
             updateState { copy(installingPlugins = installingPlugins + installKey + plugin.internalName) }
             val targetDir = File(pluginRepo.getExtensionsDir(), repoCleanName)
@@ -276,24 +281,18 @@ class ExtensionsViewModel(
                 // Release file locks from any currently loaded version before downloading the update.
                 // Without this, Files.move(REPLACE_EXISTING) fails on Windows because CompatPluginClassLoader
                 // holds an open ZipFile handle to the same destination path.
-                withContext(Dispatchers.IO) {
-                    if (SandboxedPluginManager.isEnabled()) {
-                        try { SandboxedPluginManager.unloadPlugin(jarFile) } catch (e: Throwable) { com.lagradost.common.logging.AppLogger.d("ExtensionsViewModel", "Sandbox unload note: ${e.message}") }
-                    }
-                    try { ExtensionLoader.unloadPlugin(jarFile.absolutePath) } catch (e: Throwable) { com.lagradost.common.logging.AppLogger.d("ExtensionsViewModel", "Extension unload note: ${e.message}") }
-                    @Suppress("ExplicitGarbageCollectionCall")
-                    System.gc()
-                    Thread.sleep(80)
+                if (SandboxedPluginManager.isEnabled()) {
+                    try { SandboxedPluginManager.unloadPlugin(jarFile) } catch (e: Throwable) { com.lagradost.common.logging.AppLogger.d("ExtensionsViewModel", "Sandbox unload note: ${e.message}") }
                 }
+                try { ExtensionLoader.unloadPlugin(jarFile.absolutePath) } catch (e: Throwable) { com.lagradost.common.logging.AppLogger.d("ExtensionsViewModel", "Extension unload note: ${e.message}") }
+                @Suppress("ExplicitGarbageCollectionCall")
+                System.gc()
+                Thread.sleep(80)
 
-                val downloadedFile = withContext(Dispatchers.IO) {
-                    installPluginUseCase.await(repoName, plugin)
-                }
+                val downloadedFile = installPluginUseCase.await(repoName, plugin)
                 if (downloadedFile != null) {
-                    withContext(Dispatchers.IO) {
-                        ExtensionLoader.clearFailedMarker(downloadedFile)
-                        loadInstalledPlugin(downloadedFile)
-                    }
+                    ExtensionLoader.clearFailedMarker(downloadedFile)
+                    loadInstalledPlugin(downloadedFile)
                     refreshInstalled()
                     pluginRepo.incrementSyncGeneration()
                     com.lagradost.cloudstream3.desktop.ui.components.AppToastManager.showSuccess(
@@ -326,8 +325,8 @@ class ExtensionsViewModel(
     }
 
     private fun bypassSecurityAndInstall(repoName: String, plugin: SitePlugin) {
-        viewModelScope.launch {
-            val repoCleanName = repoName.replace(Regex("[^a-zA-Z0-9.-]"), "_")
+        viewModelScope.launch(Dispatchers.IO) {
+            val repoCleanName = repoName.replace(REPO_CLEAN_REGEX, "_")
             val installKey = "$repoCleanName:${plugin.internalName}"
             updateState { copy(isDialogInstalling = true, installingPlugins = installingPlugins + installKey + plugin.internalName) }
             val targetDir = File(pluginRepo.getExtensionsDir(), repoCleanName)
@@ -352,24 +351,18 @@ class ExtensionsViewModel(
                 // Release file locks from any currently loaded version before downloading the update.
                 // Without this, Files.move(REPLACE_EXISTING) fails on Windows because CompatPluginClassLoader
                 // holds an open ZipFile handle to the same destination path.
-                withContext(Dispatchers.IO) {
-                    if (SandboxedPluginManager.isEnabled()) {
-                        try { SandboxedPluginManager.unloadPlugin(jarFile) } catch (e: Throwable) { com.lagradost.common.logging.AppLogger.d("ExtensionsViewModel", "Sandbox unload note: ${e.message}") }
-                    }
-                    try { ExtensionLoader.unloadPlugin(jarFile.absolutePath) } catch (e: Throwable) { com.lagradost.common.logging.AppLogger.d("ExtensionsViewModel", "Extension unload note: ${e.message}") }
-                    @Suppress("ExplicitGarbageCollectionCall")
-                    System.gc()
-                    Thread.sleep(80)
+                if (SandboxedPluginManager.isEnabled()) {
+                    try { SandboxedPluginManager.unloadPlugin(jarFile) } catch (e: Throwable) { com.lagradost.common.logging.AppLogger.d("ExtensionsViewModel", "Sandbox unload note: ${e.message}") }
                 }
+                try { ExtensionLoader.unloadPlugin(jarFile.absolutePath) } catch (e: Throwable) { com.lagradost.common.logging.AppLogger.d("ExtensionsViewModel", "Extension unload note: ${e.message}") }
+                @Suppress("ExplicitGarbageCollectionCall")
+                System.gc()
+                Thread.sleep(80)
 
-                val downloadedFile = withContext(Dispatchers.IO) {
-                    installPluginUseCase.await(repoName, plugin)
-                }
+                val downloadedFile = installPluginUseCase.await(repoName, plugin)
                 if (downloadedFile != null) {
-                    withContext(Dispatchers.IO) {
-                        ExtensionLoader.clearFailedMarker(downloadedFile)
-                        loadInstalledPlugin(downloadedFile, bypassSecurity = true)
-                    }
+                    ExtensionLoader.clearFailedMarker(downloadedFile)
+                    loadInstalledPlugin(downloadedFile, bypassSecurity = true)
                     refreshInstalled()
                     pluginRepo.incrementSyncGeneration()
                     com.lagradost.cloudstream3.desktop.ui.components.AppToastManager.showSuccess(
@@ -525,7 +518,7 @@ class ExtensionsViewModel(
 
     private fun uninstallPlugin(repoName: String, internalName: String) {
         viewModelScope.launch(Dispatchers.IO) {
-            val cleanRepo = repoName.replace(Regex("[^a-zA-Z0-9.-]"), "_")
+            val cleanRepo = repoName.replace(REPO_CLEAN_REGEX, "_")
             val installedMatch = uiState.value.installedPlugins.find {
                 it.internalName == internalName && (
                     it.file.parentFile?.name?.equals(cleanRepo, ignoreCase = true) == true ||
@@ -599,9 +592,6 @@ class ExtensionsViewModel(
                 onFailure = { false to (it.message ?: "Failed to install addon") },
             )
             updateState { copy(isInstallingStremioAddon = false, stremioAddonStatus = status) }
-            withContext(Dispatchers.Main) {
-                // callback replaced by MVI uiState
-            }
         }
     }
 
@@ -631,5 +621,13 @@ class ExtensionsViewModel(
         viewModelScope.launch(Dispatchers.IO) {
             com.lagradost.cloudstream3.desktop.stremio.StremioAddonManager.moveAddon(fromIndex, toIndex)
         }
+    }
+
+    override fun dispose() {
+        syncJob?.cancel()
+        syncJob = null
+        refreshJob?.cancel()
+        refreshJob = null
+        super.dispose()
     }
 }

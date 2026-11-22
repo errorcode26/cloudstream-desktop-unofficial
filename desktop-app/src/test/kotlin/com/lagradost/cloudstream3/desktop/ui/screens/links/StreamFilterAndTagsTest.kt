@@ -2,7 +2,7 @@ package com.lagradost.cloudstream3.desktop.ui.screens.links
 
 import com.lagradost.cloudstream3.desktop.player.QualityDataHelper
 import com.lagradost.cloudstream3.desktop.ui.screens.StreamFormatFilter
-import com.lagradost.cloudstream3.desktop.ui.screens.StreamSpecFilter
+import com.lagradost.cloudstream3.desktop.ui.screens.links.contract.StreamSpecFilter
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.ExtractorLinkType
 import com.lagradost.cloudstream3.utils.Qualities

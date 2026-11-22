@@ -30,6 +30,9 @@ import com.lagradost.common.storage.WatchHistory
 import kotlinx.coroutines.Job
 import com.lagradost.runtime.executor.SafePluginInvoker
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.withLock
@@ -52,6 +55,7 @@ class DesktopHomeViewModel(
 ) {
     private val categoryCache = java.util.concurrent.ConcurrentHashMap<String, com.lagradost.cloudstream3.HomePageResponse>()
     private val categoryMutex = java.util.concurrent.ConcurrentHashMap<String, kotlinx.coroutines.sync.Mutex>()
+    private val categoryJobs = java.util.concurrent.ConcurrentHashMap<String, Job>()
     private var reLinkSearchJob: Job? = null
 
     init {
@@ -89,25 +93,39 @@ class DesktopHomeViewModel(
 
         viewModelScope.launch(Dispatchers.IO) {
             uiState.map { it.providers }.distinctUntilChanged().collect { apis ->
+                val unconfiguredApis = apis.filter { api ->
+                    val provKey = com.lagradost.cloudstream3.desktop.repo.ActiveProviderRepository.getProviderKey(api)
+                    api.name !in uiState.value.disabledCatalogs || provKey !in uiState.value.disabledCatalogs
+                }
+                if (unconfiguredApis.isEmpty()) return@collect
+
+                val results = coroutineScope {
+                    unconfiguredApis.map { api ->
+                        async(Dispatchers.IO) {
+                            val provKey = com.lagradost.cloudstream3.desktop.repo.ActiveProviderRepository.getProviderKey(api)
+                            val keyName = PreferenceKeys.disabledCatalogsKey(api.name)
+                            val disabled = DesktopDataStore.getKey<Set<String>>(keyName)
+                                ?: (if (provKey != api.name) DesktopDataStore.getKey<Set<String>>(PreferenceKeys.disabledCatalogsKey(provKey)) else null)
+                                ?: emptySet()
+
+                            val orderKeyName = PreferenceKeys.orderedCatalogsKey(api.name)
+                            val ordered = DesktopDataStore.getKey<List<String>>(orderKeyName)
+                                ?: (if (provKey != api.name) DesktopDataStore.getKey<List<String>>(PreferenceKeys.orderedCatalogsKey(provKey)) else null)
+                                ?: emptyList()
+
+                            Triple(api.name, provKey, disabled to ordered)
+                        }
+                    }.awaitAll()
+                }
+
                 val disabledMap = mutableMapOf<String, Set<String>>()
                 val orderedMap = mutableMapOf<String, List<String>>()
-                for (api in apis) {
-                    val keyName = PreferenceKeys.disabledCatalogsKey(api.name)
-                    val provKey = com.lagradost.cloudstream3.desktop.repo.ActiveProviderRepository.getProviderKey(api)
-                    val keyProv = PreferenceKeys.disabledCatalogsKey(provKey)
-                    val disabled = DesktopDataStore.getKey<Set<String>>(keyName)
-                        ?: DesktopDataStore.getKey<Set<String>>(keyProv)
-                        ?: emptySet()
-                    disabledMap[api.name] = disabled
+                for ((apiName, provKey, pair) in results) {
+                    val (disabled, ordered) = pair
+                    disabledMap[apiName] = disabled
                     disabledMap[provKey] = disabled
-
-                    val orderKeyName = PreferenceKeys.orderedCatalogsKey(api.name)
-                    val orderKeyProv = PreferenceKeys.orderedCatalogsKey(provKey)
-                    val ordered = DesktopDataStore.getKey<List<String>>(orderKeyName)
-                        ?: DesktopDataStore.getKey<List<String>>(orderKeyProv)
-                        ?: emptyList()
                     if (ordered.isNotEmpty()) {
-                        orderedMap[api.name] = ordered
+                        orderedMap[apiName] = ordered
                         orderedMap[provKey] = ordered
                     }
                 }
@@ -255,7 +273,8 @@ class DesktopHomeViewModel(
             return
         }
 
-        if (currentState?.isLoading == true) {
+        val activeJob = categoryJobs[cacheKey]
+        if (activeJob?.isActive == true || currentState?.isLoading == true) {
             return
         }
 
@@ -263,58 +282,63 @@ class DesktopHomeViewModel(
             copy(categories = categories + (cacheKey to HomeCategoryUiState(isLoading = true, response = null, error = null)))
         }
 
-        viewModelScope.launch(Dispatchers.IO) {
-            val mutex = categoryMutex.getOrPut(cacheKey) { kotlinx.coroutines.sync.Mutex() }
-            mutex.withLock {
-                val existing = categoryCache[cacheKey]
-                if (existing != null) {
-                    updateState {
-                        copy(categories = categories + (cacheKey to HomeCategoryUiState(isLoading = false, response = existing, error = null)))
-                    }
-                    return@withLock
-                }
-
-                val request = MainPageRequest(pageData.name, pageData.data, pageData.horizontalImages)
-                com.lagradost.common.logging.AppLogger.i("Plugin:${provider.name}", "Loading home category: '${pageData.name}'")
-                val result = SafePluginInvoker.invoke(
-                    tag = "HomeCategory:${provider.name}:${pageData.name.ifBlank { "Category" }}",
-                    timeoutMs = SafePluginInvoker.TIMEOUT_LOAD_MS,
-                ) {
-                    provider.getMainPage(1, request)
-                }
-
-                if (result.isSuccess) {
-                    val response = result.getOrNull()
-                    if (response != null && response.items.isNotEmpty()) {
-                        com.lagradost.common.logging.AppLogger.i("Plugin:${provider.name}", "Loaded ${response.items.size} items for category '${pageData.name}'")
-                        categoryCache[cacheKey] = response
+        val job = viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val mutex = categoryMutex.getOrPut(cacheKey) { kotlinx.coroutines.sync.Mutex() }
+                mutex.withLock {
+                    val existing = categoryCache[cacheKey]
+                    if (existing != null) {
                         updateState {
-                            copy(categories = categories + (cacheKey to HomeCategoryUiState(isLoading = false, response = response, error = null)))
+                            copy(categories = categories + (cacheKey to HomeCategoryUiState(isLoading = false, response = existing, error = null)))
+                        }
+                        return@withLock
+                    }
+
+                    val request = MainPageRequest(pageData.name, pageData.data, pageData.horizontalImages)
+                    com.lagradost.common.logging.AppLogger.i("Plugin:${provider.name}", "Loading home category: '${pageData.name}'")
+                    val result = SafePluginInvoker.invoke(
+                        tag = "HomeCategory:${provider.name}:${pageData.name.ifBlank { "Category" }}",
+                        timeoutMs = SafePluginInvoker.TIMEOUT_LOAD_MS,
+                    ) {
+                        provider.getMainPage(1, request)
+                    }
+
+                    if (result.isSuccess) {
+                        val response = result.getOrNull()
+                        if (response != null && response.items.isNotEmpty()) {
+                            com.lagradost.common.logging.AppLogger.i("Plugin:${provider.name}", "Loaded ${response.items.size} items for category '${pageData.name}'")
+                            categoryCache[cacheKey] = response
+                            updateState {
+                                copy(categories = categories + (cacheKey to HomeCategoryUiState(isLoading = false, response = response, error = null)))
+                            }
+                        } else {
+                            updateState {
+                                copy(categories = categories + (cacheKey to HomeCategoryUiState(isLoading = false, response = null, error = "No items found.")))
+                            }
                         }
                     } else {
+                        val ex = result.exceptionOrNull()
+                        if (ex is kotlinx.coroutines.CancellationException) {
+                            throw ex
+                        }
+                        com.lagradost.common.logging.AppLogger.w("Plugin:${provider.name}", "Failed to load category '${pageData.name}': ${ex?.message}")
+                        DesktopErrorReporter.report("getMainPage failed for ${provider.name} - ${pageData.name.ifBlank { "Unknown Category" }}", ex ?: Exception("Unknown error"))
+                        val errorMsg = ex?.localizedMessage ?: "Connection error"
                         updateState {
-                            copy(categories = categories + (cacheKey to HomeCategoryUiState(isLoading = false, response = null, error = "No items found.")))
+                            copy(categories = categories + (cacheKey to HomeCategoryUiState(isLoading = false, response = null, error = errorMsg)))
                         }
                     }
-                } else {
-                    val ex = result.exceptionOrNull()
-                    if (ex is kotlinx.coroutines.CancellationException) {
-                        throw ex
-                    }
-                    com.lagradost.common.logging.AppLogger.w("Plugin:${provider.name}", "Failed to load category '${pageData.name}': ${ex?.message}")
-                    DesktopErrorReporter.report("getMainPage failed for ${provider.name} - ${pageData.name.ifBlank { "Unknown Category" }}", ex ?: Exception("Unknown error"))
-                    val errorMsg = ex?.localizedMessage ?: "Connection error"
-                    updateState {
-                        copy(categories = categories + (cacheKey to HomeCategoryUiState(isLoading = false, response = null, error = errorMsg)))
-                    }
                 }
+            } finally {
+                categoryJobs.remove(cacheKey)
             }
         }
+        categoryJobs[cacheKey] = job
     }
 
     private fun prefetchTopHistory(topHistory: List<com.lagradost.common.storage.WatchHistory>) {
         if (topHistory.isEmpty()) return
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             heroRepository.prefetchTopHistory(topHistory, uiState.value.providers)
         }
     }
@@ -340,6 +364,7 @@ class DesktopHomeViewModel(
     }
 
     private fun clearHistory() {
+        updateState { copy(historyList = emptyList()) }
         viewModelScope.launch(Dispatchers.IO) {
             removeWatchHistory.clearAll()
         }
@@ -465,6 +490,8 @@ class DesktopHomeViewModel(
     }
 
     private fun reloadProvider() {
+        categoryJobs.values.forEach { it.cancel() }
+        categoryJobs.clear()
         categoryCache.clear()
         categoryMutex.clear()
         com.lagradost.runtime.executor.PluginCircuitBreaker.resetAll()
@@ -474,5 +501,14 @@ class DesktopHomeViewModel(
                 refreshEpoch = refreshEpoch + 1L,
             )
         }
+    }
+
+    override fun dispose() {
+        categoryJobs.values.forEach { it.cancel() }
+        categoryJobs.clear()
+        categoryCache.clear()
+        categoryMutex.clear()
+        reLinkSearchJob?.cancel()
+        super.dispose()
     }
 }

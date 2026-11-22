@@ -1,185 +1,56 @@
 package com.lagradost.cloudstream3.desktop.ui.screens.details
 
+import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateContentSize
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.TooltipArea
-import androidx.compose.foundation.TooltipPlacement
-import androidx.compose.foundation.border
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.RotateRight
-import androidx.compose.material.icons.filled.Bookmark
-import androidx.compose.material.icons.filled.Cancel
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.DeleteOutline
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PauseCircle
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.PushPin
-import androidx.compose.material.icons.filled.Public
-import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawWithCache
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.BlendMode
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.vector.*
-import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.DpOffset
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
+import coil3.compose.LocalPlatformContext
+import coil3.compose.SubcomposeAsyncImage
+import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.lagradost.cloudstream3.ActorData
 import com.lagradost.cloudstream3.LoadResponse
 import com.lagradost.cloudstream3.MainAPI
 import com.lagradost.cloudstream3.TvType
-import com.lagradost.cloudstream3.desktop.core.preference.PreferenceKeys
 import com.lagradost.cloudstream3.desktop.ui.DesktopDimens
-import com.lagradost.cloudstream3.desktop.ui.components.CloudstreamAlertDialog
-import com.lagradost.cloudstream3.desktop.ui.components.LocalDesktopTheme
+import com.lagradost.cloudstream3.desktop.ui.badges.DesktopBadgeComponents
+import com.lagradost.cloudstream3.desktop.ui.badges.RatingBadgeUrlResolver
+import com.lagradost.cloudstream3.desktop.ui.components.CinematicTitle
 import com.lagradost.cloudstream3.desktop.ui.components.shimmerBackground
-import com.lagradost.cloudstream3.desktop.ui.theme.AppearanceConfig
-import com.lagradost.cloudstream3.fixUrl
+import com.lagradost.cloudstream3.desktop.ui.screens.details.contract.DetailsUiEvent
+import com.lagradost.cloudstream3.desktop.ui.screens.details.contract.DetailsUiState
+import com.lagradost.cloudstream3.desktop.ui.screens.details.contract.EnrichmentPhase
+import com.lagradost.cloudstream3.desktop.utils.ExternalLinkHandler
+import com.lagradost.cloudstream3.desktop.utils.ImageUtils
+import com.lagradost.cloudstream3.desktop.utils.TitleUtils
 import com.lagradost.cloudstream3.fixUrlNull
 import com.lagradost.common.storage.DesktopBookmark
-import kotlinx.coroutines.launch
-import com.lagradost.cloudstream3.desktop.ui.badges.RatingBadgeUrlResolver
-import com.lagradost.cloudstream3.desktop.utils.ExternalLinkHandler
-
-@Composable
-fun DetailsBackdrop(
-    provider: MainAPI,
-    data: LoadResponse,
-    scrollState: LazyListState,
-    enrichmentPhase: com.lagradost.cloudstream3.desktop.ui.screens.details.contract.EnrichmentPhase,
-    modifier: Modifier = Modifier,
-    dynamicColorEnabled: Boolean = false,
-    uiState: com.lagradost.cloudstream3.desktop.ui.screens.details.contract.DetailsUiState? = null,
-    activeBgUrl: String? = null,
-) {
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .graphicsLayer {
-                if (scrollState.firstVisibleItemIndex == 0) {
-                    val scrollOffset = scrollState.firstVisibleItemScrollOffset.toFloat()
-                    translationY = -scrollOffset * 0.5f
-                    alpha = 1f - (scrollOffset / (size.height * 0.8f)).coerceIn(0f, 1f)
-                } else {
-                    alpha = 0f
-                }
-            },
-    ) {
-        val currentPhase = enrichmentPhase
-
-        val baseBgUrl = remember(data.backgroundPosterUrl, data.posterUrl, uiState?.enrichedBackdropUrl) {
-            // Always prefer enriched TMDB backdrop
-            uiState?.enrichedBackdropUrl?.takeIf { it.isNotBlank() }
-                ?: provider.fixUrlNull(data.backgroundPosterUrl)?.takeIf { it.isNotBlank() }
-                ?: provider.fixUrlNull(data.posterUrl)?.takeIf { it.isNotBlank() }
-        }
-
-        val bgUrl = activeBgUrl ?: baseBgUrl
-        val isFallback = remember(data.backgroundPosterUrl, data.posterUrl, uiState?.enrichedBackdropUrl) {
-            if (!uiState?.enrichedBackdropUrl.isNullOrBlank()) return@remember false
-            data.backgroundPosterUrl.isNullOrBlank() || data.backgroundPosterUrl == data.posterUrl
-        }
-
-        if (bgUrl != null) {
-            androidx.compose.animation.Crossfade(
-                targetState = bgUrl,
-                animationSpec = androidx.compose.animation.core.tween(2000),
-                label = "backdrop_crossfade",
-                modifier = Modifier
-                    .fillMaxSize()
-                    .run { if (isFallback) this.blur(18.dp) else this }
-                    .graphicsLayer { alpha = 0.99f }
-                    .drawWithCache {
-                        val verticalFade = Brush.verticalGradient(
-                            0.00f to Color.Black,
-                            0.35f to Color.Black,
-                            0.60f to Color.Black.copy(alpha = 0.85f),
-                            0.80f to Color.Black.copy(alpha = 0.40f),
-                            0.94f to Color.Black.copy(alpha = 0.08f),
-                            1.00f to Color.Transparent,
-                        )
-                        val scrimBase = Color.Black
-                        // Horizontal vignette gradient
-                        val logoVignette = Brush.horizontalGradient(
-                            0.00f to scrimBase.copy(alpha = 0.85f),
-                            0.08f to scrimBase.copy(alpha = 0.80f),
-                            0.18f to scrimBase.copy(alpha = 0.70f),
-                            0.30f to scrimBase.copy(alpha = 0.55f),
-                            0.42f to scrimBase.copy(alpha = 0.35f),
-                            0.54f to scrimBase.copy(alpha = 0.18f),
-                            0.64f to scrimBase.copy(alpha = 0.06f),
-                            0.72f to Color.Transparent,
-                            1.00f to Color.Transparent,
-                        )
-                        val bottomScrim = Brush.verticalGradient(
-                            0.00f to Color.Transparent,
-                            0.35f to Color.Transparent,
-                            0.65f to Color.Transparent,
-                            0.85f to Color(0xFF0F0F0F).copy(alpha = 0.88f),
-                            1.00f to Color(0xFF0F0F0F),
-                        )
-                        onDrawWithContent {
-                            drawContent()
-                            drawRect(bottomScrim)
-                            drawRect(logoVignette)
-                            drawRect(verticalFade, blendMode = androidx.compose.ui.graphics.BlendMode.DstIn)
-                        }
-                    },
-            ) { targetBgUrl ->
-                val enhancedBgUrl = remember(targetBgUrl) { com.lagradost.cloudstream3.desktop.utils.ImageUtils.enhanceBackdropUrl(targetBgUrl) }
-                AsyncImage(
-                    model = coil3.request.ImageRequest.Builder(coil3.compose.LocalPlatformContext.current)
-                        .data(enhancedBgUrl)
-                        .crossfade(true)
-                        .build(),
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    filterQuality = androidx.compose.ui.graphics.FilterQuality.High,
-                    modifier = Modifier.fillMaxSize(),
-                    alignment = Alignment.TopCenter,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun InfoPanelRow(label: String, value: String) {
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(text = label, color = Color.White.copy(alpha = 0.5f), fontSize = 12.sp, fontWeight = FontWeight.Bold)
-        Text(text = value, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-    }
-}
+import com.lagradost.common.storage.DesktopDataStore
+import com.lagradost.common.storage.DesktopWatchType
+import java.util.Locale
 
 @Composable
 fun AdaptiveMetadataLayout(
@@ -211,31 +82,28 @@ fun AdaptiveMetadataLayout(
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun DetailsMetadata(
     provider: MainAPI,
     data: LoadResponse,
     heroAction: @Composable (Modifier) -> Unit = {},
     downloadAction: (@Composable (Modifier) -> Unit)? = null,
-    enrichmentPhase: com.lagradost.cloudstream3.desktop.ui.screens.details.contract.EnrichmentPhase,
+    enrichmentPhase: EnrichmentPhase,
     isLoading: Boolean = false,
-    uiState: com.lagradost.cloudstream3.desktop.ui.screens.details.contract.DetailsUiState? = null,
+    uiState: DetailsUiState? = null,
     screenshots: List<String>? = null,
     onPhotosClick: () -> Unit = {},
     onCastClick: () -> Unit = {},
-    onActorClick: (com.lagradost.cloudstream3.ActorData) -> Unit = {},
+    onActorClick: (ActorData) -> Unit = {},
     onTrailerClick: ((String) -> Unit)? = null,
-    onEvent: (com.lagradost.cloudstream3.desktop.ui.screens.details.contract.DetailsUiEvent) -> Unit = {},
+    onEvent: (DetailsUiEvent) -> Unit = {},
 ) {
-    val isLightMode = LocalDesktopTheme.current.isLightMode
     var isRightColumnHovered by remember { mutableStateOf(false) }
     val isRightColumnPinned = uiState?.isRightColumnPinned ?: false
-    val rightColumnAlpha by androidx.compose.animation.core.animateFloatAsState(
+    val rightColumnAlpha by animateFloatAsState(
         targetValue = if (isRightColumnPinned || isRightColumnHovered) 1f else 0f,
-        animationSpec = androidx.compose.animation.core.tween(durationMillis = 300),
+        animationSpec = tween(durationMillis = 300),
     )
-    val coroutineScope = rememberCoroutineScope()
 
     BoxWithConstraints(
         modifier = Modifier.fillMaxSize(),
@@ -257,7 +125,7 @@ fun DetailsMetadata(
                 onEvent = onEvent,
             )
         } else {
-            val actualMaxHeight = if (maxHeight == androidx.compose.ui.unit.Dp.Infinity) 800.dp else maxHeight
+            val actualMaxHeight = if (maxHeight == Dp.Infinity) 800.dp else maxHeight
 
             val isNarrow = maxWidth < 1100.dp
             val isButtonsNarrow = false
@@ -289,15 +157,20 @@ fun DetailsMetadata(
                 isNarrow = isNarrow,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(start = if (isNarrow) 24.dp else 64.dp, end = if (isNarrow) 24.dp else 64.dp, bottom = responsiveBottomPadding, top = responsiveTopPadding),
+                    .padding(
+                        start = if (isNarrow) 24.dp else 64.dp,
+                        end = if (isNarrow) 24.dp else 64.dp,
+                        bottom = responsiveBottomPadding,
+                        top = responsiveTopPadding,
+                    ),
                 mainContent = {
                     Column(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalAlignment = if (isNarrow) Alignment.CenterHorizontally else Alignment.Start,
                     ) {
-                        androidx.compose.animation.Crossfade(
+                        Crossfade(
                             targetState = isLoading,
-                            animationSpec = androidx.compose.animation.core.tween(350),
+                            animationSpec = tween(350),
                             label = "header_loading_crossfade",
                         ) { loading ->
                             if (loading) {
@@ -323,25 +196,22 @@ fun DetailsMetadata(
                                         ?: provider.fixUrlNull(data.logoUrl)
                                 }
                                 val displayName = data.name.takeIf { it.isNotBlank() } ?: uiState?.preloadedName ?: ""
-
                                 val hasLogo = !activeLogoUrl.isNullOrBlank()
                                 val titleContainerMinHeight = when {
                                     isCompactHeight -> 80.dp
                                     isNarrow -> 80.dp
                                     else -> 110.dp
                                 }
+
                                 Box(
                                     modifier = Modifier
-                                        .widthIn(
-                                            min = DesktopDimens.HeroLogoMinWidth,
-                                            max = responsiveLogoMaxWidth,
-                                        )
+                                        .widthIn(min = DesktopDimens.HeroLogoMinWidth, max = responsiveLogoMaxWidth)
                                         .heightIn(min = titleContainerMinHeight, max = responsiveLogoMaxHeight),
                                     contentAlignment = if (isNarrow) Alignment.Center else Alignment.BottomStart,
                                 ) {
-                                    androidx.compose.animation.Crossfade(
+                                    Crossfade(
                                         targetState = hasLogo,
-                                        animationSpec = androidx.compose.animation.core.tween(350),
+                                        animationSpec = tween(350),
                                         label = "title_logo_crossfade",
                                         modifier = Modifier.fillMaxSize(),
                                     ) { showLogo ->
@@ -351,19 +221,19 @@ fun DetailsMetadata(
                                                 contentAlignment = if (isNarrow) Alignment.Center else Alignment.BottomStart,
                                             ) {
                                                 var isDarkLogo by remember(activeLogoUrl) {
-                                                    mutableStateOf(com.lagradost.cloudstream3.desktop.utils.ImageUtils.isDarkLogoCached(activeLogoUrl) ?: false)
+                                                    mutableStateOf(ImageUtils.isDarkLogoCached(activeLogoUrl) ?: false)
                                                 }
-                                                val platformContext = coil3.compose.LocalPlatformContext.current
+                                                val platformContext = LocalPlatformContext.current
 
                                                 val logoRequest = remember(activeLogoUrl, platformContext) {
-                                                    coil3.request.ImageRequest.Builder(platformContext)
+                                                    ImageRequest.Builder(platformContext)
                                                         .data(activeLogoUrl)
                                                         .size(1600, 800)
                                                         .crossfade(true)
                                                         .listener(
                                                             onSuccess = { _, result ->
-                                                                val dark = com.lagradost.cloudstream3.desktop.utils.ImageUtils.isDarkImage(result.image)
-                                                                com.lagradost.cloudstream3.desktop.utils.ImageUtils.cacheDarkLogo(activeLogoUrl, dark)
+                                                                val dark = ImageUtils.isDarkImage(result.image)
+                                                                ImageUtils.cacheDarkLogo(activeLogoUrl, dark)
                                                                 isDarkLogo = dark
                                                             },
                                                         )
@@ -387,19 +257,19 @@ fun DetailsMetadata(
                                                     alignment = if (isNarrow) Alignment.Center else Alignment.BottomStart,
                                                     colorFilter = DesktopDimens.LogoShadowFilter,
                                                 )
-                                                coil3.compose.SubcomposeAsyncImage(
+                                                SubcomposeAsyncImage(
                                                     model = logoRequest,
                                                     contentDescription = displayName,
                                                     contentScale = ContentScale.Fit,
                                                     filterQuality = androidx.compose.ui.graphics.FilterQuality.High,
                                                     modifier = Modifier.fillMaxSize(),
                                                     alignment = if (isNarrow) Alignment.Center else Alignment.BottomStart,
-                                                    colorFilter = if (isDarkLogo) androidx.compose.ui.graphics.ColorFilter.colorMatrix(com.lagradost.cloudstream3.desktop.utils.ImageUtils.InvertColorMatrix) else null,
+                                                    colorFilter = if (isDarkLogo) ColorFilter.colorMatrix(ImageUtils.InvertColorMatrix) else null,
                                                     error = {
-                                                        com.lagradost.cloudstream3.desktop.ui.components.CinematicTitle(
+                                                        CinematicTitle(
                                                             text = displayName,
                                                             fontSize = if (displayName.length > 28) 34.sp else 42.sp,
-                                                            textAlign = if (isNarrow) androidx.compose.ui.text.style.TextAlign.Center else androidx.compose.ui.text.style.TextAlign.Start,
+                                                            textAlign = if (isNarrow) TextAlign.Center else TextAlign.Start,
                                                             modifier = Modifier
                                                                 .widthIn(max = responsivePlotMaxWidth)
                                                                 .padding(bottom = 2.dp),
@@ -412,10 +282,10 @@ fun DetailsMetadata(
                                                 modifier = Modifier.fillMaxSize(),
                                                 contentAlignment = if (isNarrow) Alignment.Center else Alignment.BottomStart,
                                             ) {
-                                                com.lagradost.cloudstream3.desktop.ui.components.CinematicTitle(
+                                                CinematicTitle(
                                                     text = displayName,
                                                     fontSize = if (displayName.length > 28) 34.sp else 42.sp,
-                                                    textAlign = if (isNarrow) androidx.compose.ui.text.style.TextAlign.Center else androidx.compose.ui.text.style.TextAlign.Start,
+                                                    textAlign = if (isNarrow) TextAlign.Center else TextAlign.Start,
                                                     modifier = Modifier
                                                         .widthIn(max = responsivePlotMaxWidth)
                                                         .padding(bottom = 2.dp),
@@ -426,12 +296,13 @@ fun DetailsMetadata(
                                 }
                             }
                         }
+
                         val activeTagline = uiState?.enrichedTagline?.takeIf { it.isNotBlank() }
                         if (activeTagline != null) {
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
                                 text = "\"$activeTagline\"",
-                                style = MaterialTheme.typography.titleMedium.copy(fontStyle = androidx.compose.ui.text.font.FontStyle.Italic),
+                                style = MaterialTheme.typography.titleMedium.copy(fontStyle = FontStyle.Italic),
                                 color = Color.White.copy(alpha = 0.85f),
                                 fontWeight = FontWeight.Normal,
                                 maxLines = 2,
@@ -439,7 +310,7 @@ fun DetailsMetadata(
                                 modifier = Modifier
                                     .widthIn(max = responsivePlotMaxWidth)
                                     .padding(start = if (isNarrow) 0.dp else 4.dp),
-                                textAlign = if (isNarrow) androidx.compose.ui.text.style.TextAlign.Center else androidx.compose.ui.text.style.TextAlign.Start,
+                                textAlign = if (isNarrow) TextAlign.Center else TextAlign.Start,
                             )
                         }
 
@@ -500,7 +371,7 @@ fun DetailsMetadata(
                                 }
 
                                 data.contentRating?.takeIf { it.isNotBlank() }?.let { rating ->
-                                    com.lagradost.cloudstream3.desktop.ui.badges.DesktopBadgeComponents.ContentRatingBadge(
+                                    DesktopBadgeComponents.ContentRatingBadge(
                                         rating = rating,
                                         isLarge = true,
                                         isSeries = data.type == TvType.TvSeries || data.type == TvType.Anime || data.type == TvType.AsianDrama,
@@ -521,9 +392,9 @@ fun DetailsMetadata(
                                     modifier = if (isNarrow) Modifier.fillMaxWidth() else Modifier,
                                 ) {
                                     if (imdbScore != null && imdbScore > 0.0) {
-                                        com.lagradost.cloudstream3.desktop.ui.badges.DesktopBadgeComponents.BrandedRatingBadge(
+                                        DesktopBadgeComponents.BrandedRatingBadge(
                                             logoRes = "badges/rating_imdb.png",
-                                            scoreText = String.format(java.util.Locale.US, "%.1f", imdbScore),
+                                            scoreText = String.format(Locale.US, "%.1f", imdbScore),
                                             textColor = Color(0xFFF5C518),
                                             logoWidth = 40.dp,
                                             tooltipText = "Open in IMDb (browser)",
@@ -533,9 +404,9 @@ fun DetailsMetadata(
                                     }
 
                                     if (tmdbScore != null && tmdbScore > 0.0) {
-                                        com.lagradost.cloudstream3.desktop.ui.badges.DesktopBadgeComponents.BrandedRatingBadge(
+                                        DesktopBadgeComponents.BrandedRatingBadge(
                                             logoRes = "badges/rating_tmdb.png",
-                                            scoreText = String.format(java.util.Locale.US, "%.1f", tmdbScore),
+                                            scoreText = String.format(Locale.US, "%.1f", tmdbScore),
                                             textColor = Color(0xFF01B4E4),
                                             logoWidth = 34.dp,
                                             tooltipText = "Open in TMDb (browser)",
@@ -545,7 +416,7 @@ fun DetailsMetadata(
                                     }
 
                                     if (anilistScore != null && anilistScore > 0.0) {
-                                        com.lagradost.cloudstream3.desktop.ui.badges.DesktopBadgeComponents.BrandedRatingBadge(
+                                        DesktopBadgeComponents.BrandedRatingBadge(
                                             logoRes = "badges/rating_mal.png",
                                             scoreText = "${(anilistScore * 10).toInt()}%",
                                             textColor = Color(0xFF02A9FF),
@@ -571,7 +442,8 @@ fun DetailsMetadata(
                             }
                             Spacer(modifier = Modifier.height(16.dp))
                         }
-                        val cleanedPlot = remember(data.plot) { com.lagradost.cloudstream3.desktop.utils.TitleUtils.cleanPlot(data.plot) }
+
+                        val cleanedPlot = remember(data.plot) { TitleUtils.cleanPlot(data.plot) }
                         if (!isLoading && !cleanedPlot.isNullOrBlank()) {
                             var plotExpanded by remember(cleanedPlot) { mutableStateOf(false) }
                             var canExpandPlot by remember(cleanedPlot) { mutableStateOf(false) }
@@ -579,7 +451,7 @@ fun DetailsMetadata(
                             Column(
                                 modifier = Modifier
                                     .widthIn(max = responsivePlotMaxWidth)
-                                    .animateContentSize(androidx.compose.animation.core.tween(250))
+                                    .animateContentSize(tween(250))
                                     .then(
                                         if (canExpandPlot) {
                                             Modifier
@@ -601,7 +473,7 @@ fun DetailsMetadata(
                                     lineHeight = 24.sp,
                                     maxLines = if (plotExpanded) Int.MAX_VALUE else 3,
                                     overflow = TextOverflow.Ellipsis,
-                                    textAlign = if (isNarrow) androidx.compose.ui.text.style.TextAlign.Center else androidx.compose.ui.text.style.TextAlign.Start,
+                                    textAlign = if (isNarrow) TextAlign.Center else TextAlign.Start,
                                     onTextLayout = { result ->
                                         if (!plotExpanded) {
                                             canExpandPlot = result.hasVisualOverflow
@@ -628,16 +500,16 @@ fun DetailsMetadata(
 
                         Spacer(modifier = Modifier.height(18.dp))
 
-                        val bookmarkId = com.lagradost.common.storage.DesktopDataStore.bookmarkId(provider.name, data.url)
+                        val bookmarkId = DesktopDataStore.bookmarkId(provider.name, data.url)
                         val allBookmarks = uiState?.bookmarks ?: emptyMap()
                         val currentBookmark = allBookmarks[bookmarkId]
                         var isEditingStatus by remember { mutableStateOf(false) }
 
                         val activeWatchType = currentBookmark?.let { b ->
-                            com.lagradost.common.storage.DesktopWatchType.entries.find { it.id == b.watchType }
-                        } ?: com.lagradost.common.storage.DesktopWatchType.WATCHING
+                            DesktopWatchType.entries.find { it.id == b.watchType }
+                        } ?: DesktopWatchType.WATCHING
 
-                        val setWatchType: (com.lagradost.common.storage.DesktopWatchType) -> Unit = { type ->
+                        val setWatchType: (DesktopWatchType) -> Unit = { type ->
                             val newBookmark = DesktopBookmark(
                                 id = bookmarkId,
                                 name = data.name.takeIf { it.isNotBlank() } ?: uiState?.preloadedName ?: "",
@@ -646,12 +518,12 @@ fun DetailsMetadata(
                                 posterUrl = data.posterUrl,
                                 watchType = type.id,
                             )
-                            onEvent(com.lagradost.cloudstream3.desktop.ui.screens.details.contract.DetailsUiEvent.OnAddBookmark(newBookmark))
+                            onEvent(DetailsUiEvent.OnAddBookmark(newBookmark))
                             isEditingStatus = false
                         }
 
                         val removeBookmarkAction: () -> Unit = {
-                            onEvent(com.lagradost.cloudstream3.desktop.ui.screens.details.contract.DetailsUiEvent.OnRemoveBookmark(bookmarkId))
+                            onEvent(DetailsUiEvent.OnRemoveBookmark(bookmarkId))
                             isEditingStatus = false
                         }
 
@@ -665,132 +537,14 @@ fun DetailsMetadata(
                             )
                         }
 
-                        CloudstreamAlertDialog(
+                        DetailsLibraryStatusDialog(
                             show = isEditingStatus,
                             onDismissRequest = { isEditingStatus = false },
-                            title = {
-                                Text(
-                                    text = if (currentBookmark != null) "Library Status" else "Add to Library",
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 18.sp,
-                                )
-                            },
-                            text = {
-                                val statusItems = listOf(
-                                    com.lagradost.common.storage.DesktopWatchType.WATCHING to Icons.Default.PlayArrow,
-                                    com.lagradost.common.storage.DesktopWatchType.COMPLETED to Icons.Default.CheckCircle,
-                                    com.lagradost.common.storage.DesktopWatchType.PLANTOWATCH to Icons.Default.Bookmark,
-                                    com.lagradost.common.storage.DesktopWatchType.ONHOLD to Icons.Default.PauseCircle,
-                                    com.lagradost.common.storage.DesktopWatchType.REWATCHING to Icons.AutoMirrored.Filled.RotateRight,
-                                    com.lagradost.common.storage.DesktopWatchType.DROPPED to Icons.Default.Cancel,
-                                )
-                                val primaryColor = MaterialTheme.colorScheme.primary
-
-                                Column(
-                                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                                ) {
-                                    statusItems.chunked(3).forEach { rowItems ->
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                                        ) {
-                                            rowItems.forEach { (type, icon) ->
-                                                val isSelected = currentBookmark?.watchType == type.id
-                                                val itemInteraction = remember { MutableInteractionSource() }
-                                                val isHovered by itemInteraction.collectIsHoveredAsState()
-
-                                                Surface(
-                                                    onClick = { setWatchType(type) },
-                                                    shape = RoundedCornerShape(14.dp),
-                                                    color = if (isSelected) {
-                                                        primaryColor.copy(alpha = 0.18f)
-                                                    } else if (isHovered) {
-                                                        Color.White.copy(alpha = 0.08f)
-                                                    } else {
-                                                        Color.White.copy(alpha = 0.04f)
-                                                    },
-                                                    border = androidx.compose.foundation.BorderStroke(
-                                                        if (isSelected) 1.5.dp else 1.dp,
-                                                        if (isSelected) {
-                                                            primaryColor
-                                                        } else if (isHovered) {
-                                                            Color.White.copy(alpha = 0.25f)
-                                                        } else {
-                                                            Color.White.copy(alpha = 0.10f)
-                                                        },
-                                                    ),
-                                                    interactionSource = itemInteraction,
-                                                    modifier = Modifier.weight(1f).height(84.dp),
-                                                ) {
-                                                    Box(
-                                                        modifier = Modifier.fillMaxSize().padding(horizontal = 6.dp, vertical = 8.dp),
-                                                    ) {
-                                                        Column(
-                                                            modifier = Modifier.fillMaxSize(),
-                                                            horizontalAlignment = Alignment.CenterHorizontally,
-                                                            verticalArrangement = Arrangement.Center,
-                                                        ) {
-                                                            Surface(
-                                                                shape = CircleShape,
-                                                                color = if (isSelected) primaryColor.copy(alpha = 0.28f) else Color.White.copy(alpha = 0.08f),
-                                                                modifier = Modifier.size(32.dp),
-                                                            ) {
-                                                                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                                                                    Icon(
-                                                                        imageVector = icon,
-                                                                        contentDescription = null,
-                                                                        tint = if (isSelected) primaryColor else Color.White.copy(alpha = 0.85f),
-                                                                        modifier = Modifier.size(17.dp),
-                                                                    )
-                                                                }
-                                                            }
-                                                            Spacer(Modifier.height(6.dp))
-                                                            Text(
-                                                                text = type.stringRes,
-                                                                color = if (isSelected) primaryColor else Color.White.copy(alpha = 0.85f),
-                                                                fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.SemiBold,
-                                                                fontSize = 12.sp,
-                                                                maxLines = 1,
-                                                                overflow = TextOverflow.Ellipsis,
-                                                            )
-                                                        }
-
-                                                        if (isSelected) {
-                                                            Icon(
-                                                                imageVector = Icons.Default.Check,
-                                                                contentDescription = null,
-                                                                tint = primaryColor,
-                                                                modifier = Modifier.size(14.dp).align(Alignment.TopEnd),
-                                                            )
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            },
-                            confirmButton = {
-                                if (currentBookmark != null) {
-                                    TextButton(
-                                        onClick = removeBookmarkAction,
-                                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                                    ) {
-                                        Icon(Icons.Default.DeleteOutline, contentDescription = null, modifier = Modifier.size(16.dp))
-                                        Spacer(Modifier.width(6.dp))
-                                        Text("Remove from Library", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
-                                    }
-                                }
-                            },
-                            dismissButton = {
-                                TextButton(onClick = { isEditingStatus = false }) {
-                                    Text("Cancel", fontSize = 13.sp)
-                                }
-                            },
+                            currentBookmark = currentBookmark,
+                            onSetWatchType = setWatchType,
+                            onRemoveBookmark = removeBookmarkAction,
                         )
 
-                        val trailerUrl = uiState?.enrichedTrailerUrl ?: uiState?.enrichedTrailers?.firstOrNull()?.url
                         val webButton: @Composable (Modifier) -> Unit = { modifier ->
                             DetailsHeroWebButton(
                                 modifier = modifier,
@@ -800,21 +554,14 @@ fun DetailsMetadata(
                             )
                         }
 
-                        val trailerButton: (@Composable (Modifier) -> Unit)? = if (false) {
-                            { modifier ->
-                                DetailsHeroTrailerButton(
-                                    modifier = modifier,
-                                    isButtonsNarrow = isButtonsNarrow,
-                                    onClick = { onTrailerClick?.invoke(trailerUrl ?: "") },
-                                )
-                            }
-                        } else null
-
                         if (isButtonsNarrow) {
                             Row(
                                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                                 verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.widthIn(max = 520.dp).fillMaxWidth().align(if (isNarrow) Alignment.CenterHorizontally else Alignment.Start),
+                                modifier = Modifier
+                                    .widthIn(max = 520.dp)
+                                    .fillMaxWidth()
+                                    .align(if (isNarrow) Alignment.CenterHorizontally else Alignment.Start),
                             ) {
                                 Box(modifier = Modifier.weight(1f)) {
                                     heroAction(Modifier.fillMaxWidth())
@@ -834,7 +581,6 @@ fun DetailsMetadata(
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
                                     heroAction(Modifier.wrapContentWidth())
-    
                                     libraryButton(Modifier)
                                     downloadAction?.invoke(Modifier)
                                     webButton(Modifier)
@@ -845,375 +591,20 @@ fun DetailsMetadata(
                 },
                 sideContent = {
                     if (!isLoading) {
-                        Column(
-                            modifier = Modifier
-                                .then(if (isNarrow) Modifier.fillMaxWidth() else Modifier.widthIn(max = 420.dp))
-                                .padding(bottom = 12.dp)
-                                .graphicsLayer { alpha = rightColumnAlpha }
-                                .pointerInput(Unit) {
-                                    awaitPointerEventScope {
-                                        while (true) {
-                                            val event = awaitPointerEvent()
-                                            if (event.type == PointerEventType.Enter) {
-                                                isRightColumnHovered = true
-                                            } else if (event.type == PointerEventType.Exit) {
-                                                isRightColumnHovered = false
-                                            }
-                                        }
-                                    }
-                                },
-                            verticalArrangement = Arrangement.spacedBy(16.dp),
-                            horizontalAlignment = if (isNarrow) Alignment.CenterHorizontally else Alignment.End,
-                        ) {
-                            val textShadow = androidx.compose.ui.text.TextStyle(
-                                shadow = com.lagradost.cloudstream3.desktop.ui.components.getTextShadow(),
-                            )
-
-                            // Action Bar Row (Screensaver Toggle + Pin Toggle)
-                            if (!isNarrow) {
-                                val actionAlpha by androidx.compose.animation.core.animateFloatAsState(
-                                    targetValue = if (isRightColumnHovered) 1f else 0f,
-                                    label = "actionAlpha",
-                                )
-                                val screensaverEnabled by AppearanceConfig.screensaverEnabled.collectAsState()
-                                val screenshots = uiState?.screenshots ?: emptyList()
-
-                                Row(
-                                    modifier = Modifier.graphicsLayer { alpha = actionAlpha },
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.End),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    if (screenshots.isNotEmpty()) {
-                                        IconButton(
-                                            onClick = {
-                                                com.lagradost.cloudstream3.desktop.utils.appScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                                                    AppearanceConfig.setScreensaverEnabled(!screensaverEnabled)
-                                                }
-                                            },
-                                            modifier = Modifier.size(36.dp),
-                                        ) {
-                                            Icon(
-                                                imageVector = if (screensaverEnabled) Icons.Default.Pause else Icons.Default.PlayArrow,
-                                                contentDescription = if (screensaverEnabled) "Pause backdrop screensaver" else "Resume backdrop screensaver",
-                                                tint = if (screensaverEnabled) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.4f),
-                                                modifier = Modifier.size(20.dp),
-                                            )
-                                        }
-                                    }
-
-                                    IconButton(
-                                        onClick = {
-                                            onEvent(com.lagradost.cloudstream3.desktop.ui.screens.details.contract.DetailsUiEvent.OnTogglePinRightColumn)
-                                        },
-                                        modifier = Modifier.size(36.dp),
-                                    ) {
-                                        Icon(
-                                            imageVector = if (isRightColumnPinned) Icons.Filled.PushPin else Icons.Outlined.PushPin,
-                                            contentDescription = "Pin sidebar",
-                                            tint = if (isRightColumnPinned) Color.White else Color.White.copy(alpha = 0.4f),
-                                            modifier = Modifier.size(20.dp),
-                                        )
-                                    }
-                                }
-                            }
-
-                            // Stats & Info Sidebar
-                            val hideDetailsSource by AppearanceConfig.hideDetailsSource.collectAsState()
-
-                            Column(
-                                verticalArrangement = Arrangement.spacedBy(12.dp),
-                                horizontalAlignment = if (isNarrow) Alignment.CenterHorizontally else Alignment.End,
-                            ) {
-                                val stats = buildList {
-                                    if (!hideDetailsSource) {
-                                        add("Source" to provider.name)
-                                    }
-
-                                    val relDate = uiState?.enrichedReleaseDate ?: data.year?.toString()
-                                    if (!relDate.isNullOrBlank()) add("Release Date" to relDate)
-
-                                    val status = uiState?.enrichedStatus
-                                    if (!status.isNullOrBlank()) add("Status" to status)
-                                }
-
-                                stats.forEachIndexed { index, stat ->
-                                    InfoRowItem(
-                                        label = stat.first,
-                                        value = stat.second,
-                                        textShadow = textShadow,
-                                        onClick = if (stat.first == "Source") {
-                                            val fixed = provider.fixUrl(data.url)
-                                            if (fixed.startsWith("http://") || fixed.startsWith("https://")) {
-                                                { ExternalLinkHandler.launchSystemBrowser(fixed) }
-                                            } else null
-                                        } else null,
-                                    )
-                                }
-                            }
-                        }
+                        DetailsSidebarStats(
+                            provider = provider,
+                            data = data,
+                            uiState = uiState,
+                            isNarrow = isNarrow,
+                            isRightColumnPinned = isRightColumnPinned,
+                            rightColumnAlpha = rightColumnAlpha,
+                            isRightColumnHovered = isRightColumnHovered,
+                            onHoverChange = { isRightColumnHovered = it },
+                            onTogglePin = { onEvent(DetailsUiEvent.OnTogglePinRightColumn) },
+                        )
                     }
                 },
             )
-        }
-    }
-}
-
-@Composable
-private fun DetailsHeroTrailerButton(
-    modifier: Modifier = Modifier,
-    isButtonsNarrow: Boolean,
-    onClick: () -> Unit,
-) {
-    val interactionSource = remember { MutableInteractionSource() }
-    val isHovered by interactionSource.collectIsHoveredAsState()
-
-    Surface(
-        onClick = onClick,
-        modifier = modifier.height(if (isButtonsNarrow) 44.dp else 52.dp),
-        shape = RoundedCornerShape(if (isButtonsNarrow) 10.dp else 12.dp),
-        color = if (isHovered) Color.White.copy(alpha = 0.22f) else Color.White.copy(alpha = 0.12f),
-        border = androidx.compose.foundation.BorderStroke(
-            1.2.dp,
-            if (isHovered) Color.White.copy(alpha = 0.50f) else Color.White.copy(alpha = 0.28f),
-        ),
-        interactionSource = interactionSource,
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center,
-            modifier = Modifier
-                .fillMaxHeight()
-                .padding(horizontal = if (isButtonsNarrow) 12.dp else 18.dp),
-        ) {
-            Icon(
-                imageVector = Icons.Default.PlayArrow,
-                contentDescription = "Trailer",
-                tint = Color.White,
-                modifier = Modifier.size(if (isButtonsNarrow) 18.dp else 20.dp),
-            )
-            Spacer(Modifier.width(if (isButtonsNarrow) 6.dp else 8.dp))
-            Text(
-                text = "Trailer",
-                color = Color.White,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = if (isButtonsNarrow) 13.sp else 14.sp,
-            )
-        }
-    }
-}
-
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-private fun DetailsHeroLibraryButton(
-    modifier: Modifier = Modifier,
-    currentBookmark: DesktopBookmark?,
-    activeWatchType: com.lagradost.common.storage.DesktopWatchType,
-    isButtonsNarrow: Boolean,
-    onEditStatus: () -> Unit,
-) {
-    val isInLibrary = currentBookmark != null
-    val libraryIcon = if (isInLibrary) {
-        when (activeWatchType) {
-            com.lagradost.common.storage.DesktopWatchType.WATCHING -> Icons.Outlined.PlayArrow
-            com.lagradost.common.storage.DesktopWatchType.COMPLETED -> Icons.Outlined.Check
-            com.lagradost.common.storage.DesktopWatchType.ONHOLD -> Icons.Outlined.Pause
-            com.lagradost.common.storage.DesktopWatchType.DROPPED -> Icons.Outlined.Close
-            com.lagradost.common.storage.DesktopWatchType.PLANTOWATCH -> Icons.Outlined.BookmarkAdded
-            com.lagradost.common.storage.DesktopWatchType.REWATCHING -> Icons.AutoMirrored.Filled.RotateRight
-        }
-    } else {
-        Icons.Outlined.BookmarkAdd
-    }
-    val tooltipText = if (isInLibrary) "Change Library Status" else "Add to Library"
-    val theme = LocalDesktopTheme.current
-    TooltipArea(
-        tooltip = {
-            Surface(
-                shape = RoundedCornerShape(6.dp),
-                color = theme.SurfaceElevated,
-                border = androidx.compose.foundation.BorderStroke(1.dp, theme.Divider),
-                shadowElevation = 6.dp,
-            ) {
-                Text(
-                    text = tooltipText,
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = theme.TextPrimary,
-                    fontWeight = FontWeight.Medium,
-                )
-            }
-        },
-        delayMillis = 400,
-        tooltipPlacement = TooltipPlacement.CursorPoint(offset = DpOffset(0.dp, 16.dp)),
-    ) {
-        Surface(
-            onClick = onEditStatus,
-            modifier = if (isInLibrary) {
-                modifier.height(if (isButtonsNarrow) 44.dp else 52.dp).animateContentSize()
-            } else {
-                modifier.size(if (isButtonsNarrow) 44.dp else 52.dp)
-            },
-            shape = RoundedCornerShape(if (isButtonsNarrow) 10.dp else 12.dp),
-            color = Color.White.copy(alpha = 0.12f),
-            border = androidx.compose.foundation.BorderStroke(
-                1.2.dp,
-                Color.White.copy(alpha = 0.28f),
-            ),
-        ) {
-            if (isInLibrary) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center,
-                    modifier = Modifier
-                        .fillMaxHeight()
-                        .padding(horizontal = if (isButtonsNarrow) 12.dp else 16.dp),
-                ) {
-                    Icon(
-                        imageVector = libraryIcon,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(if (isButtonsNarrow) 18.dp else 20.dp),
-                    )
-                    Spacer(Modifier.width(if (isButtonsNarrow) 6.dp else 8.dp))
-                    Text(
-                        text = activeWatchType.stringRes,
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = if (isButtonsNarrow) 13.sp else 14.sp,
-                        maxLines = 1,
-                    )
-                    Spacer(Modifier.width(4.dp))
-                    Icon(
-                        imageVector = Icons.Default.KeyboardArrowDown,
-                        contentDescription = "Change Status",
-                        tint = Color.White.copy(alpha = 0.8f),
-                        modifier = Modifier.size(if (isButtonsNarrow) 16.dp else 18.dp),
-                    )
-                }
-            } else {
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier.fillMaxSize(),
-                ) {
-                    Icon(
-                        imageVector = libraryIcon,
-                        contentDescription = "Add to Library",
-                        tint = Color.White,
-                        modifier = Modifier.size(if (isButtonsNarrow) 22.dp else 26.dp),
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun InfoRowItem(
-    label: String,
-    value: String,
-    textShadow: androidx.compose.ui.text.TextStyle,
-    onClick: (() -> Unit)? = null,
-    interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },
-    isHovered: Boolean = interactionSource.collectIsHoveredAsState().value,
-) {
-    Column(
-        horizontalAlignment = Alignment.End,
-        modifier = if (onClick != null) {
-            Modifier
-                .pointerHoverIcon(PointerIcon.Hand)
-                .clickable(
-                    interactionSource = interactionSource,
-                    indication = null,
-                    onClick = onClick,
-                )
-        } else {
-            Modifier
-        },
-        verticalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        Text(
-            text = label.uppercase(),
-            style = MaterialTheme.typography.labelSmall.merge(textShadow),
-            color = Color.White.copy(alpha = 0.55f),
-            fontWeight = FontWeight.Bold,
-            letterSpacing = 1.sp,
-            fontSize = 11.sp,
-        )
-        Text(
-            text = value,
-            style = MaterialTheme.typography.bodyMedium.merge(textShadow),
-            color = if (onClick != null && isHovered) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.95f),
-            textDecoration = if (onClick != null && isHovered) androidx.compose.ui.text.style.TextDecoration.Underline else null,
-            fontWeight = FontWeight.SemiBold,
-            fontSize = 14.sp,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-    }
-}
-
-
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-private fun DetailsHeroWebButton(
-    modifier: Modifier = Modifier,
-    isButtonsNarrow: Boolean,
-    provider: MainAPI,
-    url: String?,
-) {
-    val fullWebUrl = remember(provider, url) {
-        if (url.isNullOrBlank()) null
-        else {
-            val fixed = provider.fixUrl(url)
-            if (fixed.startsWith("http://") || fixed.startsWith("https://")) fixed else null
-        }
-    } ?: return
-
-    val interactionSource = remember { MutableInteractionSource() }
-    val isHovered by interactionSource.collectIsHoveredAsState()
-    val theme = LocalDesktopTheme.current
-
-    TooltipArea(
-        tooltip = {
-            Surface(
-                shape = RoundedCornerShape(6.dp),
-                color = theme.SurfaceElevated,
-                border = androidx.compose.foundation.BorderStroke(1.dp, theme.Divider),
-                shadowElevation = 6.dp,
-            ) {
-                Text(
-                    text = "Open source page in browser",
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = theme.TextPrimary,
-                    fontWeight = FontWeight.Medium,
-                )
-            }
-        },
-        delayMillis = 400,
-        tooltipPlacement = TooltipPlacement.CursorPoint(offset = DpOffset(0.dp, 16.dp)),
-    ) {
-        Surface(
-            onClick = { ExternalLinkHandler.launchSystemBrowser(fullWebUrl) },
-            modifier = modifier
-                .size(if (isButtonsNarrow) 44.dp else 52.dp)
-                .pointerHoverIcon(PointerIcon.Hand),
-            shape = RoundedCornerShape(if (isButtonsNarrow) 10.dp else 12.dp),
-            color = if (isHovered) Color.White.copy(alpha = 0.22f) else Color.White.copy(alpha = 0.12f),
-            border = androidx.compose.foundation.BorderStroke(
-                1.2.dp,
-                if (isHovered) Color.White.copy(alpha = 0.50f) else Color.White.copy(alpha = 0.28f),
-            ),
-            interactionSource = interactionSource,
-        ) {
-            Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                Icon(
-                    imageVector = Icons.Default.Public,
-                    contentDescription = "Open in Browser (${provider.name})",
-                    tint = Color.White,
-                    modifier = Modifier.size(if (isButtonsNarrow) 18.dp else 20.dp),
-                )
-            }
         }
     }
 }

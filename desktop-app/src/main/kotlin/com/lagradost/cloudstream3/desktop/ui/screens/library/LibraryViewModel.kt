@@ -294,4 +294,10 @@ class LibraryViewModel(
     private fun dismissError() {
         updateState { copy(showError = null) }
     }
+
+    override fun dispose() {
+        reLinkSearchJob?.cancel()
+        reLinkSearchJob = null
+        super.dispose()
+    }
 }

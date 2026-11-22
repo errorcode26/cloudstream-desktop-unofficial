@@ -13,52 +13,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import java.io.File
 
-enum class DesktopWatchType(val id: Int, val stringRes: String) {
-    WATCHING(0, "Watching"),
-    COMPLETED(1, "Completed"),
-    ONHOLD(2, "On Hold"),
-    DROPPED(3, "Dropped"),
-    PLANTOWATCH(4, "Plan to Watch"),
-    REWATCHING(5, "Re-watching"),
-}
-
-data class DesktopBookmark(
-    val id: String,
-    val name: String,
-    val url: String,
-    val apiName: String,
-    val posterUrl: String?,
-    val watchType: Int = 0,
-    val dateAdded: Long = System.currentTimeMillis(),
-)
-
-data class WatchHistory(
-    val parentId: String,
-    val showName: String,
-    val showUrl: String,
-    val apiName: String,
-    val posterUrl: String?,
-    val episodeThumbnailUrl: String?,
-    val screenshotUrl: String?,
-    val episode: Int?,
-    val season: Int?,
-    val episodeId: String?,
-    val position: Long,
-    val duration: Long,
-    val updateTime: Long = System.currentTimeMillis(),
-    val episodeName: String? = null,
-    val episodeDescription: String? = null,
-)
-
-data class PluginUpdateRecord(
-    val pluginName: String,
-    val version: Int,
-    val iconUrl: String?,
-    val timestamp: Long = System.currentTimeMillis(),
-    val isSuccess: Boolean = true,
-    val errorMessage: String? = null,
-)
-
 object DesktopDataStore {
     @PublishedApi internal val mapper: ObjectMapper =
         jacksonObjectMapper()
@@ -103,10 +57,8 @@ object DesktopDataStore {
 
     fun init() {
         withDbLock {
-            // Initialize the database
             val db = DatabaseFactory.database
 
-            // Pre-load all key-values into RAM cache for zero-latency O(1) reads
             try {
                 db.cloudstreamDBQueries.selectAllKeyValues().executeAsList().forEach { row ->
                     rawKeyCache[row.key] = row.value_
@@ -116,7 +68,6 @@ object DesktopDataStore {
                 AppLogger.e("Failed to pre-cache key-values", e)
             }
 
-            // Migration from old datastore.json
             if (dataFile.exists() && dataFile.length() > 0L) {
                 try {
                     AppLogger.i("Migrating legacy datastore.json to SQLDelight...")
@@ -396,258 +347,31 @@ object DesktopDataStore {
         }
     }
 
-    fun getBookmarks(profileId: Int = activeProfileId): List<DesktopBookmark> {
-        val prefix = "p${profileId}_"
-        return withDbLock {
-            try {
-                DatabaseFactory.database.cloudstreamDBQueries.selectBookmarksByProfile(profileId.toLong()).executeAsList()
-                    .map {
-                        val cleanId = if (it.id.startsWith(prefix)) {
-                            it.id.removePrefix(prefix)
-                        } else if (it.id.startsWith("p") && it.id.contains("_")) {
-                            it.id.substringAfter("_")
-                        } else {
-                            it.id
-                        }
-                        DesktopBookmark(cleanId, it.name, it.url, it.apiName, it.posterUrl, it.watchType?.toInt() ?: 0, it.dateAdded ?: 0L)
-                    }.distinctBy { it.id }
-                    .filter { it.name.isNotBlank() }
-            } catch (e: Exception) {
-                AppLogger.e("Failed to fetch bookmarks for profile $profileId", e)
-                emptyList()
-            }
-        }
-    }
+    // ── Bookmarks Store Delegation ──────────────────────────────────────────────
 
-    fun addBookmark(bookmark: DesktopBookmark, profileId: Int = activeProfileId) {
-        val cleanId = if (bookmark.id.startsWith("p") && bookmark.id.contains("_")) bookmark.id.substringAfter("_") else bookmark.id
-        val resolvedId = "p${profileId}_$cleanId"
-        withDbLock {
-            try {
-                DatabaseFactory.database.cloudstreamDBQueries.insertBookmark(
-                    resolvedId,
-                    bookmark.name,
-                    bookmark.url,
-                    bookmark.apiName,
-                    bookmark.posterUrl,
-                    bookmark.watchType.toLong(),
-                    bookmark.dateAdded.also {
-                        if (profileId == 0 && cleanId != resolvedId) {
-                            DatabaseFactory.database.cloudstreamDBQueries.deleteBookmark(cleanId)
-                        }
-                    },
-                    profileId.toLong(),
-                )
-            } catch (e: Exception) {
-                AppLogger.e("Failed to insert bookmark $resolvedId", e)
-            }
-        }
-        notifyBookmarksChanged()
-    }
+    fun normalizeUrl(url: String): String = DesktopBookmarkStore.normalizeUrl(url)
 
-    fun removeBookmark(id: String, profileId: Int = activeProfileId) {
-        val cleanId = if (id.startsWith("p") && id.contains("_")) id.substringAfter("_") else id
-        val resolvedId = "p${profileId}_$cleanId"
-        withDbLock {
-            try {
-                DatabaseFactory.database.cloudstreamDBQueries.deleteBookmark(resolvedId)
-                if (profileId == 0) {
-                    DatabaseFactory.database.cloudstreamDBQueries.deleteBookmark(cleanId)
-                }
-            } catch (e: Exception) {
-                AppLogger.e("Failed to delete bookmark $resolvedId", e)
-            }
-        }
-        notifyBookmarksChanged()
-    }
+    fun bookmarkId(apiName: String, url: String): String = DesktopBookmarkStore.bookmarkId(apiName, url)
 
-    fun isBookmarked(id: String, profileId: Int = activeProfileId): Boolean {
-        val cleanId = if (id.startsWith("p") && id.contains("_")) id.substringAfter("_") else id
-        val resolvedId = "p${profileId}_$cleanId"
-        return withDbLock {
-            try {
-                val exists = DatabaseFactory.database.cloudstreamDBQueries.selectBookmarkById(resolvedId).executeAsOneOrNull() != null
-                if (exists) return@withDbLock true
-                profileId == 0 && DatabaseFactory.database.cloudstreamDBQueries.selectBookmarkById(cleanId).executeAsOneOrNull() != null
-            } catch (e: Exception) {
-                AppLogger.e("Failed to check if bookmarked: $id", e)
-                false
-            }
-        }
-    }
+    fun getBookmarks(profileId: Int = activeProfileId): List<DesktopBookmark> =
+        DesktopBookmarkStore.getBookmarks(profileId)
 
-    fun getAllWatchHistory(profileId: Int = activeProfileId): List<WatchHistory> {
-        return withDbLock {
-            try {
-                DatabaseFactory.database.cloudstreamDBQueries.selectWatchHistoryByProfile(profileId.toLong()).executeAsList()
-                    .filter {
-                        it.showName.isNotBlank() &&
-                            !it.showName.equals("Unknown Channel", ignoreCase = true) &&
-                            !it.showName.equals("Unknown", ignoreCase = true) &&
-                            (it.duration > 0 || it.position > 0)
-                    }
-                    .map {
-                        WatchHistory(
-                            parentId = it.parentId,
-                            showName = it.showName,
-                            showUrl = it.showUrl,
-                            apiName = it.apiName,
-                            posterUrl = it.posterUrl,
-                            episodeThumbnailUrl = it.episodeThumbnailUrl,
-                            screenshotUrl = it.screenshotUrl,
-                            episode = it.episode?.toInt(),
-                            season = it.season?.toInt(),
-                            episodeId = it.episodeId.takeIf { id -> id.isNotEmpty() },
-                            position = it.position,
-                            duration = it.duration,
-                            updateTime = it.updateTime,
-                            episodeName = it.episodeName,
-                            episodeDescription = it.episodeDescription,
-                        )
-                    }
-            } catch (e: Exception) {
-                AppLogger.e("Failed to get watch history for profile $profileId", e)
-                emptyList()
-            }
-        }
-    }
+    fun addBookmark(bookmark: DesktopBookmark, profileId: Int = activeProfileId) =
+        DesktopBookmarkStore.addBookmark(bookmark, profileId)
 
-    private var lastHistoryNotifyMs = 0L
+    fun removeBookmark(id: String, profileId: Int = activeProfileId) =
+        DesktopBookmarkStore.removeBookmark(id, profileId)
 
-    fun notifyHistoryChanged(force: Boolean = false) {
-        val now = System.currentTimeMillis()
-        if (force || now - lastHistoryNotifyMs >= 1000L) {
-            lastHistoryNotifyMs = now
-            historyUpdates.value++
-        }
-    }
+    fun isBookmarked(id: String, profileId: Int = activeProfileId): Boolean =
+        DesktopBookmarkStore.isBookmarked(id, profileId)
 
-    fun clearAllWatchHistory(profileId: Int = activeProfileId) {
-        withDbLock {
-            try {
-                DatabaseFactory.database.cloudstreamDBQueries.deleteWatchHistoryByProfile(profileId.toLong())
-            } catch (e: Exception) {
-                AppLogger.e("Failed to clear all watch history for profile $profileId", e)
-            }
-        }
-        notifyHistoryChanged(force = true)
-    }
+    fun clearAllBookmarks(profileId: Int = activeProfileId) =
+        DesktopBookmarkStore.clearAllBookmarks(profileId)
 
-    fun clearAllBookmarks(profileId: Int = activeProfileId) {
-        withDbLock {
-            try {
-                DatabaseFactory.database.cloudstreamDBQueries.deleteBookmarksByProfile(profileId.toLong())
-            } catch (e: Exception) {
-                AppLogger.e("Failed to clear all bookmarks for profile $profileId", e)
-            }
-        }
-        notifyBookmarksChanged()
-    }
+    // ── Watch History Store Delegation ──────────────────────────────────────────
 
-    fun removeWatchHistory(parentId: String) {
-        withDbLock {
-            try {
-                DatabaseFactory.database.cloudstreamDBQueries.deleteWatchHistoryByParent(parentId)
-                val legacyId = if (parentId.startsWith("p") && parentId.contains("_")) {
-                    parentId.substringAfter("_")
-                } else {
-                    null
-                }
-                if (legacyId != null && legacyId != parentId) {
-                    DatabaseFactory.database.cloudstreamDBQueries.deleteWatchHistoryByParent(legacyId)
-                }
-            } catch (e: Exception) {
-                AppLogger.e("Failed to remove watch history for $parentId", e)
-            }
-        }
-        notifyHistoryChanged(force = true)
-    }
-
-    fun removeEpisodeWatched(
-        parentId: String,
-        episodeId: String,
-        season: Int? = null,
-        episode: Int? = null,
-        extraEpisodeIds: List<String> = emptyList(),
-    ) {
-        val allParentIds = mutableListOf(parentId)
-        val legacyId = if (parentId.startsWith("p") && parentId.contains("_")) {
-            parentId.substringAfter("_")
-        } else {
-            null
-        }
-        if (legacyId != null && legacyId != parentId) {
-            allParentIds.add(legacyId)
-        }
-
-        val allEpisodeIds = (listOf(episodeId) + extraEpisodeIds).filter { it.isNotBlank() }.distinct()
-
-        withDbLock {
-            try {
-                DatabaseFactory.database.cloudstreamDBQueries.transaction {
-                    allParentIds.forEach { pid ->
-                        allEpisodeIds.forEach { eid ->
-                            DatabaseFactory.database.cloudstreamDBQueries.deleteWatchHistoryByEpisode(pid, eid)
-                        }
-                        if (episode != null) {
-                            val rows = DatabaseFactory.database.cloudstreamDBQueries.selectWatchHistoryByParent(pid).executeAsList()
-                            rows.forEach { row ->
-                                val rowSeason = row.season?.toInt() ?: 1
-                                val targetSeason = season ?: 1
-                                if (row.episode?.toInt() == episode && rowSeason == targetSeason) {
-                                    DatabaseFactory.database.cloudstreamDBQueries.deleteWatchHistoryByEpisode(pid, row.episodeId)
-                                }
-                            }
-                        }
-                    }
-                }
-            } catch (e: Exception) {
-                AppLogger.e("Failed to remove episode watched for $parentId", e)
-            }
-        }
-        notifyHistoryChanged(force = true)
-    }
-
-    fun removeMultipleEpisodesWatched(
-        parentId: String,
-        episodeIds: List<String>,
-        extraParentIds: List<String> = emptyList(),
-    ) {
-        if (episodeIds.isEmpty()) return
-        val allParentIds = (listOf(parentId) + extraParentIds).toMutableList()
-        val legacyId = if (parentId.startsWith("p") && parentId.contains("_")) {
-            parentId.substringAfter("_")
-        } else {
-            null
-        }
-        if (legacyId != null && !allParentIds.contains(legacyId)) {
-            allParentIds.add(legacyId)
-        }
-
-        val targetEpisodeIds = episodeIds.filter { it.isNotBlank() }.distinct()
-        withDbLock {
-            try {
-                DatabaseFactory.database.cloudstreamDBQueries.transaction {
-                    allParentIds.forEach { pid ->
-                        targetEpisodeIds.forEach { episodeId ->
-                            DatabaseFactory.database.cloudstreamDBQueries.deleteWatchHistoryByEpisode(pid, episodeId)
-                        }
-                    }
-                }
-            } catch (e: Exception) {
-                AppLogger.e("Failed to remove multiple episodes watched", e)
-            }
-        }
-        notifyHistoryChanged(force = true)
-    }
-
-    fun normalizeUrl(url: String): String {
-        return url.trim().removeSuffix("/")
-    }
-
-    fun bookmarkId(apiName: String, url: String): String {
-        return "${apiName}_${normalizeUrl(url).hashCode()}"
-    }
+    fun notifyHistoryChanged(force: Boolean = false) =
+        DesktopWatchHistoryStore.notifyHistoryChanged(force)
 
     fun watchHistoryId(
         apiName: String,
@@ -656,14 +380,48 @@ object DesktopDataStore {
         episode: Int? = null,
         episodeData: String? = null,
         profileId: Int = activeProfileId,
-    ): String {
-        val base = "p${profileId}_${apiName}_${normalizeUrl(showUrl).hashCode()}"
-        return if (season != null || episode != null || !episodeData.isNullOrBlank()) {
-            "${base}_s${season ?: 0}_e${episode ?: 0}_${episodeData?.hashCode() ?: 0}"
-        } else {
-            base
-        }
-    }
+    ): String = DesktopWatchHistoryStore.watchHistoryId(apiName, showUrl, season, episode, episodeData, profileId)
+
+    fun getAllWatchHistory(profileId: Int = activeProfileId): List<WatchHistory> =
+        DesktopWatchHistoryStore.getAllWatchHistory(profileId)
+
+    fun getLastWatched(parentId: String): WatchHistory? =
+        DesktopWatchHistoryStore.getLastWatched(parentId)
+
+    fun getWatchHistoryByParent(parentId: String): List<WatchHistory> =
+        DesktopWatchHistoryStore.getWatchHistoryByParent(parentId)
+
+    fun getLatestWatchHistoryForShow(showUrl: String): WatchHistory? =
+        DesktopWatchHistoryStore.getLatestWatchHistoryForShow(showUrl)
+
+    fun getEpisodeWatched(parentId: String, episodeId: String?): WatchHistory? =
+        DesktopWatchHistoryStore.getEpisodeWatched(parentId, episodeId)
+
+    fun setLastWatched(history: WatchHistory, forceNotify: Boolean = false) =
+        DesktopWatchHistoryStore.setLastWatched(history, forceNotify)
+
+    fun setMultipleLastWatched(histories: List<WatchHistory>) =
+        DesktopWatchHistoryStore.setMultipleLastWatched(histories)
+
+    fun clearAllWatchHistory(profileId: Int = activeProfileId) =
+        DesktopWatchHistoryStore.clearAllWatchHistory(profileId)
+
+    fun removeWatchHistory(parentId: String) =
+        DesktopWatchHistoryStore.removeWatchHistory(parentId)
+
+    fun removeEpisodeWatched(
+        parentId: String,
+        episodeId: String,
+        season: Int? = null,
+        episode: Int? = null,
+        extraEpisodeIds: List<String> = emptyList(),
+    ) = DesktopWatchHistoryStore.removeEpisodeWatched(parentId, episodeId, season, episode, extraEpisodeIds)
+
+    fun removeMultipleEpisodesWatched(
+        parentId: String,
+        episodeIds: List<String>,
+        extraParentIds: List<String> = emptyList(),
+    ) = DesktopWatchHistoryStore.removeMultipleEpisodesWatched(parentId, episodeIds, extraParentIds)
 
     fun migrateWatchHistoryAndBookmark(
         oldApiName: String,
@@ -673,310 +431,11 @@ object DesktopDataStore {
         newName: String,
         newPosterUrl: String?,
         profileId: Int = activeProfileId,
-    ): Boolean {
-        val oldParentId = watchHistoryId(oldApiName, oldUrl, profileId = profileId)
-        val newParentId = watchHistoryId(newApiName, newUrl, profileId = profileId)
-        val legacyOldParentId = if (oldParentId.startsWith("p") && oldParentId.contains("_")) oldParentId.substringAfter("_") else null
+    ): Boolean = DesktopWatchHistoryStore.migrateWatchHistoryAndBookmark(
+        oldApiName, oldUrl, newApiName, newUrl, newName, newPosterUrl, profileId,
+    )
 
-        val oldCleanBookmarkId = bookmarkId(oldApiName, oldUrl)
-        val newCleanBookmarkId = bookmarkId(newApiName, newUrl)
-        val oldResolvedBookmarkId = "p${profileId}_$oldCleanBookmarkId"
-        val newResolvedBookmarkId = "p${profileId}_$newCleanBookmarkId"
-
-        return withDbLock {
-            try {
-                DatabaseFactory.database.cloudstreamDBQueries.transaction {
-                    val existingRows = DatabaseFactory.database.cloudstreamDBQueries.selectWatchHistoryByParent(oldParentId).executeAsList().toMutableList()
-                    if (legacyOldParentId != null && legacyOldParentId != oldParentId) {
-                        existingRows.addAll(DatabaseFactory.database.cloudstreamDBQueries.selectWatchHistoryByParent(legacyOldParentId).executeAsList())
-                    }
-
-                    existingRows.distinctBy { "${it.season}_${it.episode}_${it.episodeId}" }.forEach { row ->
-                        DatabaseFactory.database.cloudstreamDBQueries.insertWatchHistory(
-                            parentId = newParentId,
-                            episodeId = row.episodeId,
-                            showName = newName.takeIf { it.isNotBlank() } ?: row.showName,
-                            showUrl = newUrl,
-                            apiName = newApiName,
-                            posterUrl = newPosterUrl ?: row.posterUrl,
-                            episodeThumbnailUrl = row.episodeThumbnailUrl,
-                            screenshotUrl = row.screenshotUrl,
-                            episode = row.episode,
-                            season = row.season,
-                            position = row.position,
-                            duration = row.duration,
-                            updateTime = row.updateTime,
-                            episodeName = row.episodeName,
-                            episodeDescription = row.episodeDescription,
-                            profileId = profileId.toLong(),
-                        )
-                    }
-
-                    DatabaseFactory.database.cloudstreamDBQueries.deleteWatchHistoryByParent(oldParentId)
-                    if (legacyOldParentId != null) {
-                        DatabaseFactory.database.cloudstreamDBQueries.deleteWatchHistoryByParent(legacyOldParentId)
-                    }
-
-                    val existingBookmark = DatabaseFactory.database.cloudstreamDBQueries.selectBookmarkById(oldResolvedBookmarkId).executeAsOneOrNull()
-                        ?: DatabaseFactory.database.cloudstreamDBQueries.selectBookmarkById(oldCleanBookmarkId).executeAsOneOrNull()
-                    if (existingBookmark != null) {
-                        DatabaseFactory.database.cloudstreamDBQueries.insertBookmark(
-                            newResolvedBookmarkId,
-                            newName.takeIf { it.isNotBlank() } ?: existingBookmark.name,
-                            newUrl,
-                            newApiName,
-                            newPosterUrl ?: existingBookmark.posterUrl,
-                            existingBookmark.watchType ?: 0L,
-                            existingBookmark.dateAdded ?: System.currentTimeMillis(),
-                            profileId.toLong(),
-                        )
-                        DatabaseFactory.database.cloudstreamDBQueries.deleteBookmark(oldResolvedBookmarkId)
-                        DatabaseFactory.database.cloudstreamDBQueries.deleteBookmark(oldCleanBookmarkId)
-                    }
-                }
-                notifyHistoryChanged(force = true)
-                notifyBookmarksChanged()
-                true
-            } catch (e: Exception) {
-                AppLogger.e("Failed to migrate watch history and bookmark from $oldParentId to $newParentId", e)
-                false
-            }
-        }
-    }
-
-    fun setLastWatched(history: WatchHistory, forceNotify: Boolean = false) {
-        val name = history.showName.trim()
-        if (name.isBlank() || name.equals("Unknown Channel", ignoreCase = true) || name.equals("Unknown", ignoreCase = true)) {
-            return
-        }
-        val normalizedDuration = history.duration.coerceAtLeast(0)
-        val normalizedPosition = if (normalizedDuration > 0) {
-            history.position.coerceIn(0, normalizedDuration)
-        } else {
-            history.position.coerceAtLeast(0)
-        }
-        if (normalizedDuration <= 0 && normalizedPosition <= 0) {
-            return
-        }
-
-        val resolvedProfileId = if (history.parentId.startsWith("p") && history.parentId.contains("_")) {
-            history.parentId.substringBefore("_").removePrefix("p").toLongOrNull() ?: activeProfileId.toLong()
-        } else {
-            activeProfileId.toLong()
-        }
-
-        withDbLock {
-            try {
-                DatabaseFactory.database.cloudstreamDBQueries.insertWatchHistory(
-                    parentId = history.parentId,
-                    episodeId = history.episodeId ?: "",
-                    showName = history.showName,
-                    showUrl = history.showUrl,
-                    apiName = history.apiName,
-                    posterUrl = history.posterUrl,
-                    episodeThumbnailUrl = history.episodeThumbnailUrl,
-                    screenshotUrl = history.screenshotUrl,
-                    episode = history.episode?.toLong(),
-                    season = history.season?.toLong(),
-                    position = normalizedPosition,
-                    duration = normalizedDuration,
-                    updateTime = history.updateTime.takeIf { it > 0 } ?: System.currentTimeMillis(),
-                    episodeName = history.episodeName,
-                    episodeDescription = history.episodeDescription,
-                    profileId = resolvedProfileId,
-                )
-            } catch (e: Exception) {
-                AppLogger.e("Failed to insert watch history for ${history.parentId}", e)
-            }
-        }
-        notifyHistoryChanged(force = forceNotify)
-    }
-
-    fun setMultipleLastWatched(histories: List<WatchHistory>) {
-        val validHistories = histories.filter {
-            val name = it.showName.trim()
-            name.isNotBlank() &&
-                !name.equals("Unknown Channel", ignoreCase = true) &&
-                !name.equals("Unknown", ignoreCase = true) &&
-                (it.duration > 0 || it.position > 0)
-        }
-        if (validHistories.isEmpty()) return
-        withDbLock {
-            try {
-                DatabaseFactory.database.cloudstreamDBQueries.transaction {
-                    validHistories.forEach { history ->
-                        val normalizedDuration = history.duration.coerceAtLeast(0)
-                        val normalizedPosition = if (normalizedDuration > 0) {
-                            history.position.coerceIn(0, normalizedDuration)
-                        } else {
-                            history.position.coerceAtLeast(0)
-                        }
-
-                        val resolvedProfileId = if (history.parentId.startsWith("p") && history.parentId.contains("_")) {
-                            history.parentId.substringBefore("_").removePrefix("p").toLongOrNull() ?: activeProfileId.toLong()
-                        } else {
-                            activeProfileId.toLong()
-                        }
-
-                        DatabaseFactory.database.cloudstreamDBQueries.insertWatchHistory(
-                            parentId = history.parentId,
-                            episodeId = history.episodeId ?: "",
-                            showName = history.showName,
-                            showUrl = history.showUrl,
-                            apiName = history.apiName,
-                            posterUrl = history.posterUrl,
-                            episodeThumbnailUrl = history.episodeThumbnailUrl,
-                            screenshotUrl = history.screenshotUrl,
-                            episode = history.episode?.toLong(),
-                            season = history.season?.toLong(),
-                            position = normalizedPosition,
-                            duration = normalizedDuration,
-                            updateTime = history.updateTime.takeIf { it > 0 } ?: System.currentTimeMillis(),
-                            episodeName = history.episodeName,
-                            episodeDescription = history.episodeDescription,
-                            profileId = resolvedProfileId,
-                        )
-                    }
-                }
-            } catch (e: Exception) {
-                AppLogger.e("Failed to insert multiple watch history items", e)
-            }
-        }
-        notifyHistoryChanged(force = true)
-    }
-
-    fun getLastWatched(parentId: String): WatchHistory? {
-        return withDbLock {
-            try {
-                DatabaseFactory.database.cloudstreamDBQueries
-                    .selectWatchHistoryByParent(parentId)
-                    .executeAsList()
-                    .firstOrNull()
-                    ?.let {
-                        WatchHistory(
-                            parentId = it.parentId,
-                            showName = it.showName,
-                            showUrl = it.showUrl,
-                            apiName = it.apiName,
-                            posterUrl = it.posterUrl,
-                            episodeThumbnailUrl = it.episodeThumbnailUrl,
-                            screenshotUrl = it.screenshotUrl,
-                            episode = it.episode?.toInt(),
-                            season = it.season?.toInt(),
-                            episodeId = it.episodeId.takeIf { id -> id.isNotEmpty() },
-                            position = it.position,
-                            duration = it.duration,
-                            updateTime = it.updateTime,
-                            episodeName = it.episodeName,
-                            episodeDescription = it.episodeDescription,
-                        )
-                    }
-            } catch (e: Exception) {
-                AppLogger.e("Failed to get last watched for $parentId", e)
-                null
-            }
-        }
-    }
-
-    fun getWatchHistoryByParent(parentId: String): List<WatchHistory> {
-        return withDbLock {
-            try {
-                DatabaseFactory.database.cloudstreamDBQueries
-                    .selectWatchHistoryByParent(parentId)
-                    .executeAsList()
-                    .map {
-                        WatchHistory(
-                            parentId = it.parentId,
-                            showName = it.showName,
-                            showUrl = it.showUrl,
-                            apiName = it.apiName,
-                            posterUrl = it.posterUrl,
-                            episodeThumbnailUrl = it.episodeThumbnailUrl,
-                            screenshotUrl = it.screenshotUrl,
-                            episode = it.episode?.toInt(),
-                            season = it.season?.toInt(),
-                            episodeId = it.episodeId.takeIf { id -> id.isNotEmpty() },
-                            position = it.position,
-                            duration = it.duration,
-                            updateTime = it.updateTime,
-                            episodeName = it.episodeName,
-                            episodeDescription = it.episodeDescription,
-                        )
-                    }
-            } catch (e: Exception) {
-                AppLogger.e("Failed to get watch history by parent for $parentId", e)
-                emptyList()
-            }
-        }
-    }
-
-    fun getLatestWatchHistoryForShow(showUrl: String): WatchHistory? {
-        return withDbLock {
-            try {
-                DatabaseFactory.database.cloudstreamDBQueries
-                    .selectLatestWatchHistoryForShow(showUrl)
-                    .executeAsOneOrNull()
-                    ?.let {
-                        WatchHistory(
-                            parentId = it.parentId,
-                            showName = it.showName,
-                            showUrl = it.showUrl,
-                            apiName = it.apiName,
-                            posterUrl = it.posterUrl,
-                            episodeThumbnailUrl = it.episodeThumbnailUrl,
-                            screenshotUrl = it.screenshotUrl,
-                            episode = it.episode?.toInt(),
-                            season = it.season?.toInt(),
-                            episodeId = it.episodeId.takeIf { id -> id.isNotEmpty() },
-                            position = it.position,
-                            duration = it.duration,
-                            updateTime = it.updateTime,
-                            episodeName = it.episodeName,
-                            episodeDescription = it.episodeDescription,
-                        )
-                    }
-            } catch (e: Exception) {
-                AppLogger.e("Failed to get latest watch history for show $showUrl", e)
-                null
-            }
-        }
-    }
-
-    fun getEpisodeWatched(
-        parentId: String,
-        episodeId: String?,
-    ): WatchHistory? {
-        val searchId = episodeId ?: ""
-        return withDbLock {
-            try {
-                DatabaseFactory.database.cloudstreamDBQueries
-                    .selectWatchHistoryByEpisode(parentId, searchId)
-                    .executeAsOneOrNull()
-                    ?.let {
-                        WatchHistory(
-                            parentId = it.parentId,
-                            showName = it.showName,
-                            showUrl = it.showUrl,
-                            apiName = it.apiName,
-                            posterUrl = it.posterUrl,
-                            episodeThumbnailUrl = it.episodeThumbnailUrl,
-                            screenshotUrl = it.screenshotUrl,
-                            episode = it.episode?.toInt(),
-                            season = it.season?.toInt(),
-                            episodeId = it.episodeId.takeIf { id -> id.isNotEmpty() },
-                            position = it.position,
-                            duration = it.duration,
-                            updateTime = it.updateTime,
-                            episodeName = it.episodeName,
-                            episodeDescription = it.episodeDescription,
-                        )
-                    }
-            } catch (e: Exception) {
-                AppLogger.e("Failed to get episode watched for $parentId / $searchId", e)
-                null
-            }
-        }
-    }
+    // ── Plugin Updates History ──────────────────────────────────────────────────
 
     private const val UNREAD_UPDATES_KEY = "unread_plugin_updates"
 
@@ -1036,6 +495,8 @@ object DesktopDataStore {
         pluginUpdatesFlow.value++
     }
 
+    // ── Preference Keys ─────────────────────────────────────────────────────────
+
     const val PREF_ALLOW_EXTERNAL_BROWSER = "ALLOW_EXTERNAL_BROWSER"
     const val PREF_ALLOW_CF_BYPASS = "ALLOW_CF_BYPASS"
     const val PREF_ISOLATED_EXTERNAL_BROWSER = "ISOLATED_EXTERNAL_BROWSER"
@@ -1060,6 +521,8 @@ object DesktopDataStore {
     const val PREF_TORBOX_API_KEY = "torbox_api_key"
     const val PREF_TORBOX_ENABLED = "torbox_enabled"
     const val PREF_TORBOX_AUTO_RESOLVE = "torbox_auto_resolve"
+
+    // ── Trusted Plugins Registry ────────────────────────────────────────────────
 
     private const val TRUSTED_PLUGINS_KEY = "trusted_plugins_set"
 
@@ -1133,6 +596,12 @@ object DesktopDataStore {
         }
     }
 
+    fun setPluginTrusted(internalName: String, trusted: Boolean) {
+        setPluginsTrusted(listOf(internalName), trusted)
+    }
+
+    // ── Ignored Verification Domains ────────────────────────────────────────────
+
     private const val IGNORED_CF_DOMAINS_KEY = "ignored_verification_domains"
     val sessionIgnoredCfDomains = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
 
@@ -1205,9 +674,5 @@ object DesktopDataStore {
         } catch (e: Exception) {
             AppLogger.e("Failed to save ignored verification domains", e)
         }
-    }
-
-    fun setPluginTrusted(internalName: String, trusted: Boolean) {
-        setPluginsTrusted(listOf(internalName), trusted)
     }
 }

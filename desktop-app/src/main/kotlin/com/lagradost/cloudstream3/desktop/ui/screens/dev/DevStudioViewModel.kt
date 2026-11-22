@@ -26,8 +26,10 @@ class DevStudioViewModel : BaseMviViewModel<DevStudioUiState, DevStudioUiEvent, 
     private var playerPollJob: Job? = null
 
     init {
-        val initialAdvanced = DesktopDataStore.getKey<Boolean>(PREF_ADVANCED_MODE) ?: false
-        updateState { copy(isAdvancedMode = initialAdvanced) }
+        viewModelScope.launch(Dispatchers.IO) {
+            val initialAdvanced = DesktopDataStore.getKey<Boolean>(PREF_ADVANCED_MODE) ?: false
+            updateState { copy(isAdvancedMode = initialAdvanced) }
+        }
         refreshLogsDirect()
         refreshNetworkDirect()
         listenToLiveLogs()

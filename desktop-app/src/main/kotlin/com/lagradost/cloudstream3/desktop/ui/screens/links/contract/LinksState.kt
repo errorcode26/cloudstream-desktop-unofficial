@@ -5,6 +5,14 @@ import com.lagradost.cloudstream3.desktop.ui.base.UiState
 import com.lagradost.cloudstream3.desktop.ui.screens.StreamFormatFilter
 import com.lagradost.cloudstream3.utils.ExtractorLink
 
+enum class StreamSpecFilter(val label: String) {
+    ALL("All"),
+    DEBRID("⚡ Debrid"),
+    REMUX("REMUX"),
+    BLURAY("BluRay"),
+    WEBDL("WEB-DL"),
+}
+
 data class LinksUiState(
     val links: List<ExtractorLink> = emptyList(),
     val subtitles: List<SubtitleFile> = emptyList(),
@@ -18,6 +26,7 @@ data class LinksUiState(
     val selectedQuality: Int? = null,
     val selectedFormat: StreamFormatFilter = StreamFormatFilter.ALL,
     val selectedSource: String? = null,
+    val selectedSpecFilter: StreamSpecFilter = StreamSpecFilter.ALL,
     val isP2pEnabled: Boolean = false,
     val embeddedError: String? = null,
     val linkToDownload: ExtractorLink? = null,

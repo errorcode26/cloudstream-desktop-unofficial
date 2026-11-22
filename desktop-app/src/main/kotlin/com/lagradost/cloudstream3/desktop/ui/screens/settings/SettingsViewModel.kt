@@ -31,6 +31,15 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import java.io.File
 
+private val SUB_BOOLEAN_KEYS = setOf(
+    PlayerConfig.PREF_SUB_ENABLED,
+    PlayerConfig.PREF_ENABLE_SUB_OVERRIDE,
+    PlayerConfig.PREF_SUB_REMOVE_CAPTIONS,
+    PlayerConfig.PREF_SUB_REMOVE_BLOAT,
+    PlayerConfig.PREF_SUB_UPPERCASE,
+    PlayerConfig.PREF_SUBSOURCE_ENABLED,
+)
+
 class SettingsViewModel : BaseMviViewModel<SettingsUiState, SettingsUiEvent, SettingsUiEffect>(
     initialState = SettingsUiState(),
 ) {
@@ -44,6 +53,10 @@ class SettingsViewModel : BaseMviViewModel<SettingsUiState, SettingsUiEvent, Set
     private var providerTestJob: Job? = null
     private var networkDiagJob: Job? = null
     private var metaDiagJob: Job? = null
+    private var storageMetricsJob: Job? = null
+    private var dnsTestJob: Job? = null
+    private var torboxValidationJob: Job? = null
+    private var accountApiTestJob: Job? = null
 
     init {
         updateState {
@@ -153,15 +166,7 @@ class SettingsViewModel : BaseMviViewModel<SettingsUiState, SettingsUiEvent, Set
         viewModelScope.launch(Dispatchers.IO) {
             DesktopDataStore.keyUpdates.collect { key ->
                 if (key.startsWith("player_sub_") || key == PlayerConfig.PREF_ENABLE_SUB_OVERRIDE) {
-                    val booleanKeys = setOf(
-                        PlayerConfig.PREF_SUB_ENABLED,
-                        PlayerConfig.PREF_ENABLE_SUB_OVERRIDE,
-                        PlayerConfig.PREF_SUB_REMOVE_CAPTIONS,
-                        PlayerConfig.PREF_SUB_REMOVE_BLOAT,
-                        PlayerConfig.PREF_SUB_UPPERCASE,
-                        PlayerConfig.PREF_SUBSOURCE_ENABLED,
-                    )
-                    if (key in booleanKeys) {
+                    if (key in SUB_BOOLEAN_KEYS) {
                         val boolVal = DesktopDataStore.getKey<Boolean>(key)
                         updateState {
                             copy(
@@ -190,15 +195,15 @@ class SettingsViewModel : BaseMviViewModel<SettingsUiState, SettingsUiEvent, Set
                         dnsTestState = if (event.key == NetworkConfig.PREF_CUSTOM_DOH_URL) DnsTestState() else dnsTestState,
                     )
                 }
-                if (event.key == NetworkConfig.PREF_CUSTOM_DOH_URL) {
-                    try {
-                        NetworkConfig.updateGlobalNetworkClients()
-                    } catch (e: Exception) {
-                        com.lagradost.common.logging.AppLogger.e("Network Reload Error", e)
-                    }
-                }
                 viewModelScope.launch(Dispatchers.IO) {
                     DesktopDataStore.setKey(event.key, event.value)
+                    if (event.key == NetworkConfig.PREF_CUSTOM_DOH_URL) {
+                        try {
+                            NetworkConfig.updateGlobalNetworkClients()
+                        } catch (e: Exception) {
+                            com.lagradost.common.logging.AppLogger.e("Network Reload Error", e)
+                        }
+                    }
                 }
             }
             is SettingsUiEvent.OnUpdateBoolean -> {
@@ -513,7 +518,8 @@ class SettingsViewModel : BaseMviViewModel<SettingsUiState, SettingsUiEvent, Set
     }
 
     private fun refreshStorageMetrics() {
-        viewModelScope.launch(Dispatchers.IO) {
+        storageMetricsJob?.cancel()
+        storageMetricsJob = viewModelScope.launch(Dispatchers.IO) {
             updateState { copy(isRefreshingStorage = true) }
             val img = getDirectorySizeBytes(imageCacheDir)
             val net = getDirectorySizeBytes(networkCacheDir)
@@ -903,7 +909,6 @@ class SettingsViewModel : BaseMviViewModel<SettingsUiState, SettingsUiEvent, Set
                                 results = currentResults,
                                 passed = passedCount,
                                 failed = failedCount,
-                                currentlyTestingProvider = if (providerTestState.currentlyTestingProvider == api.name) null else providerTestState.currentlyTestingProvider,
                             ),
                         )
                     }
@@ -995,8 +1000,9 @@ class SettingsViewModel : BaseMviViewModel<SettingsUiState, SettingsUiEvent, Set
     }
 
     private fun testDns(provider: DohProvider?, customEndpoint: String?) {
+        dnsTestJob?.cancel()
         updateState { copy(dnsTestState = DnsTestState(isTesting = true, result = null)) }
-        viewModelScope.launch(Dispatchers.IO) {
+        dnsTestJob = viewModelScope.launch(Dispatchers.IO) {
             val currentProvider = provider
                 ?: uiState.value.intSettings[NetworkConfig.PREF_DOH_PROVIDER]?.let { idx -> DohProvider.entries.getOrNull(idx) }
                 ?: DesktopDataStore.getKey<Int>(NetworkConfig.PREF_DOH_PROVIDER)?.let { idx -> DohProvider.entries.getOrNull(idx) }
@@ -1127,6 +1133,7 @@ class SettingsViewModel : BaseMviViewModel<SettingsUiState, SettingsUiEvent, Set
             }
             return
         }
+        torboxValidationJob?.cancel()
         updateState {
             copy(
                 torboxAccountState = torboxAccountState.copy(
@@ -1135,7 +1142,7 @@ class SettingsViewModel : BaseMviViewModel<SettingsUiState, SettingsUiEvent, Set
                 )
             )
         }
-        viewModelScope.launch(Dispatchers.IO) {
+        torboxValidationJob = viewModelScope.launch(Dispatchers.IO) {
             val user = TorboxApiClient.getUser(clean)
             if (user != null) {
                 DesktopDataStore.setKey(DesktopDataStore.PREF_TORBOX_API_KEY, clean)
@@ -1289,8 +1296,9 @@ class SettingsViewModel : BaseMviViewModel<SettingsUiState, SettingsUiEvent, Set
             updateState { copy(testAccountApiStatus = false to "API Key cannot be empty") }
             return
         }
+        accountApiTestJob?.cancel()
         updateState { copy(isTestingAccountApi = true, testAccountApiStatus = null) }
-        viewModelScope.launch(Dispatchers.IO) {
+        accountApiTestJob = viewModelScope.launch(Dispatchers.IO) {
             runCatching {
                 when (idPrefix) {
                     "subdl" -> {
@@ -1311,9 +1319,27 @@ class SettingsViewModel : BaseMviViewModel<SettingsUiState, SettingsUiEvent, Set
                         true to "API Key format verified"
                     }
                 }
-            }.getOrElse { false to "Connection error: ${it.message}" }.let { res -> updateState { copy(isTestingAccountApi = false, testAccountApiStatus = res) }
-
+            }.getOrElse { false to "Connection error: ${it.message}" }.let { res ->
+                updateState { copy(isTestingAccountApi = false, testAccountApiStatus = res) }
             }
         }
+    }
+
+    override fun dispose() {
+        providerTestJob?.cancel()
+        providerTestJob = null
+        networkDiagJob?.cancel()
+        networkDiagJob = null
+        metaDiagJob?.cancel()
+        metaDiagJob = null
+        storageMetricsJob?.cancel()
+        storageMetricsJob = null
+        dnsTestJob?.cancel()
+        dnsTestJob = null
+        torboxValidationJob?.cancel()
+        torboxValidationJob = null
+        accountApiTestJob?.cancel()
+        accountApiTestJob = null
+        super.dispose()
     }
 }

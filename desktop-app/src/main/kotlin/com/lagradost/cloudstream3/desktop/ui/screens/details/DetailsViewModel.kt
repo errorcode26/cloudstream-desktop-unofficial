@@ -35,53 +35,52 @@ class DetailsViewModel(
     private val getBookmarks: GetBookmarks = AppContainerHolder.container.getBookmarks,
     private val bookmarksRepository: BookmarksRepository = AppContainerHolder.container.bookmarksRepository,
 ) : BaseMviViewModel<DetailsUiState, DetailsUiEvent, DetailsUiEffect>(
-    initialState = run {
-        val autoPlay = DesktopDataStore.getKey<Boolean>(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_AUTO_PLAY) ?: true
-        val isStacked = DesktopDataStore.getKey<Boolean>(PreferenceKeys.PREF_EPISODES_STACKED_VIEW) ?: false
-        val viewMode = DesktopDataStore.getKey<Int>(PreferenceKeys.PREF_EPISODES_VIEW_MODE) ?: if (isStacked) 1 else 0
-        val isPinned = DesktopDataStore.getKey<Boolean>(PreferenceKeys.DETAILS_RIGHT_COLUMN_PINNED) ?: false
-
-        cachedUiState?.copy(
-            fetchFailed = false,
-            error = null,
-            selectedSeason = initialSeason ?: cachedUiState.selectedSeason,
-            hasUserSelectedSeason = initialSeason != null,
-            autoPlayEnabled = autoPlay,
-            isEpisodesStackedView = isStacked,
-            episodeViewMode = viewMode,
-            isRightColumnPinned = isPinned,
-        ) ?: DetailsUiState(
-            preloadedName = preloadedName,
-            response = cachedResponse,
-            selectedSeason = initialSeason,
-            hasUserSelectedSeason = initialSeason != null,
-            enrichedLogoUrl = cachedResponse?.logoUrl,
-            enrichedBackdropUrl = cachedResponse?.backgroundPosterUrl,
-            isLoading = cachedResponse == null,
-            fakeData = if (cachedResponse == null) {
-                @Suppress("DEPRECATION_ERROR", "DEPRECATION")
-                MovieLoadResponse(
-                    name = preloadedName ?: "",
-                    url = url,
-                    apiName = provider.name,
-                    type = TvType.Movie,
-                    dataUrl = url,
-                    posterUrl = preloadedPoster,
-                ).apply {
-                    this.backgroundPosterUrl = preloadedBg
-                }
-            } else {
-                null
-            },
-            autoPlayEnabled = autoPlay,
-            isEpisodesStackedView = isStacked,
-            episodeViewMode = viewMode,
-            isRightColumnPinned = isPinned,
-        )
-    },
+    initialState = cachedUiState?.copy(
+        fetchFailed = false,
+        error = null,
+        selectedSeason = initialSeason ?: cachedUiState.selectedSeason,
+        hasUserSelectedSeason = initialSeason != null,
+    ) ?: DetailsUiState(
+        preloadedName = preloadedName,
+        response = cachedResponse,
+        selectedSeason = initialSeason,
+        hasUserSelectedSeason = initialSeason != null,
+        enrichedLogoUrl = cachedResponse?.logoUrl,
+        enrichedBackdropUrl = cachedResponse?.backgroundPosterUrl,
+        isLoading = cachedResponse == null,
+        fakeData = if (cachedResponse == null) {
+            @Suppress("DEPRECATION_ERROR", "DEPRECATION")
+            MovieLoadResponse(
+                name = preloadedName ?: "",
+                url = url,
+                apiName = provider.name,
+                type = TvType.Movie,
+                dataUrl = url,
+                posterUrl = preloadedPoster,
+            ).apply {
+                this.backgroundPosterUrl = preloadedBg
+            }
+        } else {
+            null
+        },
+    ),
 ) {
 
     init {
+        viewModelScope.launch(Dispatchers.IO) {
+            val autoPlay = DesktopDataStore.getKey<Boolean>(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_AUTO_PLAY) ?: true
+            val isStacked = DesktopDataStore.getKey<Boolean>(PreferenceKeys.PREF_EPISODES_STACKED_VIEW) ?: false
+            val viewMode = DesktopDataStore.getKey<Int>(PreferenceKeys.PREF_EPISODES_VIEW_MODE) ?: if (isStacked) 1 else 0
+            val isPinned = DesktopDataStore.getKey<Boolean>(PreferenceKeys.DETAILS_RIGHT_COLUMN_PINNED) ?: false
+            updateState {
+                copy(
+                    autoPlayEnabled = autoPlay,
+                    isEpisodesStackedView = isStacked,
+                    episodeViewMode = viewMode,
+                    isRightColumnPinned = isPinned,
+                )
+            }
+        }
         viewModelScope.launch(Dispatchers.IO) {
             getWatchHistory.subscribeAll().collect {
                 val currentDataUrl = uiState.value.response?.url ?: url
@@ -94,6 +93,9 @@ class DetailsViewModel(
                     )
                     .distinctBy { it.episodeId }
                     .associateBy { it.episodeId ?: "" }
+
+                if (uiState.value.watchHistory == historyMap) return@collect
+
                 val latestHistory = historyMap.values.maxByOrNull { it.updateTime }
                 val resp = uiState.value.response
                 val autoTarget = if (resp != null) {
@@ -232,20 +234,12 @@ class DetailsViewModel(
                         }
                     }
                     is EnrichmentUpdate.LogoLoaded -> {
-                        updateState {
-                            val newState = copy(enrichedLogoUrl = update.url)
-                            EnrichedDetailsCache.put(url, newState)
-                            newState.response?.url?.let { rUrl -> if (rUrl != url) EnrichedDetailsCache.put(rUrl, newState) }
-                            newState
-                        }
+                        updateState { copy(enrichedLogoUrl = update.url) }
+                        cacheEnrichedState(uiState.value)
                     }
                     is EnrichmentUpdate.BackdropLoaded -> {
-                        updateState {
-                            val newState = copy(enrichedBackdropUrl = update.url)
-                            EnrichedDetailsCache.put(url, newState)
-                            newState.response?.url?.let { rUrl -> if (rUrl != url) EnrichedDetailsCache.put(rUrl, newState) }
-                            newState
-                        }
+                        updateState { copy(enrichedBackdropUrl = update.url) }
+                        cacheEnrichedState(uiState.value)
                     }
                     is EnrichmentUpdate.ScreenshotsLoaded -> {
                         updateState { copy(screenshots = update.urls) }
@@ -254,20 +248,16 @@ class DetailsViewModel(
                         // Ignored, color extraction removed
                     }
                     is EnrichmentUpdate.ActorsLoaded -> {
-                        updateState {
-                            val currentActors = enrichedActors
-                            val currentHasDualCast = currentActors?.any { it.voiceActor != null } == true
-                            val updateHasDualCast = update.actors.any { it.voiceActor != null }
-                            val resolvedActors = if (currentHasDualCast && !updateHasDualCast) {
-                                currentActors
-                            } else {
-                                update.actors
-                            }
-                            val newState = copy(enrichedActors = resolvedActors)
-                            EnrichedDetailsCache.put(url, newState)
-                            newState.response?.url?.let { rUrl -> if (rUrl != url) EnrichedDetailsCache.put(rUrl, newState) }
-                            newState
+                        val currentActors = uiState.value.enrichedActors
+                        val currentHasDualCast = currentActors?.any { it.voiceActor != null } == true
+                        val updateHasDualCast = update.actors.any { it.voiceActor != null }
+                        val resolvedActors = if (currentHasDualCast && !updateHasDualCast) {
+                            currentActors
+                        } else {
+                            update.actors
                         }
+                        updateState { copy(enrichedActors = resolvedActors) }
+                        cacheEnrichedState(uiState.value)
                     }
                     is EnrichmentUpdate.TrailersLoaded -> {
                         updateState { copy(enrichedTrailers = update.trailers, enrichedTrailerUrl = update.trailers.firstOrNull()?.url) }
@@ -288,44 +278,46 @@ class DetailsViewModel(
                         }
                     }
                     is EnrichmentUpdate.MetadataLoaded -> {
+                        val currentProd = uiState.value.enrichedProductionCompanies
+                        val mergedProdCompanies = if (update.productionCompanies != null) {
+                            val current = currentProd.toMutableList()
+                            update.productionCompanies.forEach { newComp ->
+                                val existingIdx = current.indexOfFirst { it.name.trim().equals(newComp.name.trim(), ignoreCase = true) }
+                                if (existingIdx >= 0) {
+                                    val existing = current[existingIdx]
+                                    if (existing.logoUrl.isNullOrBlank() && !newComp.logoUrl.isNullOrBlank()) {
+                                        current[existingIdx] = newComp
+                                    }
+                                } else {
+                                    current.add(newComp)
+                                }
+                            }
+                            current
+                        } else {
+                            currentProd
+                        }
+
+                        val currentNet = uiState.value.enrichedNetworksList
+                        val mergedNetCompanies = if (update.networkCompanies != null) {
+                            val current = currentNet.toMutableList()
+                            update.networkCompanies.forEach { newComp ->
+                                val existingIdx = current.indexOfFirst { it.name.trim().equals(newComp.name.trim(), ignoreCase = true) }
+                                if (existingIdx >= 0) {
+                                    val existing = current[existingIdx]
+                                    if (existing.logoUrl.isNullOrBlank() && !newComp.logoUrl.isNullOrBlank()) {
+                                        current[existingIdx] = newComp
+                                    }
+                                } else {
+                                    current.add(newComp)
+                                }
+                            }
+                            current
+                        } else {
+                            currentNet
+                        }
+
                         updateState {
-                            val mergedProdCompanies = if (update.productionCompanies != null) {
-                                val current = enrichedProductionCompanies.toMutableList()
-                                update.productionCompanies.forEach { newComp ->
-                                    val existingIdx = current.indexOfFirst { it.name.trim().equals(newComp.name.trim(), ignoreCase = true) }
-                                    if (existingIdx >= 0) {
-                                        val existing = current[existingIdx]
-                                        if (existing.logoUrl.isNullOrBlank() && !newComp.logoUrl.isNullOrBlank()) {
-                                            current[existingIdx] = newComp
-                                        }
-                                    } else {
-                                        current.add(newComp)
-                                    }
-                                }
-                                current
-                            } else {
-                                enrichedProductionCompanies
-                            }
-
-                            val mergedNetCompanies = if (update.networkCompanies != null) {
-                                val current = enrichedNetworksList.toMutableList()
-                                update.networkCompanies.forEach { newComp ->
-                                    val existingIdx = current.indexOfFirst { it.name.trim().equals(newComp.name.trim(), ignoreCase = true) }
-                                    if (existingIdx >= 0) {
-                                        val existing = current[existingIdx]
-                                        if (existing.logoUrl.isNullOrBlank() && !newComp.logoUrl.isNullOrBlank()) {
-                                            current[existingIdx] = newComp
-                                        }
-                                    } else {
-                                        current.add(newComp)
-                                    }
-                                }
-                                current
-                            } else {
-                                enrichedNetworksList
-                            }
-
-                            val newState = copy(
+                            copy(
                                 enrichedTagline = update.tagline ?: enrichedTagline,
                                 enrichedStatus = update.status ?: enrichedStatus,
                                 enrichedStudios = if (update.studios.isNotEmpty()) update.studios else enrichedStudios,
@@ -352,25 +344,19 @@ class DetailsViewModel(
                                     update.actors ?: enrichedActors
                                 },
                             )
-                            EnrichedDetailsCache.put(url, newState)
-                            newState.response?.url?.let { rUrl -> if (rUrl != url) EnrichedDetailsCache.put(rUrl, newState) }
-                            newState
                         }
+                        cacheEnrichedState(uiState.value)
                     }
                     is EnrichmentUpdate.FullyEnriched -> {
+                        val resolvedTmdbId = uiState.value.tmdbId ?: uiState.value.response?.syncData?.get("tmdb")?.toIntOrNull()
                         updateState {
-                            val resolvedTmdbId = tmdbId ?: response?.syncData?.get("tmdb")?.toIntOrNull()
-                            val newState = copy(
+                            copy(
                                 isEnriching = false,
                                 enrichmentPhase = com.lagradost.cloudstream3.desktop.ui.screens.details.contract.EnrichmentPhase.Complete,
                                 tmdbId = resolvedTmdbId ?: tmdbId,
                             )
-                            EnrichedDetailsCache.put(url, newState)
-                            newState.response?.url?.let {
-                                if (it != url) EnrichedDetailsCache.put(it, newState)
-                            }
-                            newState
                         }
+                        cacheEnrichedState(uiState.value)
                         val isSeries = uiState.value.response?.let { it is TvSeriesLoadResponse || it is AnimeLoadResponse } ?: false
                         val currentAvailableSeasons = when (val resp = uiState.value.response) {
                             is TvSeriesLoadResponse -> resp.episodes.mapNotNull { it.season }.distinct().sorted()
@@ -790,5 +776,10 @@ class DetailsViewModel(
 
     private fun closeLinksPanel() {
         updateState { copy(isPanelOpen = false, activeLinkData = null) }
+    }
+
+    private fun cacheEnrichedState(state: DetailsUiState) {
+        EnrichedDetailsCache.put(url, state)
+        state.response?.url?.let { rUrl -> if (rUrl != url) EnrichedDetailsCache.put(rUrl, state) }
     }
 }

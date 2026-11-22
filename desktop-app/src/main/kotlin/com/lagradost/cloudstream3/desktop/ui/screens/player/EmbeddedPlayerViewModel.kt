@@ -52,6 +52,10 @@ class EmbeddedPlayerViewModel(
     private val linkRetries = mutableMapOf<String, Int>()
     private val hasShownNowPlayingToast = AtomicBoolean(false)
     private var lastSavedPositionSec = 0L
+    private var autoPlayTimeoutMs: Long = 20_000L
+    private var inactivityLimit: Int = 3
+    private var scrapeFlowControl: String? = null
+
     companion object {
         private const val MAX_PROBE_RETRIES = 0
         private const val MAX_PLAYING_RETRIES = 2
@@ -62,6 +66,12 @@ class EmbeddedPlayerViewModel(
 
         viewModelScope.launch(Dispatchers.IO) {
             val autoPlay = DesktopDataStore.getKey<Boolean>(PlayerConfig.PREF_AUTO_PLAY) ?: true
+            val timeoutStr = DesktopDataStore.getKey<String>(PlayerConfig.PREF_AUTO_PLAY_TIMEOUT) ?: "20000"
+            autoPlayTimeoutMs = timeoutStr.toLongOrNull() ?: 20_000L
+            inactivityLimit = DesktopDataStore.getKey<Int>(PlayerConfig.PREF_INACTIVITY_EPISODE_LIMIT)
+                ?: DesktopDataStore.getKey<String>(PlayerConfig.PREF_INACTIVITY_EPISODE_LIMIT)?.toIntOrNull()
+                ?: 3
+            scrapeFlowControl = DesktopDataStore.getKey<String>(PlayerConfig.PREF_SCRAPE_FLOW_CONTROL)
             updateState { copy(autoPlayEnabled = autoPlay) }
         }
 
@@ -189,8 +199,6 @@ class EmbeddedPlayerViewModel(
         }
 
         playerState.detachMpv()
-
-        super.dispose()
         sleepTimerJob?.cancel()
         loadLinksJob?.cancel()
         saveJob?.cancel()
@@ -198,6 +206,7 @@ class EmbeddedPlayerViewModel(
         timeoutJob?.cancel()
         scraper.cancelPreScrape()
         updateState { copy(launchData = null, phase = PlayerPhase.Idle, failedLinks = emptyMap()) }
+        super.dispose()
     }
 
     override fun handleEvent(event: PlayerUiEvent) {
@@ -340,8 +349,7 @@ class EmbeddedPlayerViewModel(
                 hasShownNowPlayingToast.set(false)
                 timeoutJob?.cancel()
                 val timedOutUrl = phase.link.url
-                val timeoutStr = DesktopDataStore.getKey<String>(PlayerConfig.PREF_AUTO_PLAY_TIMEOUT) ?: "20000"
-                val baseTimeoutMs = timeoutStr.toLongOrNull() ?: 20_000L
+                val baseTimeoutMs = autoPlayTimeoutMs
                 val isP2p = com.lagradost.cloudstream3.desktop.torrent.DesktopTorrentEngine.isTorrentLink(phase.link) || phase.link.url.contains("127.0.0.1:8091")
                 val isLocalLoopback = (phase.link.url.contains("127.0.0.1") || phase.link.url.contains("localhost")) &&
                     !phase.link.url.contains("/proxy") && !phase.link.url.contains("/dash")
@@ -439,8 +447,7 @@ class EmbeddedPlayerViewModel(
             return
         }
 
-        // Re-read the pref fresh so a mid-session toggle takes effect immediately.
-        val autoPlay = DesktopDataStore.getKey<Boolean>(PlayerConfig.PREF_AUTO_PLAY) ?: true
+        val autoPlay = state.autoPlayEnabled
         val hasNext = state.hasNextEpisode
         val isOffline = state.launchData?.history?.apiName in listOf("Offline", "Local")
         // When loadResponse is null (history / deep-link launch), episodes is empty so
@@ -449,10 +456,8 @@ class EmbeddedPlayerViewModel(
         // be a next one. loadNextEpisode will surface a toast if nothing is found.
         val episodesUnknown = !isOffline && state.episodes.isEmpty() && state.launchData?.history?.episode != null
         if ((hasNext || episodesUnknown) && autoPlay) {
-            val inactivityLimit = DesktopDataStore.getKey<Int>(PlayerConfig.PREF_INACTIVITY_EPISODE_LIMIT)
-                ?: DesktopDataStore.getKey<String>(PlayerConfig.PREF_INACTIVITY_EPISODE_LIMIT)?.toIntOrNull()
-                ?: 3
-            if (inactivityLimit > 0 && state.consecutiveAutoplayCount >= inactivityLimit) {
+            val limit = inactivityLimit
+            if (limit > 0 && state.consecutiveAutoplayCount >= limit) {
                 playerState.pause()
                 updateState { copy(showInactivityPrompt = true, countdownToNextEpisode = null) }
                 NativePlayerBridge.safePostMessage("""{"type":"show_inactivity_prompt"}""")
@@ -1384,22 +1389,28 @@ class EmbeddedPlayerViewModel(
                 }
                 updatePhase(PlayerPhase.Probing(best, stillScraping = false))
             } else {
+                var candidateToProbe: ExtractorLink? = null
+                var errorReason: String? = null
+                val currentFailed = uiState.value.failedLinks
+                val isScrapingPhase = uiState.value.phase is PlayerPhase.Scraping
+
+                if (isScrapingPhase) {
+                    val candidate = pickBestActiveLink(sortedLinks, currentFailed.keys, startPos)
+                    if (candidate != null) {
+                        candidateToProbe = candidate
+                    } else {
+                        errorReason = "All ${sortedLinks.size} discovered stream sources failed or could not be loaded"
+                    }
+                }
+
                 updateState {
                     val newPhase = when (val p = phase) {
-
                         is PlayerPhase.Probing -> p.copy(stillScraping = false)
                         is PlayerPhase.Scraping -> {
-                            val candidate = pickBestActiveLink(sortedLinks, failedLinks.keys, startPos)
-                            if (candidate != null) {
-                                viewModelScope.launch {
-                                    updatePhase(PlayerPhase.Probing(candidate, stillScraping = false))
-                                }
-                                PlayerPhase.Probing(candidate, stillScraping = false)
+                            if (candidateToProbe != null) {
+                                PlayerPhase.Probing(candidateToProbe, stillScraping = false)
                             } else {
-                                val reason = "All ${sortedLinks.size} discovered stream sources failed or could not be loaded"
-                                viewModelScope.launch {
-                                    handlePlaybackError("", reason)
-                                }
+                                val reason = errorReason ?: "All ${sortedLinks.size} discovered stream sources failed or could not be loaded"
                                 PlayerPhase.Exhausted(reason, failedLinks, "All ${sortedLinks.size} sources returned errors or timed out.")
                             }
                         }
@@ -1407,6 +1418,12 @@ class EmbeddedPlayerViewModel(
                         else -> p
                     }
                     copy(phase = newPhase)
+                }
+
+                if (candidateToProbe != null) {
+                    updatePhase(PlayerPhase.Probing(candidateToProbe, stillScraping = false))
+                } else if (errorReason != null) {
+                    handlePlaybackError("", errorReason)
                 }
             }
         }
@@ -1564,11 +1581,7 @@ class EmbeddedPlayerViewModel(
                 )
             }
             if (bestLink != null) {
-
-
-
-                run { updatePhase(PlayerPhase.Probing(bestLink, false))
-                }
+                updatePhase(PlayerPhase.Probing(bestLink, false))
             } else {
                 updatePhase(PlayerPhase.Idle)
             }
@@ -1628,7 +1641,7 @@ class EmbeddedPlayerViewModel(
                     AppLogger.i("EmbeddedPlayerViewModel:${provider.name}", "Fast-play triggered: probing ${link.name} (quality=${link.quality}p)")
                     updatePhase(PlayerPhase.Probing(link, stillScraping = true))
 
-                    val flowControl = DesktopDataStore.getKey<String>(PlayerConfig.PREF_SCRAPE_FLOW_CONTROL)
+                    val flowControl = scrapeFlowControl
                     if (flowControl == "immediate") {
                         AppLogger.i("EmbeddedPlayerViewModel", "Scrape Flow Control: Immediate mode active — stopping background scrape.")
                         stopBackgroundScraping()
@@ -1680,16 +1693,13 @@ class EmbeddedPlayerViewModel(
                 currentSubs
             }
 
+            var candidateToProbe: ExtractorLink? = null
+            if (uiState.value.phase is PlayerPhase.Scraping && isPlaying) {
+                candidateToProbe = pickBestActiveLink(combinedLinks, uiState.value.failedLinks.keys, startPos)
+            }
+
             updateState {
                 if (!isScrapingLinks && !isPlaying) return@updateState this
-                if (phase is PlayerPhase.Scraping && isPlaying) {
-                    val candidate = pickBestActiveLink(combinedLinks, failedLinks.keys, startPos)
-                    if (candidate != null) {
-                        viewModelScope.launch {
-                            updatePhase(PlayerPhase.Probing(candidate, stillScraping = true))
-                        }
-                    }
-                }
                 val currentLaunch = launchData
                 val updatedLaunch = if (currentLaunch != null && currentLaunch.history.episodeId == targetEpisodeId) {
                     currentLaunch.copy(links = combinedLinks, subtitles = combinedSubs)
@@ -1702,6 +1712,10 @@ class EmbeddedPlayerViewModel(
                     nextEpisodeSubtitles = combinedSubs,
                     launchData = updatedLaunch,
                 )
+            }
+
+            if (candidateToProbe != null) {
+                updatePhase(PlayerPhase.Probing(candidateToProbe, stillScraping = true))
             }
         }
 
@@ -1756,21 +1770,26 @@ class EmbeddedPlayerViewModel(
             }
 
             if (hasStartedPlaying.get()) {
+                var candidateToProbe: ExtractorLink? = null
+                var errorReason: String? = null
+                val isScrapingPhase = uiState.value.phase is PlayerPhase.Scraping
+                if (isScrapingPhase) {
+                    val candidate = pickBestActiveLink(sortedLinks, uiState.value.failedLinks.keys, startPos)
+                    if (candidate != null) {
+                        candidateToProbe = candidate
+                    } else {
+                        errorReason = "All ${sortedLinks.size} discovered stream sources failed or could not be loaded"
+                    }
+                }
+
                 updateState {
                     val newPhase = when (val p = phase) {
                         is PlayerPhase.Probing -> p.copy(stillScraping = false)
                         is PlayerPhase.Scraping -> {
-                            val candidate = pickBestActiveLink(sortedLinks, failedLinks.keys, startPos)
-                            if (candidate != null) {
-                                viewModelScope.launch {
-                                    updatePhase(PlayerPhase.Probing(candidate, stillScraping = false))
-                                }
-                                PlayerPhase.Probing(candidate, stillScraping = false)
+                            if (candidateToProbe != null) {
+                                PlayerPhase.Probing(candidateToProbe, stillScraping = false)
                             } else {
-                                val reason = "All ${sortedLinks.size} discovered stream sources failed or could not be loaded"
-                                viewModelScope.launch {
-                                    handlePlaybackError("", reason)
-                                }
+                                val reason = errorReason ?: "All ${sortedLinks.size} discovered stream sources failed or could not be loaded"
                                 PlayerPhase.Exhausted(reason, failedLinks, "All ${sortedLinks.size} sources returned errors or timed out.")
                             }
                         }
@@ -1788,6 +1807,12 @@ class EmbeddedPlayerViewModel(
                         nextEpisodeLinks = sortedLinks,
                         launchData = updatedLaunch ?: launchData,
                     )
+                }
+
+                if (candidateToProbe != null) {
+                    updatePhase(PlayerPhase.Probing(candidateToProbe, stillScraping = false))
+                } else if (errorReason != null) {
+                    handlePlaybackError("", errorReason)
                 }
             } else {
                 var bestLinkToProbe: ExtractorLink? = null
@@ -1891,21 +1916,26 @@ class EmbeddedPlayerViewModel(
                 if (sortedLinks.isNotEmpty()) {
                     LinkCache.set(targetEpisodeId, sortedLinks, uiState.value.nextEpisodeSubtitles)
                 }
+                var candidateToProbe: ExtractorLink? = null
+                var errorReason: String? = null
+                val isScrapingPhase = uiState.value.phase is PlayerPhase.Scraping
+                if (isScrapingPhase) {
+                    val candidate = pickBestActiveLink(sortedLinks, uiState.value.failedLinks.keys, startPos)
+                    if (candidate != null) {
+                        candidateToProbe = candidate
+                    } else {
+                        errorReason = "All ${sortedLinks.size} discovered stream sources failed or could not be loaded"
+                    }
+                }
+
                 updateState {
                     val newPhase = when (val p = phase) {
                         is PlayerPhase.Probing -> p.copy(stillScraping = false)
                         is PlayerPhase.Scraping -> {
-                            val candidate = pickBestActiveLink(sortedLinks, failedLinks.keys, startPos)
-                            if (candidate != null) {
-                                viewModelScope.launch {
-                                    updatePhase(PlayerPhase.Probing(candidate, stillScraping = false))
-                                }
-                                PlayerPhase.Probing(candidate, stillScraping = false)
+                            if (candidateToProbe != null) {
+                                PlayerPhase.Probing(candidateToProbe, stillScraping = false)
                             } else {
-                                val reason = "All ${sortedLinks.size} discovered stream sources failed or could not be loaded"
-                                viewModelScope.launch {
-                                    handlePlaybackError("", reason)
-                                }
+                                val reason = errorReason ?: "All ${sortedLinks.size} discovered stream sources failed or could not be loaded"
                                 PlayerPhase.Exhausted(reason, failedLinks, "All ${sortedLinks.size} sources returned errors or timed out.")
                             }
                         }
@@ -1913,6 +1943,12 @@ class EmbeddedPlayerViewModel(
                         else -> p
                     }
                     copy(phase = newPhase)
+                }
+
+                if (candidateToProbe != null) {
+                    updatePhase(PlayerPhase.Probing(candidateToProbe, stillScraping = false))
+                } else if (errorReason != null) {
+                    handlePlaybackError("", errorReason)
                 }
             } else {
                 var bestFallbackToProbe: ExtractorLink? = null
