@@ -3,7 +3,6 @@ package com.lagradost.cloudstream3.desktop.ui.screens.player
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.ExtractorLinkType
 import com.lagradost.cloudstream3.utils.Qualities
-import com.lagradost.cloudstream3.utils.newExtractorLink
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -35,15 +34,15 @@ class PlayerErrorDiagnosticsTest {
 
     @Test
     fun testBuildDiagnosticsReport() {
-        val link = newExtractorLink(
+        @Suppress("DEPRECATION")
+        val link = ExtractorLink(
             source = "Direct",
             name = "1080p Stream",
             url = "https://example.com/stream.m3u8",
+            referer = "",
+            quality = Qualities.P1080.value,
             type = ExtractorLinkType.M3U8,
-        ) {
-            this.referer = ""
-            this.quality = Qualities.P1080.value
-        }
+        )
         val failed = mapOf(link.url to "404 Not Found")
         val report = PlayerErrorDiagnostics.buildDiagnosticsReport(
             showName = "Test Show",

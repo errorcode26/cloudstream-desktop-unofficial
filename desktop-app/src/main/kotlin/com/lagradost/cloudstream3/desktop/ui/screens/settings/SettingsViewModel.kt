@@ -1,28 +1,32 @@
 package com.lagradost.cloudstream3.desktop.ui.screens.settings
 
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.lagradost.cloudstream3.APIHolder
 import com.lagradost.cloudstream3.desktop.core.preference.PreferenceKeys
+import com.lagradost.cloudstream3.desktop.debrid.torbox.TorboxApiClient
 import com.lagradost.cloudstream3.desktop.discord.DiscordRpcManager
 import com.lagradost.cloudstream3.desktop.download.AppDownloadManager
 import com.lagradost.cloudstream3.desktop.download.TaskStatus
 import com.lagradost.cloudstream3.desktop.downloader.DesktopDownloadManager
 import com.lagradost.cloudstream3.desktop.models.CustomSite
-import com.lagradost.cloudstream3.desktop.network.DiagnosticsRunner
 import com.lagradost.cloudstream3.desktop.network.DohProvider
 import com.lagradost.cloudstream3.desktop.network.NetworkConfig
-
+import com.lagradost.cloudstream3.desktop.network.webview.WindowsWebView2Runtime
 import com.lagradost.cloudstream3.desktop.player.LanguagePriorityHelper
 import com.lagradost.cloudstream3.desktop.player.PlayerConfig
 import com.lagradost.cloudstream3.desktop.player.QualityDataHelper
 import com.lagradost.cloudstream3.desktop.torrent.DesktopTorrentEngine
 import com.lagradost.cloudstream3.desktop.ui.base.BaseMviViewModel
-import com.lagradost.cloudstream3.desktop.debrid.torbox.TorboxApiClient
-import com.lagradost.cloudstream3.desktop.ui.screens.settings.contract.*
+import com.lagradost.cloudstream3.desktop.ui.screens.settings.contract.DnsTestState
+import com.lagradost.cloudstream3.desktop.ui.screens.settings.contract.ProviderTestReportState
+import com.lagradost.cloudstream3.desktop.ui.screens.settings.contract.SettingsUiEffect
+import com.lagradost.cloudstream3.desktop.ui.screens.settings.contract.SettingsUiEvent
+import com.lagradost.cloudstream3.desktop.ui.screens.settings.contract.SettingsUiState
+import com.lagradost.cloudstream3.desktop.ui.screens.settings.contract.StorageCacheType
+import com.lagradost.cloudstream3.desktop.ui.theme.AppearanceConfig
 import com.lagradost.cloudstream3.desktop.updates.UnifiedUpdateManager
 import com.lagradost.cloudstream3.desktop.utils.DeveloperModeManager
 import com.lagradost.cloudstream3.network.CloudflareKiller
-import com.lagradost.cloudstream3.utils.TestingUtils
+import com.lagradost.cloudstream3.utils.Qualities
 import com.lagradost.common.logging.AppLogger
 import com.lagradost.common.platform.PlatformPaths
 import com.lagradost.common.storage.DesktopDataStore
@@ -30,6 +34,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import java.io.File
+import java.net.URI
 
 private val SUB_BOOLEAN_KEYS = setOf(
     PlayerConfig.PREF_SUB_ENABLED,
@@ -43,20 +48,9 @@ private val SUB_BOOLEAN_KEYS = setOf(
 class SettingsViewModel : BaseMviViewModel<SettingsUiState, SettingsUiEvent, SettingsUiEffect>(
     initialState = SettingsUiState(),
 ) {
-    private val imageCacheDir = File(PlatformPaths.appDataDir, "image_cache")
-    private val networkCacheDir = File(PlatformPaths.cacheDir, "network")
-    private val dbFile = File(PlatformPaths.dataDir, "cloudstream.db")
-    private val logsDir = PlatformPaths.logsDir
-    private val streamCacheDir = File(PlatformPaths.cacheDir, "stream_cache")
-    private val updatesDir = UnifiedUpdateManager.getUpdatesDirectory()
-
-    private var providerTestJob: Job? = null
-    private var networkDiagJob: Job? = null
-    private var metaDiagJob: Job? = null
     private var storageMetricsJob: Job? = null
-    private var dnsTestJob: Job? = null
-    private var torboxValidationJob: Job? = null
-    private var accountApiTestJob: Job? = null
+    private val diagnosticEngine = SettingsDiagnosticEngine(viewModelScope)
+    private val debridCoordinator = SettingsDebridCoordinator(viewModelScope)
 
     init {
         updateState {
@@ -104,18 +98,13 @@ class SettingsViewModel : BaseMviViewModel<SettingsUiState, SettingsUiEvent, Set
                 } catch (e: Exception) {
                     null
                 }
-            } else null
+            } else {
+                null
+            }
 
             val ignoredDomains = DesktopDataStore.getIgnoredCfDomains().toList().sorted()
+            val clonedSitesList = SettingsCustomSitesEngine.loadClonedSitesList()
 
-            val clonedSitesList = try {
-                val json = DesktopDataStore.getKey<String>(PreferenceKeys.USER_PROVIDER_API)
-                if (json != null) {
-                    jacksonObjectMapper().readValue(json, object : com.fasterxml.jackson.core.type.TypeReference<List<CustomSite>>() {})
-                } else emptyList()
-            } catch (e: Exception) {
-                emptyList()
-            }
             updateState {
                 copy(
                     downloadPath = initialDownloadPath,
@@ -201,7 +190,7 @@ class SettingsViewModel : BaseMviViewModel<SettingsUiState, SettingsUiEvent, Set
                         try {
                             NetworkConfig.updateGlobalNetworkClients()
                         } catch (e: Exception) {
-                            com.lagradost.common.logging.AppLogger.e("Network Reload Error", e)
+                            AppLogger.e("Network Reload Error", e)
                         }
                     }
                 }
@@ -224,7 +213,7 @@ class SettingsViewModel : BaseMviViewModel<SettingsUiState, SettingsUiEvent, Set
                         try {
                             NetworkConfig.updateGlobalNetworkClients()
                         } catch (e: Exception) {
-                            com.lagradost.common.logging.AppLogger.e("Network Reload Error", e)
+                            AppLogger.e("Network Reload Error", e)
                         }
                     }
 
@@ -232,7 +221,7 @@ class SettingsViewModel : BaseMviViewModel<SettingsUiState, SettingsUiEvent, Set
                         try {
                             DiscordRpcManager.onSettingsChanged()
                         } catch (e: Exception) {
-                            com.lagradost.common.logging.AppLogger.e("Discord RPC Error", e)
+                            AppLogger.e("Discord RPC Error", e)
                         }
                     }
                 }
@@ -251,7 +240,7 @@ class SettingsViewModel : BaseMviViewModel<SettingsUiState, SettingsUiEvent, Set
                         try {
                             NetworkConfig.updateGlobalNetworkClients()
                         } catch (e: Exception) {
-                            com.lagradost.common.logging.AppLogger.e("Network Reload Error", e)
+                            AppLogger.e("Network Reload Error", e)
                         }
                     }
                 }
@@ -262,79 +251,33 @@ class SettingsViewModel : BaseMviViewModel<SettingsUiState, SettingsUiEvent, Set
                     DesktopDataStore.setKey(event.key, event.value)
                 }
             }
-            is SettingsUiEvent.RefreshStorageMetrics -> {
-                refreshStorageMetrics()
-            }
-            is SettingsUiEvent.ClearCache -> {
-                clearCache(event.cacheType)
-            }
-            is SettingsUiEvent.VacuumDatabase -> {
-                vacuumDatabase()
-            }
-            is SettingsUiEvent.ResetSettingsToDefault -> {
-                resetSettingsToDefault()
-            }
-            is SettingsUiEvent.FactoryReset -> {
-                factoryReset()
-            }
-            is SettingsUiEvent.CheckUpdates -> {
-                checkUpdates(event.force)
-            }
-            is SettingsUiEvent.RefreshTorrServerStatus -> {
-                refreshTorrServerStatus()
-            }
-            is SettingsUiEvent.CheckTorrServerUpdates -> {
-                checkTorrServerUpdates()
-            }
-            is SettingsUiEvent.DeleteTorrServerBinary -> {
-                deleteTorrServerBinary()
-            }
-            is SettingsUiEvent.RefreshClearanceCookies -> {
-                refreshClearanceCookies()
-            }
-            is SettingsUiEvent.ClearDomainCookies -> {
-                clearDomainCookies(event.domain)
-            }
-            is SettingsUiEvent.ClearAllClearanceCookies -> {
-                clearAllClearanceCookies()
-            }
-            is SettingsUiEvent.LaunchManualClearance -> {
-                launchManualClearance(event.url)
-            }
-            is SettingsUiEvent.UnlockDeveloperMode -> {
-                unlockDeveloperMode(event.password)
-            }
-            is SettingsUiEvent.SetDeveloperMode -> {
-                setDeveloperMode(event.enabled)
-            }
-            is SettingsUiEvent.StartProviderTests -> {
-                startProviderTests()
-            }
-            is SettingsUiEvent.StartSingleProviderTest -> {
-                testSingleProvider(event.apiName)
-            }
+            is SettingsUiEvent.RefreshStorageMetrics -> refreshStorageMetrics()
+            is SettingsUiEvent.ClearCache -> clearCache(event.cacheType)
+            is SettingsUiEvent.VacuumDatabase -> vacuumDatabase()
+            is SettingsUiEvent.ResetSettingsToDefault -> resetSettingsToDefault()
+            is SettingsUiEvent.FactoryReset -> SettingsStorageEngine.executeFactoryReset()
+            is SettingsUiEvent.CheckUpdates -> checkUpdates(event.force)
+            is SettingsUiEvent.RefreshTorrServerStatus -> refreshTorrServerStatus()
+            is SettingsUiEvent.CheckTorrServerUpdates -> checkTorrServerUpdates()
+            is SettingsUiEvent.DeleteTorrServerBinary -> deleteTorrServerBinary()
+            is SettingsUiEvent.RefreshClearanceCookies -> refreshClearanceCookies()
+            is SettingsUiEvent.ClearDomainCookies -> clearDomainCookies(event.domain)
+            is SettingsUiEvent.ClearAllClearanceCookies -> clearAllClearanceCookies()
+            is SettingsUiEvent.LaunchManualClearance -> launchManualClearance(event.url)
+            is SettingsUiEvent.UnlockDeveloperMode -> unlockDeveloperMode(event.password)
+            is SettingsUiEvent.SetDeveloperMode -> setDeveloperMode(event.enabled)
+            is SettingsUiEvent.StartProviderTests -> startProviderTests()
+            is SettingsUiEvent.StartSingleProviderTest -> testSingleProvider(event.apiName)
             is SettingsUiEvent.SetProviderTestFilter -> {
                 updateState { copy(providerTestState = providerTestState.copy(filter = event.filter)) }
                 startProviderTests()
             }
-            is SettingsUiEvent.CancelProviderTests -> {
-                cancelProviderTests()
-            }
-            is SettingsUiEvent.RunNetworkDiagnostics -> {
-                runNetworkDiagnostics()
-            }
-            is SettingsUiEvent.RunMetaDiagnostics -> {
-                runMetaDiagnostics()
-            }
-            is SettingsUiEvent.TestDns -> {
-                testDns(event.provider, event.customEndpoint)
-            }
-            is SettingsUiEvent.UpdateDownloadPath -> {
-                updateDownloadPath(event.path)
-            }
-            is SettingsUiEvent.UpdateScreenshotPath -> {
-                updateScreenshotPath(event.path)
-            }
+            is SettingsUiEvent.CancelProviderTests -> cancelProviderTests()
+            is SettingsUiEvent.RunNetworkDiagnostics -> runNetworkDiagnostics()
+            is SettingsUiEvent.RunMetaDiagnostics -> runMetaDiagnostics()
+            is SettingsUiEvent.TestDns -> testDns(event.provider, event.customEndpoint)
+            is SettingsUiEvent.UpdateDownloadPath -> updateDownloadPath(event.path)
+            is SettingsUiEvent.UpdateScreenshotPath -> updateScreenshotPath(event.path)
             is SettingsUiEvent.SetQualityPriority -> {
                 viewModelScope.launch(Dispatchers.IO) {
                     try {
@@ -356,9 +299,9 @@ class SettingsViewModel : BaseMviViewModel<SettingsUiState, SettingsUiEvent, Set
             is SettingsUiEvent.SetQualityPreset4K -> {
                 viewModelScope.launch(Dispatchers.IO) {
                     try {
-                        QualityDataHelper.setQualityPriority(com.lagradost.cloudstream3.utils.Qualities.P2160.value, 10)
-                        QualityDataHelper.setQualityPriority(com.lagradost.cloudstream3.utils.Qualities.P1080.value, 8)
-                        QualityDataHelper.setQualityPriority(com.lagradost.cloudstream3.utils.Qualities.P720.value, 5)
+                        QualityDataHelper.setQualityPriority(Qualities.P2160.value, 10)
+                        QualityDataHelper.setQualityPriority(Qualities.P1080.value, 8)
+                        QualityDataHelper.setQualityPriority(Qualities.P720.value, 5)
                     } catch (e: Exception) {
                         AppLogger.e("SettingsViewModel", "Failed to set 4K preset", e)
                     }
@@ -367,9 +310,9 @@ class SettingsViewModel : BaseMviViewModel<SettingsUiState, SettingsUiEvent, Set
             is SettingsUiEvent.SetQualityPreset1080p -> {
                 viewModelScope.launch(Dispatchers.IO) {
                     try {
-                        QualityDataHelper.setQualityPriority(com.lagradost.cloudstream3.utils.Qualities.P1080.value, 10)
-                        QualityDataHelper.setQualityPriority(com.lagradost.cloudstream3.utils.Qualities.P720.value, 8)
-                        QualityDataHelper.setQualityPriority(com.lagradost.cloudstream3.utils.Qualities.P2160.value, 4)
+                        QualityDataHelper.setQualityPriority(Qualities.P1080.value, 10)
+                        QualityDataHelper.setQualityPriority(Qualities.P720.value, 8)
+                        QualityDataHelper.setQualityPriority(Qualities.P2160.value, 4)
                     } catch (e: Exception) {
                         AppLogger.e("SettingsViewModel", "Failed to set 1080p preset", e)
                     }
@@ -465,55 +408,19 @@ class SettingsViewModel : BaseMviViewModel<SettingsUiState, SettingsUiEvent, Set
                     }
                 }
             }
-            is SettingsUiEvent.AddClonedSite -> {
-                addClonedSite(event.site)
-            }
-            is SettingsUiEvent.RemoveClonedSite -> {
-                removeClonedSite(event.site)
-            }
-            is SettingsUiEvent.ValidateTorboxKey -> {
-                validateTorboxKey(event.apiKey)
-            }
-            is SettingsUiEvent.StartTorboxAuth -> {
-                startTorboxAuth()
-            }
-            is SettingsUiEvent.CompleteTorboxAuth -> {
-                completeTorboxAuth(event.token)
-            }
-            is SettingsUiEvent.SetTorboxAuthError -> {
-                setTorboxAuthError(event.error)
-            }
-            is SettingsUiEvent.CancelTorboxAuth -> {
-                cancelTorboxAuth()
-            }
-            is SettingsUiEvent.DisconnectTorbox -> {
-                disconnectTorbox()
-            }
-            is SettingsUiEvent.LoadIgnoredCfDomains -> {
-                loadIgnoredCfDomains()
-            }
-            is SettingsUiEvent.RemoveIgnoredCfDomain -> {
-                removeIgnoredCfDomain(event.domain)
-            }
-            is SettingsUiEvent.ClearAllIgnoredCfDomains -> {
-                clearAllIgnoredCfDomains()
-            }
-            is SettingsUiEvent.TestAccountApiKey -> {
-                testAccountApiKey(event.idPrefix, event.apiKey)
-            }
-            is SettingsUiEvent.ResetAccountApiTestStatus -> {
-                updateState { copy(testAccountApiStatus = null) }
-            }
-        }
-    }
-
-    private fun getDirectorySizeBytes(dir: File): Long {
-        if (!dir.exists()) return 0L
-        return try {
-            dir.walkTopDown().filter { it.isFile }.map { it.length() }.sum()
-        } catch (e: Exception) {
-            AppLogger.d("Settings: Directory size calculation failed for ${dir.name}: ${e.message}")
-            0L
+            is SettingsUiEvent.AddClonedSite -> addClonedSite(event.site)
+            is SettingsUiEvent.RemoveClonedSite -> removeClonedSite(event.site)
+            is SettingsUiEvent.ValidateTorboxKey -> validateTorboxKey(event.apiKey)
+            is SettingsUiEvent.StartTorboxAuth -> startTorboxAuth()
+            is SettingsUiEvent.CompleteTorboxAuth -> completeTorboxAuth(event.token)
+            is SettingsUiEvent.SetTorboxAuthError -> setTorboxAuthError(event.error)
+            is SettingsUiEvent.CancelTorboxAuth -> cancelTorboxAuth()
+            is SettingsUiEvent.DisconnectTorbox -> disconnectTorbox()
+            is SettingsUiEvent.LoadIgnoredCfDomains -> loadIgnoredCfDomains()
+            is SettingsUiEvent.RemoveIgnoredCfDomain -> removeIgnoredCfDomain(event.domain)
+            is SettingsUiEvent.ClearAllIgnoredCfDomains -> clearAllIgnoredCfDomains()
+            is SettingsUiEvent.TestAccountApiKey -> testAccountApiKey(event.idPrefix, event.apiKey)
+            is SettingsUiEvent.ResetAccountApiTestStatus -> updateState { copy(testAccountApiStatus = null) }
         }
     }
 
@@ -521,22 +428,10 @@ class SettingsViewModel : BaseMviViewModel<SettingsUiState, SettingsUiEvent, Set
         storageMetricsJob?.cancel()
         storageMetricsJob = viewModelScope.launch(Dispatchers.IO) {
             updateState { copy(isRefreshingStorage = true) }
-            val img = getDirectorySizeBytes(imageCacheDir)
-            val net = getDirectorySizeBytes(networkCacheDir)
-            val db = if (dbFile.exists()) dbFile.length() else 0L
-            val logs = getDirectorySizeBytes(logsDir)
-            val stream = getDirectorySizeBytes(streamCacheDir)
-            val upd = getDirectorySizeBytes(updatesDir)
+            val metrics = SettingsStorageEngine.calculateStorageMetrics()
             updateState {
                 copy(
-                    storageMetrics = StorageMetrics(
-                        imageCacheBytes = img,
-                        networkCacheBytes = net,
-                        databaseBytes = db,
-                        logsBytes = logs,
-                        streamCacheBytes = stream,
-                        updatesBytes = upd,
-                    ),
+                    storageMetrics = metrics,
                     isRefreshingStorage = false,
                 )
             }
@@ -545,21 +440,8 @@ class SettingsViewModel : BaseMviViewModel<SettingsUiState, SettingsUiEvent, Set
 
     private fun clearCache(type: StorageCacheType) {
         viewModelScope.launch(Dispatchers.IO) {
-            val (dir, label) = when (type) {
-                StorageCacheType.IMAGE -> imageCacheDir to "Image cache"
-                StorageCacheType.NETWORK -> networkCacheDir to "Network cache"
-                StorageCacheType.LOGS -> logsDir to "Logs"
-                StorageCacheType.STREAM -> streamCacheDir to "Stream & temp cache"
-                StorageCacheType.UPDATES -> updatesDir to "Update installers"
-            }
-            try {
-                if (dir.exists()) {
-                    dir.listFiles()?.forEach { it.deleteRecursively() }
-                }
-                sendEffect(SettingsUiEffect.ShowToast("$label cleared"))
-            } catch (e: Exception) {
-                sendEffect(SettingsUiEffect.ShowToast("Failed to clear $label: ${e.message}", isError = true))
-            }
+            val (success, message) = SettingsStorageEngine.clearCache(type)
+            sendEffect(SettingsUiEffect.ShowToast(message, isError = !success))
             refreshStorageMetrics()
         }
     }
@@ -568,36 +450,17 @@ class SettingsViewModel : BaseMviViewModel<SettingsUiState, SettingsUiEvent, Set
         if (uiState.value.isOptimizingDb) return
         viewModelScope.launch(Dispatchers.IO) {
             updateState { copy(isOptimizingDb = true) }
-            try {
-                if (dbFile.exists()) {
-                    java.sql.DriverManager.getConnection("jdbc:sqlite:${dbFile.absolutePath}").use { conn ->
-                        conn.createStatement().use { stmt ->
-                            stmt.execute("VACUUM;")
-                        }
-                    }
-                }
-                sendEffect(SettingsUiEffect.ShowToast("Database defragmented and compacted"))
-            } catch (e: Exception) {
-                sendEffect(SettingsUiEffect.ShowToast("Optimization failed: ${e.message}", isError = true))
-            } finally {
-                updateState { copy(isOptimizingDb = false) }
-                refreshStorageMetrics()
-            }
+            val (success, message) = SettingsStorageEngine.vacuumDatabase()
+            updateState { copy(isOptimizingDb = false) }
+            sendEffect(SettingsUiEffect.ShowToast(message, isError = !success))
+            refreshStorageMetrics()
         }
     }
 
     private fun resetSettingsToDefault() {
         viewModelScope.launch(Dispatchers.IO) {
-            try {
-                if (dbFile.exists()) {
-                    java.sql.DriverManager.getConnection("jdbc:sqlite:${dbFile.absolutePath}").use { conn ->
-                        conn.createStatement().use { stmt ->
-                            stmt.execute("DELETE FROM KeyValueStore;")
-                        }
-                    }
-                }
-                DesktopDataStore.rawKeyCache.clear()
-                com.lagradost.cloudstream3.desktop.ui.theme.AppearanceConfig.reloadFromDataStore()
+            val (success, message) = SettingsStorageEngine.resetSettingsToDefault()
+            if (success) {
                 updateState {
                     copy(
                         stringSettings = emptyMap(),
@@ -606,72 +469,9 @@ class SettingsViewModel : BaseMviViewModel<SettingsUiState, SettingsUiEvent, Set
                         floatSettings = emptyMap(),
                     )
                 }
-                sendEffect(SettingsUiEffect.ShowToast("Settings restored to defaults"))
-            } catch (e: Exception) {
-                sendEffect(SettingsUiEffect.ShowToast("Failed to reset settings: ${e.message}", isError = true))
             }
+            sendEffect(SettingsUiEffect.ShowToast(message, isError = !success))
             refreshStorageMetrics()
-        }
-    }
-
-    private fun factoryReset() {
-        viewModelScope.launch(Dispatchers.IO) {
-            val target = PlatformPaths.appDataDir
-            try {
-                com.lagradost.cloudstream3.desktop.sandbox.SandboxedPluginManager.close()
-            } catch (e: Throwable) {
-                AppLogger.d("Settings: Teardown step notice during reset: ${e.message}")
-            }
-            try {
-                DesktopTorrentEngine.binary.stop()
-            } catch (e: Throwable) {
-                AppLogger.d("Settings: Teardown step notice during reset: ${e.message}")
-            }
-            try {
-                com.lagradost.runtime.loader.ExtensionLoader.unloadAllPlugins()
-            } catch (e: Throwable) {
-                AppLogger.d("Settings: Teardown step notice during reset: ${e.message}")
-            }
-
-            @Suppress("ExplicitGarbageCollectionCall")
-            System.gc()
-            @Suppress("deprecation")
-            System.runFinalization()
-
-            if (target.exists()) {
-                try {
-                    target.deleteRecursively()
-                } catch (e: Throwable) {
-                    AppLogger.w("Settings: Direct appDataDir delete notice during reset: ${e.message}")
-                }
-            }
-
-            try {
-                val isWindows = PlatformPaths.currentOS == PlatformPaths.OS.WINDOWS
-                val tempDir = File(System.getProperty("java.io.tmpdir"))
-                if (isWindows) {
-                    val escapedPath = target.absolutePath.replace("'", "''")
-                    ProcessBuilder(
-                        "powershell.exe",
-                        "-WindowStyle", "Hidden",
-                        "-NoProfile",
-                        "-NonInteractive",
-                        "-Command",
-                        "Start-Sleep -Seconds 2; Stop-Process -Name torrserver -Force -ErrorAction SilentlyContinue; if (Test-Path -LiteralPath '$escapedPath') { Remove-Item -LiteralPath '$escapedPath' -Recurse -Force -ErrorAction SilentlyContinue }"
-                    ).directory(tempDir).start()
-                } else {
-                    val escapedPath = target.absolutePath.replace("\"", "\\\"")
-                    ProcessBuilder(
-                        "sh",
-                        "-c",
-                        "sleep 2; if [ -d \"$escapedPath\" ]; then rm -rf \"$escapedPath\" 2>/dev/null; fi"
-                    ).directory(tempDir).start()
-                }
-            } catch (e: Throwable) {
-                AppLogger.e("Settings: Background delayed wipe launcher failed", e)
-            }
-
-            kotlin.system.exitProcess(0)
         }
     }
 
@@ -785,12 +585,12 @@ class SettingsViewModel : BaseMviViewModel<SettingsUiState, SettingsUiEvent, Set
             updateState { copy(clearanceState = clearanceState.copy(isLaunchingManualBypass = true)) }
             sendEffect(SettingsUiEffect.ShowToast("Opening browser to solve clearance..."))
             val host = try {
-                java.net.URI(url).host.orEmpty()
+                URI(url).host.orEmpty()
             } catch (e: Exception) {
                 AppLogger.w("Settings: Invalid URL for manual clearance '$url': ${e.message}")
                 ""
             }
-            val success = if (com.lagradost.cloudstream3.desktop.network.webview.WindowsWebView2Runtime.isAvailable && host.isNotBlank()) {
+            val success = if (WindowsWebView2Runtime.isAvailable && host.isNotBlank()) {
                 CloudflareKiller.solveWithEmbeddedWebView(url, host)
             } else {
                 false
@@ -843,11 +643,35 @@ class SettingsViewModel : BaseMviViewModel<SettingsUiState, SettingsUiEvent, Set
     }
 
     private fun startProviderTests() {
-        cancelProviderTests()
-        val providers = APIHolder.allProviders
-            .filter { it.providerType != com.lagradost.cloudstream3.ProviderType.MetaProvider && it.name != "NONE" && it.name.isNotBlank() }
-            .distinctBy { it.name }
-            .sortedBy { it.name }
+        val providerNames = diagnosticEngine.startProviderTests(
+            onResult = { apiName, result ->
+                updateState {
+                    val newResults = providerTestState.results + (apiName to result)
+                    val passed = if (result.success) providerTestState.passed + 1 else providerTestState.passed
+                    val failed = if (!result.success) providerTestState.failed + 1 else providerTestState.failed
+                    val isRunning = newResults.size < providerTestState.total
+                    copy(
+                        providerTestState = providerTestState.copy(
+                            results = newResults,
+                            passed = passed,
+                            failed = failed,
+                            isRunning = isRunning,
+                            currentlyTestingProvider = if (isRunning) apiName else null,
+                        ),
+                    )
+                }
+            },
+            onFinished = {
+                updateState {
+                    copy(
+                        providerTestState = providerTestState.copy(
+                            isRunning = false,
+                            currentlyTestingProvider = null,
+                        ),
+                    )
+                }
+            },
+        )
         updateState {
             copy(
                 providerTestState = ProviderTestReportState(
@@ -855,35 +679,15 @@ class SettingsViewModel : BaseMviViewModel<SettingsUiState, SettingsUiEvent, Set
                     results = emptyMap(),
                     passed = 0,
                     failed = 0,
-                    total = providers.size,
+                    total = providerNames.size,
                     filter = providerTestState.filter,
                 ),
             )
         }
-        providerTestJob = viewModelScope.launch(Dispatchers.IO) {
-            TestingUtils.getDeferredProviderTests(this, providers.toTypedArray()) { api, result ->
-                updateState {
-                    val newResults = providerTestState.results + (api.name to result)
-                    val passed = if (result.success) providerTestState.passed + 1 else providerTestState.passed
-                    val failed = if (!result.success) providerTestState.failed + 1 else providerTestState.failed
-                    val isRunning = newResults.size < providers.size
-                    copy(
-                        providerTestState = providerTestState.copy(
-                            results = newResults,
-                            passed = passed,
-                            failed = failed,
-                            isRunning = isRunning,
-                            currentlyTestingProvider = if (isRunning) api.name else null,
-                        ),
-                    )
-                }
-            }
-        }
     }
 
     private fun cancelProviderTests() {
-        providerTestJob?.cancel()
-        providerTestJob = null
+        diagnosticEngine.cancelProviderTests()
         updateState { copy(providerTestState = providerTestState.copy(isRunning = false, currentlyTestingProvider = null)) }
     }
 
@@ -896,26 +700,24 @@ class SettingsViewModel : BaseMviViewModel<SettingsUiState, SettingsUiEvent, Set
                 ),
             )
         }
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                TestingUtils.getDeferredProviderTests(this, arrayOf(target)) { api, result ->
-                    updateState {
-                        val currentResults = providerTestState.results.toMutableMap()
-                        currentResults[api.name] = result
-                        val passedCount = currentResults.values.count { it.success }
-                        val failedCount = currentResults.values.count { !it.success }
-                        copy(
-                            providerTestState = providerTestState.copy(
-                                results = currentResults,
-                                passed = passedCount,
-                                failed = failedCount,
-                            ),
-                        )
-                    }
+        diagnosticEngine.testSingleProvider(
+            apiName = apiName,
+            onResult = { api, result ->
+                updateState {
+                    val currentResults = providerTestState.results.toMutableMap()
+                    currentResults[api] = result
+                    val passedCount = currentResults.values.count { it.success }
+                    val failedCount = currentResults.values.count { !it.success }
+                    copy(
+                        providerTestState = providerTestState.copy(
+                            results = currentResults,
+                            passed = passedCount,
+                            failed = failedCount,
+                        ),
+                    )
                 }
-            } catch (e: Throwable) {
-                AppLogger.e("SettingsViewModel", "Single provider test failed for $apiName", e)
-            } finally {
+            },
+            onFinished = {
                 updateState {
                     copy(
                         providerTestState = providerTestState.copy(
@@ -923,12 +725,11 @@ class SettingsViewModel : BaseMviViewModel<SettingsUiState, SettingsUiEvent, Set
                         ),
                     )
                 }
-            }
-        }
+            },
+        )
     }
 
     private fun runNetworkDiagnostics() {
-        networkDiagJob?.cancel()
         updateState {
             copy(
                 diagnosticsState = diagnosticsState.copy(
@@ -938,8 +739,8 @@ class SettingsViewModel : BaseMviViewModel<SettingsUiState, SettingsUiEvent, Set
                 ),
             )
         }
-        networkDiagJob = viewModelScope.launch(Dispatchers.IO) {
-            DiagnosticsRunner.runAll { result ->
+        diagnosticEngine.runNetworkDiagnostics(
+            onProgress = { result ->
                 updateState {
                     copy(
                         diagnosticsState = diagnosticsState.copy(
@@ -948,23 +749,22 @@ class SettingsViewModel : BaseMviViewModel<SettingsUiState, SettingsUiEvent, Set
                         ),
                     )
                 }
-            }
-            val formattedTime = java.time.LocalDateTime.now()
-                .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
-            updateState {
-                copy(
-                    diagnosticsState = diagnosticsState.copy(
-                        isNetworkTesting = false,
-                        currentTest = "",
-                        lastRunTime = formattedTime,
-                    ),
-                )
-            }
-        }
+            },
+            onComplete = { formattedTime ->
+                updateState {
+                    copy(
+                        diagnosticsState = diagnosticsState.copy(
+                            isNetworkTesting = false,
+                            currentTest = "",
+                            lastRunTime = formattedTime,
+                        ),
+                    )
+                }
+            },
+        )
     }
 
     private fun runMetaDiagnostics() {
-        metaDiagJob?.cancel()
         updateState {
             copy(
                 diagnosticsState = diagnosticsState.copy(
@@ -974,8 +774,8 @@ class SettingsViewModel : BaseMviViewModel<SettingsUiState, SettingsUiEvent, Set
                 ),
             )
         }
-        metaDiagJob = viewModelScope.launch(Dispatchers.IO) {
-            DiagnosticsRunner.runMetaProviders { result ->
+        diagnosticEngine.runMetaDiagnostics(
+            onProgress = { result ->
                 updateState {
                     copy(
                         diagnosticsState = diagnosticsState.copy(
@@ -984,34 +784,33 @@ class SettingsViewModel : BaseMviViewModel<SettingsUiState, SettingsUiEvent, Set
                         ),
                     )
                 }
-            }
-            val formattedTime = java.time.LocalDateTime.now()
-                .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
-            updateState {
-                copy(
-                    diagnosticsState = diagnosticsState.copy(
-                        isMetaTesting = false,
-                        currentTest = "",
-                        lastRunTime = formattedTime,
-                    ),
-                )
-            }
-        }
+            },
+            onComplete = { formattedTime ->
+                updateState {
+                    copy(
+                        diagnosticsState = diagnosticsState.copy(
+                            isMetaTesting = false,
+                            currentTest = "",
+                            lastRunTime = formattedTime,
+                        ),
+                    )
+                }
+            },
+        )
     }
 
     private fun testDns(provider: DohProvider?, customEndpoint: String?) {
-        dnsTestJob?.cancel()
         updateState { copy(dnsTestState = DnsTestState(isTesting = true, result = null)) }
-        dnsTestJob = viewModelScope.launch(Dispatchers.IO) {
-            val currentProvider = provider
-                ?: uiState.value.intSettings[NetworkConfig.PREF_DOH_PROVIDER]?.let { idx -> DohProvider.entries.getOrNull(idx) }
-                ?: DesktopDataStore.getKey<Int>(NetworkConfig.PREF_DOH_PROVIDER)?.let { idx -> DohProvider.entries.getOrNull(idx) }
-                ?: DohProvider.NONE
+        val currentProvider = provider
+            ?: uiState.value.intSettings[NetworkConfig.PREF_DOH_PROVIDER]?.let { idx -> DohProvider.entries.getOrNull(idx) }
+            ?: DesktopDataStore.getKey<Int>(NetworkConfig.PREF_DOH_PROVIDER)?.let { idx -> DohProvider.entries.getOrNull(idx) }
+            ?: DohProvider.NONE
 
-            val endpoint = customEndpoint
-                ?: uiState.value.stringSettings[NetworkConfig.PREF_CUSTOM_DOH_URL]
-                ?: DesktopDataStore.getKey<String>(NetworkConfig.PREF_CUSTOM_DOH_URL)
-            val result = NetworkConfig.testDnsConnection(currentProvider, endpoint)
+        val endpoint = customEndpoint
+            ?: uiState.value.stringSettings[NetworkConfig.PREF_CUSTOM_DOH_URL]
+            ?: DesktopDataStore.getKey<String>(NetworkConfig.PREF_CUSTOM_DOH_URL)
+
+        diagnosticEngine.testDns(currentProvider, endpoint) { result ->
             updateState { copy(dnsTestState = DnsTestState(isTesting = false, result = result)) }
         }
     }
@@ -1047,31 +846,8 @@ class SettingsViewModel : BaseMviViewModel<SettingsUiState, SettingsUiEvent, Set
     private fun addClonedSite(site: CustomSite) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                val mapper = jacksonObjectMapper()
-                val existing = try {
-                    val json = DesktopDataStore.getKey<String>(PreferenceKeys.USER_PROVIDER_API)
-                    if (json != null) mapper.readValue(json, object : com.fasterxml.jackson.core.type.TypeReference<List<CustomSite>>() {}) else emptyList()
-                } catch (e: Exception) {
-                    AppLogger.w("Settings: Failed parsing cloned sites JSON", e)
-                    emptyList()
-                }
-                val newList = existing.filter { it.name != site.name } + site
-                val jsonString = mapper.writeValueAsString(newList)
-                DesktopDataStore.setKey(PreferenceKeys.USER_PROVIDER_API, jsonString)
+                val (newList, jsonString) = SettingsCustomSitesEngine.addClonedSite(site)
                 updateState { copy(stringSettings = stringSettings + (PreferenceKeys.USER_PROVIDER_API to jsonString), clonedSites = newList) }
-                if (com.lagradost.cloudstream3.desktop.sandbox.SandboxedPluginManager.isEnabled()) {
-                    try {
-                        com.lagradost.cloudstream3.desktop.sandbox.SandboxedPluginManager.syncClonedSites(jsonString)
-                    } catch (e: Throwable) {
-                        AppLogger.d("SettingsViewModel", "Sandboxed cloned site sync note: ${e.message}")
-                    }
-                }
-                try {
-                    com.lagradost.cloudstream3.desktop.init.loadClonedSites()
-                    com.lagradost.cloudstream3.desktop.repo.ActiveProviderRepository.refreshProviders()
-                } catch (e: Throwable) {
-                    AppLogger.w("SettingsViewModel", "Failed to refresh cloned providers: ${e.message}")
-                }
                 sendEffect(SettingsUiEffect.ShowToast("Added cloned site '${site.name}'", isError = false))
             } catch (e: Exception) {
                 sendEffect(SettingsUiEffect.ShowToast("Failed to add cloned site: ${e.message}", isError = true))
@@ -1082,37 +858,8 @@ class SettingsViewModel : BaseMviViewModel<SettingsUiState, SettingsUiEvent, Set
     private fun removeClonedSite(site: CustomSite) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                val mapper = jacksonObjectMapper()
-                val existing = try {
-                    val json = DesktopDataStore.getKey<String>(PreferenceKeys.USER_PROVIDER_API)
-                    if (json != null) mapper.readValue(json, object : com.fasterxml.jackson.core.type.TypeReference<List<CustomSite>>() {}) else emptyList()
-                } catch (e: Exception) {
-                    AppLogger.w("Settings: Failed parsing cloned sites JSON", e)
-                    emptyList()
-                }
-                val newList = existing.filter { it.name != site.name && it.url != site.url }
-                val jsonString = mapper.writeValueAsString(newList)
-                DesktopDataStore.setKey(PreferenceKeys.USER_PROVIDER_API, jsonString)
+                val (newList, jsonString) = SettingsCustomSitesEngine.removeClonedSite(site)
                 updateState { copy(stringSettings = stringSettings + (PreferenceKeys.USER_PROVIDER_API to jsonString), clonedSites = newList) }
-                if (com.lagradost.cloudstream3.desktop.sandbox.SandboxedPluginManager.isEnabled()) {
-                    try {
-                        com.lagradost.cloudstream3.desktop.sandbox.SandboxedPluginManager.syncClonedSites(jsonString)
-                    } catch (e: Throwable) {
-                        AppLogger.d("SettingsViewModel", "Sandboxed cloned site sync note: ${e.message}")
-                    }
-                }
-                synchronized(APIHolder.allProviders) {
-                    val toRemove = APIHolder.allProviders.filter { it.name == site.name && !it.canBeOverridden }
-                    toRemove.forEach {
-                        APIHolder.allProviders.remove(it)
-                        APIHolder.removePluginMapping(it)
-                    }
-                }
-                try {
-                    com.lagradost.cloudstream3.desktop.repo.ActiveProviderRepository.refreshProviders()
-                } catch (e: Throwable) {
-                    AppLogger.w("SettingsViewModel", "Failed to refresh providers on removal: ${e.message}")
-                }
                 sendEffect(SettingsUiEffect.ShowToast("Removed cloned site '${site.name}'", isError = false))
             } catch (e: Exception) {
                 sendEffect(SettingsUiEffect.ShowToast("Failed to remove cloned site: ${e.message}", isError = true))
@@ -1121,97 +868,64 @@ class SettingsViewModel : BaseMviViewModel<SettingsUiState, SettingsUiEvent, Set
     }
 
     private fun validateTorboxKey(apiKey: String) {
-        val clean = apiKey.trim()
-        if (clean.isBlank()) {
-            updateState {
-                copy(
-                    torboxAccountState = torboxAccountState.copy(
-                        feedbackMessage = "API Key cannot be blank",
-                        feedbackIsError = true,
-                    )
-                )
-            }
-            return
-        }
-        torboxValidationJob?.cancel()
-        updateState {
-            copy(
-                torboxAccountState = torboxAccountState.copy(
-                    isValidatingKey = true,
-                    feedbackMessage = null,
-                )
-            )
-        }
-        torboxValidationJob = viewModelScope.launch(Dispatchers.IO) {
-            val user = TorboxApiClient.getUser(clean)
-            if (user != null) {
-                DesktopDataStore.setKey(DesktopDataStore.PREF_TORBOX_API_KEY, clean)
-                DesktopDataStore.setKey(DesktopDataStore.PREF_TORBOX_ENABLED, true)
+        debridCoordinator.validateTorboxKey(
+            apiKey = apiKey,
+            onValidating = {
                 updateState {
                     copy(
-                        stringSettings = stringSettings + (DesktopDataStore.PREF_TORBOX_API_KEY to clean),
-                        booleanSettings = booleanSettings + (DesktopDataStore.PREF_TORBOX_ENABLED to true),
+                        torboxAccountState = torboxAccountState.copy(
+                            isValidatingKey = true,
+                            feedbackMessage = null,
+                        ),
+                    )
+                }
+            },
+            onResult = { user, feedback, isError ->
+                updateState {
+                    copy(
+                        stringSettings = if (user != null) stringSettings + (DesktopDataStore.PREF_TORBOX_API_KEY to apiKey.trim()) else stringSettings,
+                        booleanSettings = if (user != null) booleanSettings + (DesktopDataStore.PREF_TORBOX_ENABLED to true) else booleanSettings,
                         torboxAccountState = torboxAccountState.copy(
                             user = user,
                             isValidatingKey = false,
-                            feedbackMessage = "Connected successfully as ${user.email ?: "user"} (${user.planName})",
-                            feedbackIsError = false,
+                            feedbackMessage = feedback,
+                            feedbackIsError = isError,
                         ),
                     )
                 }
-            } else {
-                updateState {
-                    copy(
-                        torboxAccountState = torboxAccountState.copy(
-                            isValidatingKey = false,
-                            feedbackMessage = "Invalid API Key or server unreachable",
-                            feedbackIsError = true,
-                        ),
-                    )
-                }
-            }
-        }
+            },
+        )
     }
 
     private fun startTorboxAuth() {
-        updateState {
-            copy(
-                torboxAccountState = torboxAccountState.copy(
-                    isStartingAuth = true,
-                    feedbackMessage = null,
-                )
-            )
-        }
-        viewModelScope.launch(Dispatchers.IO) {
-            val auth = TorboxApiClient.startDeviceAuthorization()
-            if (auth != null) {
+        debridCoordinator.startTorboxAuth(
+            onStarting = {
+                updateState {
+                    copy(
+                        torboxAccountState = torboxAccountState.copy(
+                            isStartingAuth = true,
+                            feedbackMessage = null,
+                        ),
+                    )
+                }
+            },
+            onResult = { auth, error ->
                 updateState {
                     copy(
                         torboxAccountState = torboxAccountState.copy(
                             isStartingAuth = false,
                             activeAuth = auth,
-                        )
+                            feedbackMessage = error,
+                            feedbackIsError = error != null,
+                        ),
                     )
                 }
-            } else {
-                updateState {
-                    copy(
-                        torboxAccountState = torboxAccountState.copy(
-                            isStartingAuth = false,
-                            feedbackMessage = "Failed to start Torbox authorization. Check internet connection.",
-                            feedbackIsError = true,
-                        )
-                    )
-                }
-            }
-        }
+            },
+        )
     }
 
     private fun completeTorboxAuth(token: String) {
-        viewModelScope.launch(Dispatchers.IO) {
-            DesktopDataStore.setKey(DesktopDataStore.PREF_TORBOX_API_KEY, token)
-            DesktopDataStore.setKey(DesktopDataStore.PREF_TORBOX_ENABLED, true)
-            val user = TorboxApiClient.getUser(token)
+        debridCoordinator.completeTorboxAuth(token) { user ->
             updateState {
                 copy(
                     stringSettings = stringSettings + (DesktopDataStore.PREF_TORBOX_API_KEY to token),
@@ -1221,7 +935,7 @@ class SettingsViewModel : BaseMviViewModel<SettingsUiState, SettingsUiEvent, Set
                         activeAuth = null,
                         feedbackMessage = "Successfully connected to Torbox via WebView!",
                         feedbackIsError = false,
-                    )
+                    ),
                 )
             }
         }
@@ -1234,7 +948,7 @@ class SettingsViewModel : BaseMviViewModel<SettingsUiState, SettingsUiEvent, Set
                     activeAuth = null,
                     feedbackMessage = error,
                     feedbackIsError = true,
-                )
+                ),
             )
         }
     }
@@ -1244,14 +958,13 @@ class SettingsViewModel : BaseMviViewModel<SettingsUiState, SettingsUiEvent, Set
             copy(
                 torboxAccountState = torboxAccountState.copy(
                     activeAuth = null,
-                )
+                ),
             )
         }
     }
 
     private fun disconnectTorbox() {
-        viewModelScope.launch(Dispatchers.IO) {
-            DesktopDataStore.removeKey(DesktopDataStore.PREF_TORBOX_API_KEY)
+        debridCoordinator.disconnectTorbox {
             updateState {
                 copy(
                     stringSettings = stringSettings + (DesktopDataStore.PREF_TORBOX_API_KEY to ""),
@@ -1260,7 +973,7 @@ class SettingsViewModel : BaseMviViewModel<SettingsUiState, SettingsUiEvent, Set
                         activeAuth = null,
                         feedbackMessage = "Disconnected from Torbox",
                         feedbackIsError = false,
-                    )
+                    ),
                 )
             }
         }
@@ -1291,55 +1004,22 @@ class SettingsViewModel : BaseMviViewModel<SettingsUiState, SettingsUiEvent, Set
     }
 
     private fun testAccountApiKey(idPrefix: String, apiKey: String) {
-        val cleanKey = apiKey.trim()
-        if (cleanKey.isBlank()) {
-            updateState { copy(testAccountApiStatus = false to "API Key cannot be empty") }
-            return
-        }
-        accountApiTestJob?.cancel()
         updateState { copy(isTestingAccountApi = true, testAccountApiStatus = null) }
-        accountApiTestJob = viewModelScope.launch(Dispatchers.IO) {
-            runCatching {
-                when (idPrefix) {
-                    "subdl" -> {
-                        val r = com.lagradost.cloudstream3.app.get(
-                            "https://api.subdl.com/api/v1/subtitles?api_key=$cleanKey&film_name=matrix",
-                            timeout = 8000L
-                        ).okhttpResponse
-                        when (r.code) {
-                            200 -> true to "Valid API Key (Connected successfully)"
-                            400, 401, 403 -> false to "Invalid API Key (HTTP ${r.code})"
-                            else -> false to "HTTP ${r.code}: Unexpected response"
-                        }
-                    }
-                    "subsource" -> {
-                        com.lagradost.cloudstream3.desktop.subtitles.SubsourceSubtitleProvider.testApiKey(cleanKey)
-                    }
-                    else -> {
-                        true to "API Key format verified"
-                    }
-                }
-            }.getOrElse { false to "Connection error: ${it.message}" }.let { res ->
-                updateState { copy(isTestingAccountApi = false, testAccountApiStatus = res) }
+        diagnosticEngine.testAccountApiKey(idPrefix, apiKey) { success, message ->
+            updateState {
+                copy(
+                    isTestingAccountApi = false,
+                    testAccountApiStatus = success to message,
+                )
             }
         }
     }
 
     override fun dispose() {
-        providerTestJob?.cancel()
-        providerTestJob = null
-        networkDiagJob?.cancel()
-        networkDiagJob = null
-        metaDiagJob?.cancel()
-        metaDiagJob = null
+        diagnosticEngine.cancelAll()
+        debridCoordinator.cancel()
         storageMetricsJob?.cancel()
         storageMetricsJob = null
-        dnsTestJob?.cancel()
-        dnsTestJob = null
-        torboxValidationJob?.cancel()
-        torboxValidationJob = null
-        accountApiTestJob?.cancel()
-        accountApiTestJob = null
         super.dispose()
     }
 }
