@@ -47,6 +47,8 @@ class SandboxProcessManager(
     private var currentJobObject: WindowsJobObject? = null
     private var currentProcess: WindowsAppContainerLauncher.SandboxedProcess? = null
     private var processWriter: BufferedWriter? = null
+    @Volatile
+    private var lastExitCode: String = "none"
 
     @Volatile
     var isHostAvailable: Boolean = true
@@ -65,7 +67,8 @@ class SandboxProcessManager(
     }
 
     private fun launchWorkerInternal() {
-        logger.info("Initializing sandboxed extension worker in container '$containerName' (1 GB Cap)...")
+        logger.info("Initializing sandboxed extension worker in container '$containerName' (3 GB Cap)...")
+        com.lagradost.common.logging.AppLogger.i("Sandbox:Process", "Initializing sandboxed extension worker in container '$containerName' (3 GB Cap)...")
 
         val sid = WindowsAppContainerApi.getOrCreateAppContainer(
             containerName = containerName,
@@ -254,7 +257,7 @@ class SandboxProcessManager(
             "-Djna.tmpdir=\"${sandboxTmp.absolutePath}\" " +
             "-Djava.util.prefs.PreferencesFactory=com.lagradost.cloudstream3.desktop.sandbox.worker.NoOpPreferencesFactory " +
             "-XX:+DisableAttachMechanism -Djdk.attach.allowAttachSelf=false " +
-            "-XX:TieredStopAtLevel=1 -Xss256k -Xms16m -Xmx256m -XX:MaxMetaspaceSize=80m -XX:ReservedCodeCacheSize=20m -XX:+UseSerialGC -XX:MinHeapFreeRatio=10 -XX:MaxHeapFreeRatio=20 -XX:+ExitOnOutOfMemoryError " +
+            "-XX:TieredStopAtLevel=1 -Xss1m -Xms32m -Xmx512m -XX:MaxMetaspaceSize=256m -XX:ReservedCodeCacheSize=64m -XX:+UseSerialGC -XX:MinHeapFreeRatio=10 -XX:MaxHeapFreeRatio=20 -XX:+ExitOnOutOfMemoryError " +
             "-cp \"$workerClasspath\" " +
             "com.lagradost.cloudstream3.desktop.sandbox.worker.PluginWorkerMain"
 
@@ -366,7 +369,10 @@ class SandboxProcessManager(
                         }
                     } else {
                         when {
-                            trimmed.startsWith("[ERROR]") || trimmed.contains(" ERROR ") -> com.lagradost.common.logging.AppLogger.e("Sandbox:Worker", trimmed)
+                            trimmed.startsWith("[ERROR]") || trimmed.contains(" ERROR ") ||
+                                trimmed.startsWith("Error:") || trimmed.startsWith("Exception in thread") ||
+                                trimmed.contains("Cannot create VM") || trimmed.contains("fatal exception") ->
+                                com.lagradost.common.logging.AppLogger.e("Sandbox:Worker", trimmed)
                             trimmed.startsWith("[WARN]") || trimmed.contains(" WARN ") -> com.lagradost.common.logging.AppLogger.w("Sandbox:Worker", trimmed)
                             trimmed.startsWith("[INFO]") || trimmed.contains(" INFO ") -> com.lagradost.common.logging.AppLogger.i("Sandbox:Worker", trimmed)
                             else -> com.lagradost.common.logging.AppLogger.d("Sandbox:Worker", trimmed)
@@ -379,6 +385,7 @@ class SandboxProcessManager(
         }
 
         logger.info("Sandboxed worker process started successfully (PID: ${process.pid})")
+        com.lagradost.common.logging.AppLogger.i("Sandbox:Process", "Sandboxed worker process started successfully (PID: ${process.pid})")
     }
 
     private fun handleWorkerTermination() {
@@ -388,6 +395,10 @@ class SandboxProcessManager(
 
         val exit = try { currentProcess?.exitValue() } catch (_: Throwable) { null }
         val exitHex = exit?.let { "0x" + Integer.toHexString(it).uppercase() } ?: "unknown"
+        lastExitCode = "$exit ($exitHex)"
+
+        // Allow a brief window for background stderr reader to flush any JVM fatal error lines before closing handles
+        try { Thread.sleep(100) } catch (_: Throwable) {}
 
         for (p in pending) {
             p.completeExceptionally(IOException("Sandboxed worker process terminated unexpectedly (exit: $exitHex)"))
@@ -412,6 +423,7 @@ class SandboxProcessManager(
         currentJobObject = null
 
         logger.warn("Sandboxed worker process terminated. Exit code: $exit ($exitHex). Ready for auto-recovery on next query.")
+        com.lagradost.common.logging.AppLogger.w("Sandbox:Process", "Sandboxed worker process terminated. Exit code: $exit ($exitHex). Ready for auto-recovery on next query.")
     }
 
     suspend fun sendRequest(
@@ -426,6 +438,9 @@ class SandboxProcessManager(
             mutex.withLock {
                 if (!isAlive()) {
                     ensureStartedLocked(onEnsureStarted)
+                }
+                if (!isAlive() || processWriter == null) {
+                    throw IOException("Sandboxed worker process failed to start or terminated immediately (exit: $lastExitCode)")
                 }
                 sendDirect(request)
             }
@@ -452,7 +467,7 @@ class SandboxProcessManager(
     }
 
     fun sendDirect(request: WorkerRequest) {
-        val writer = processWriter ?: throw IOException("Process stdin writer is not available")
+        val writer = processWriter ?: throw IOException("Process stdin writer is not available (worker exited: $lastExitCode)")
         val json = WorkerProtocolSerializer.serializeRequest(request)
         synchronized(writer) {
             writer.write(json)

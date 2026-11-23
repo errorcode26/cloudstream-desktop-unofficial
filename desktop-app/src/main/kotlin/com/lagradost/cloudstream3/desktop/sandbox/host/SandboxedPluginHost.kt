@@ -5,6 +5,7 @@ import com.lagradost.cloudstream3.desktop.sandbox.protocol.SandboxedProviderMeta
 import com.lagradost.cloudstream3.desktop.sandbox.protocol.WorkerProtocolSerializer
 import com.lagradost.cloudstream3.desktop.sandbox.protocol.WorkerRequest
 import com.lagradost.cloudstream3.desktop.sandbox.protocol.WorkerResponse
+import com.lagradost.common.logging.AppLogger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -84,7 +85,7 @@ class SandboxedPluginHost(
     }
 
     private suspend fun onWorkerStarted() {
-        runCatching {
+        try {
             processManager.sendDirectAwaitLocked(
                 WorkerRequest(
                     id = nextRequestId.getAndIncrement(),
@@ -92,8 +93,9 @@ class SandboxedPluginHost(
                 ),
                 15_000L
             )
-        }.onFailure {
-            logger.warn("Worker ready ping timed out or failed: ${it.message}")
+        } catch (t: Throwable) {
+            AppLogger.e("SandboxedPluginHost", "Worker initial ready ping failed: ${t.message}", t)
+            throw IOException("Sandboxed worker process failed readiness ping: ${t.message}", t)
         }
 
         val rawSettings = com.lagradost.common.storage.DesktopDataStore.rawKeyCache.toMap()

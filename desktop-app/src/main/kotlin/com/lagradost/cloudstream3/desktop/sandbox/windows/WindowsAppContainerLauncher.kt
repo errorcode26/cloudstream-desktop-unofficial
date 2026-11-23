@@ -1,5 +1,6 @@
 package com.lagradost.cloudstream3.desktop.sandbox.windows
 
+import com.lagradost.common.logging.AppLogger
 import com.sun.jna.Memory
 import com.sun.jna.Native
 import com.sun.jna.Pointer
@@ -269,18 +270,21 @@ object WindowsAppContainerLauncher {
         val sandboxTmpDir = File(com.lagradost.common.platform.PlatformPaths.sandboxDir, "tmp").apply { if (!exists()) mkdirs() }.absolutePath
         val sandboxHome = com.lagradost.common.platform.PlatformPaths.sandboxDir.absolutePath
 
-        val envEntries = listOf(
-            "SystemRoot=$sysRoot",
-            "windir=$windir",
-            "PATH=$path",
-            "PATHEXT=$pathext",
-            "TMP=$sandboxTmpDir",
-            "TEMP=$sandboxTmpDir",
-            "USERPROFILE=$sandboxHome",
-            "LOCALAPPDATA=$sandboxHome",
-            "APPDATA=$sandboxHome",
-            "USERNAME=SandboxedWorker",
-        )
+        val envEntries = buildList {
+            add("SystemRoot=$sysRoot")
+            add("windir=$windir")
+            add("PATH=$path")
+            add("PATHEXT=$pathext")
+            add("TMP=$sandboxTmpDir")
+            add("TEMP=$sandboxTmpDir")
+            add("USERPROFILE=$sandboxHome")
+            add("LOCALAPPDATA=$sandboxHome")
+            add("APPDATA=$sandboxHome")
+            add("USERNAME=SandboxedWorker")
+            System.getenv("PROCESSOR_ARCHITECTURE")?.let { add("PROCESSOR_ARCHITECTURE=$it") }
+            System.getenv("PROCESSOR_ARCHITEW6432")?.let { add("PROCESSOR_ARCHITEW6432=$it") }
+            System.getenv("NUMBER_OF_PROCESSORS")?.let { add("NUMBER_OF_PROCESSORS=$it") }
+        }
         val envBuilder = StringBuilder()
         for (entry in envEntries) {
             envBuilder.append(entry).append('\u0000')
@@ -349,6 +353,7 @@ object WindowsAppContainerLauncher {
         Kernel32.INSTANCE.CloseHandle(hThread)
 
         logger.info("Successfully launched AppContainer process (PID: $pid) inside container '$containerName'")
+        AppLogger.i("Sandbox:Launcher", "Successfully launched AppContainer process (PID: $pid) inside container '$containerName'")
 
         return SandboxedProcess(
             processHandle = hProcess,
