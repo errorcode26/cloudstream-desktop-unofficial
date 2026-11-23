@@ -418,7 +418,12 @@ object NetworkConfig {
         insecureApp.defaultHeaders = mapOf("user-agent" to com.lagradost.cloudstream3.USER_AGENT)
 
         // Build dedicated image loading client derived from app.baseClient
+        val imgDispatcher = okhttp3.Dispatcher().apply {
+            maxRequests = 64
+            maxRequestsPerHost = 20
+        }
         val imgBuilder = app.baseClient.newBuilder()
+            .dispatcher(imgDispatcher)
             .apply {
                 interceptors().removeAll { it is RateLimitInterceptor || it is DevNetworkInterceptor }
             }

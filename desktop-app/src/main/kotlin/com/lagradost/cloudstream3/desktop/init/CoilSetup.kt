@@ -11,10 +11,14 @@ import java.io.File
 @androidx.compose.runtime.Composable
 fun ApplicationScope.initCoil() {
     setSingletonImageLoaderFactory { context ->
+        val maxHeap = Runtime.getRuntime().maxMemory()
+        val memoryCacheBytes = (maxHeap * 0.25).toLong().coerceIn(128L * 1024 * 1024, 512L * 1024 * 1024)
+
         coil3.ImageLoader.Builder(context)
             .memoryCache {
                 coil3.memory.MemoryCache.Builder()
-                    .maxSizeBytes(48L * 1024 * 1024)
+                    .maxSizeBytes(memoryCacheBytes)
+                    .strongReferencesEnabled(true)
                     .build()
             }
             .diskCache {
