@@ -64,6 +64,13 @@ data class PosterCardStyle(
     val cardOpacity: Float = 1.0f,
     val shadowMultiplier: Float = 1.0f,
     val depthEffectEnabled: Boolean = true,
+    val gridScale: String = "Normal",
+    val autoCleanTitles: Boolean = true,
+    val autoDetectSubDub: Boolean = true,
+    val autoDetectQuality: Boolean = true,
+    val showRatingBadges: Boolean = true,
+    val ratingPolicy: RatingSourcePolicy = RatingSourcePolicy.SMART_HYBRID,
+    val isCleanMode: Boolean = false,
 )
 
 val LocalPosterCardStyle = staticCompositionLocalOf { PosterCardStyle() }
@@ -82,7 +89,21 @@ fun rememberPosterCardStyle(): PosterCardStyle {
     val cardOpacity by AppearanceConfig.uiCardOpacity.collectAsState()
     val shadowMultiplier by AppearanceConfig.elementShadowMultiplier.collectAsState()
     val depthEffectEnabled by AppearanceConfig.posterDepthEffectEnabled.collectAsState()
-    return remember(roundingDp, titlePosition, metadataPosition, textAlignment, titleMaxLines, showRating, showQuality, showLanguage, hoverGlowEnabled, cardOpacity, shadowMultiplier, depthEffectEnabled) {
+    val gridScale by AppearanceConfig.gridScale.collectAsState()
+    val isCleanMode by AppearanceConfig.cleanModeEnabled.collectAsState()
+    val autoCleanTitles by CardMetadataConfig.autoCleanTitles.collectAsState()
+    val autoDetectSubDub by CardMetadataConfig.autoDetectSubDub.collectAsState()
+    val autoDetectQuality by CardMetadataConfig.autoDetectQuality.collectAsState()
+    val showRatingBadges by CardMetadataConfig.showRatingBadges.collectAsState()
+    val ratingPolicy by CardMetadataConfig.ratingPolicy.collectAsState()
+
+    return remember(
+        roundingDp, titlePosition, metadataPosition, textAlignment,
+        titleMaxLines, showRating, showQuality, showLanguage,
+        hoverGlowEnabled, cardOpacity, shadowMultiplier, depthEffectEnabled,
+        gridScale, isCleanMode, autoCleanTitles, autoDetectSubDub,
+        autoDetectQuality, showRatingBadges, ratingPolicy
+    ) {
         PosterCardStyle(
             roundingDp = roundingDp,
             titlePosition = titlePosition,
@@ -96,6 +117,13 @@ fun rememberPosterCardStyle(): PosterCardStyle {
             cardOpacity = cardOpacity,
             shadowMultiplier = shadowMultiplier,
             depthEffectEnabled = depthEffectEnabled,
+            gridScale = gridScale,
+            autoCleanTitles = autoCleanTitles,
+            autoDetectSubDub = autoDetectSubDub,
+            autoDetectQuality = autoDetectQuality,
+            showRatingBadges = showRatingBadges,
+            ratingPolicy = ratingPolicy,
+            isCleanMode = isCleanMode,
         )
     }
 }
@@ -114,8 +142,7 @@ fun PosterCard(
     onPlayClick: (() -> Unit)? = null,
 ) {
     val style = LocalPosterCardStyle.current
-    val currentGridScale by AppearanceConfig.gridScale.collectAsState()
-    val effectiveGridScale = gridScale ?: currentGridScale
+    val effectiveGridScale = gridScale ?: style.gridScale
     val shape = remember(style.roundingDp) { RoundedCornerShape(style.roundingDp.dp) }
     val rawImgUrl = provider?.fixUrlNull(item.posterUrl) ?: item.posterUrl
     val imgUrl = remember(rawImgUrl) { com.lagradost.cloudstream3.desktop.utils.ImageUtils.enhancePosterUrl(rawImgUrl) }
@@ -146,12 +173,12 @@ fun PosterCard(
     val showPosterLanguage = style.showLanguage
     val posterHoverGlowEnabled = style.hoverGlowEnabled
 
-    val autoCleanTitles by CardMetadataConfig.autoCleanTitles.collectAsState()
-    val autoDetectSubDub by CardMetadataConfig.autoDetectSubDub.collectAsState()
-    val autoDetectQuality by CardMetadataConfig.autoDetectQuality.collectAsState()
-    val showRatingBadges by CardMetadataConfig.showRatingBadges.collectAsState()
-    val ratingPolicy by CardMetadataConfig.ratingPolicy.collectAsState()
-    val isCleanMode by AppearanceConfig.cleanModeEnabled.collectAsState()
+    val autoCleanTitles = style.autoCleanTitles
+    val autoDetectSubDub = style.autoDetectSubDub
+    val autoDetectQuality = style.autoDetectQuality
+    val showRatingBadges = style.showRatingBadges
+    val ratingPolicy = style.ratingPolicy
+    val isCleanMode = style.isCleanMode
 
     val isAnime = item is com.lagradost.cloudstream3.AnimeSearchResponse
     val pluginHasSub = isAnime && (
