@@ -48,6 +48,7 @@ import com.lagradost.cloudstream3.desktop.ui.theme.AppearanceConfig
 import com.lagradost.cloudstream3.desktop.ui.theme.PosterMetadataPosition
 import com.lagradost.cloudstream3.desktop.ui.theme.PosterTextAlignment
 import com.lagradost.cloudstream3.desktop.ui.theme.PosterTitlePosition
+import com.lagradost.cloudstream3.desktop.ui.theme.ProviderBadgeDisplayMode
 import com.lagradost.cloudstream3.fixUrlNull
 
 @androidx.compose.runtime.Immutable
@@ -71,6 +72,7 @@ data class PosterCardStyle(
     val showRatingBadges: Boolean = true,
     val ratingPolicy: RatingSourcePolicy = RatingSourcePolicy.SMART_HYBRID,
     val isCleanMode: Boolean = false,
+    val providerBadgeDisplayMode: ProviderBadgeDisplayMode = ProviderBadgeDisplayMode.HIDDEN,
 )
 
 val LocalPosterCardStyle = staticCompositionLocalOf { PosterCardStyle() }
@@ -96,13 +98,14 @@ fun rememberPosterCardStyle(): PosterCardStyle {
     val autoDetectQuality by CardMetadataConfig.autoDetectQuality.collectAsState()
     val showRatingBadges by CardMetadataConfig.showRatingBadges.collectAsState()
     val ratingPolicy by CardMetadataConfig.ratingPolicy.collectAsState()
+    val providerBadgeDisplayMode by AppearanceConfig.providerBadgeDisplayMode.collectAsState()
 
     return remember(
         roundingDp, titlePosition, metadataPosition, textAlignment,
         titleMaxLines, showRating, showQuality, showLanguage,
         hoverGlowEnabled, cardOpacity, shadowMultiplier, depthEffectEnabled,
         gridScale, isCleanMode, autoCleanTitles, autoDetectSubDub,
-        autoDetectQuality, showRatingBadges, ratingPolicy
+        autoDetectQuality, showRatingBadges, ratingPolicy, providerBadgeDisplayMode
     ) {
         PosterCardStyle(
             roundingDp = roundingDp,
@@ -124,6 +127,7 @@ fun rememberPosterCardStyle(): PosterCardStyle {
             showRatingBadges = showRatingBadges,
             ratingPolicy = ratingPolicy,
             isCleanMode = isCleanMode,
+            providerBadgeDisplayMode = providerBadgeDisplayMode,
         )
     }
 }

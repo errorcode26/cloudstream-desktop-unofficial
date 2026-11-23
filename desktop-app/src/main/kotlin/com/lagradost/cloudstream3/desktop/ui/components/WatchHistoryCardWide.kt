@@ -99,12 +99,9 @@ fun WatchHistoryCardWide(
     val primary = MaterialTheme.colorScheme.primary
     val backgroundColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = uiCardOpacity)
 
-    val effectiveBadgeMode = providerBadgeDisplayMode
-        ?: AppearanceConfig.providerBadgeDisplayMode.collectAsState().value
-    val effectiveAutoClean = autoCleanTitles
-        ?: CardMetadataConfig.autoCleanTitles.collectAsState().value
-    val effectiveCleanMode = isCleanMode
-        ?: AppearanceConfig.cleanModeEnabled.collectAsState().value
+    val effectiveBadgeMode = providerBadgeDisplayMode ?: style.providerBadgeDisplayMode
+    val effectiveAutoClean = autoCleanTitles ?: style.autoCleanTitles
+    val effectiveCleanMode = isCleanMode ?: style.isCleanMode
 
     val displayTitle = remember(history.showName, effectiveAutoClean, effectiveCleanMode) {
         if (effectiveAutoClean || effectiveCleanMode) {
