@@ -147,8 +147,11 @@ fun main(args: Array<String> = emptyArray()) {
         com.lagradost.cloudstream3.desktop.init.SafeModeState.enable("Pre-startup storage initialization failure: ${t.message ?: t.javaClass.simpleName}")
     }
 
-    // Pre-warm theme presets, search indexes, and custom font cache on background thread
+    // Pre-warm theme presets, search indexes, custom font cache, and sandboxed JVM worker on background thread
     kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
+        if (!isSafeModeRequested) {
+            runCatching { com.lagradost.cloudstream3.desktop.sandbox.SandboxedPluginManager.warmup() }
+        }
         com.lagradost.cloudstream3.desktop.ui.theme.CustomFontManager.getAvailableFonts()
         com.lagradost.cloudstream3.desktop.ui.theme.BuiltInPresets.presets.size
         com.lagradost.cloudstream3.desktop.ui.screens.settings.SettingsSearchIndex.searchIndex.size
