@@ -256,4 +256,84 @@ object LanguageNormalizer {
         NormalizedLanguage("vie", "vi", "Vietnamese", "VIE"),
         NormalizedLanguage("tha", "th", "Thai", "THA"),
     )
+
+    private val TRANSIENT_QUERY_KEYS = setOf(
+        "policy",
+        "signature",
+        "key-pair-id",
+        "epochtime",
+        "token",
+        "expires",
+        "expiry",
+        "expire",
+        "st",
+        "e",
+        "h",
+        "hdnts",
+        "auth_token",
+        "sig",
+    )
+
+    private fun extractProxyTarget(rawUrl: String): String {
+        val queryStart = rawUrl.indexOf('?')
+        if (queryStart != -1 && queryStart < rawUrl.length - 1) {
+            val queryString = rawUrl.substring(queryStart + 1)
+            val params = queryString.split('&')
+            for (param in params) {
+                val eq = param.indexOf('=')
+                if (eq != -1) {
+                    val key = param.substring(0, eq).trim().lowercase()
+                    if (key == "url" || key == "src" || key == "target") {
+                        val encoded = param.substring(eq + 1).trim()
+                        val decoded = try {
+                            java.net.URLDecoder.decode(encoded, "UTF-8")
+                        } catch (_: Exception) {
+                            encoded
+                        }
+                        if (decoded.startsWith("http://", ignoreCase = true) || decoded.startsWith("https://", ignoreCase = true)) {
+                            return decoded
+                        }
+                    }
+                }
+            }
+        }
+        return rawUrl
+    }
+
+    /**
+     * Computes a stable canonical key for subtitle deduplication across multiple stream emissions
+     * and ephemeral pre-signed storage tokens.
+     */
+    fun getCanonicalKey(lang: String?, rawUrl: String?): String {
+        val normLang = if (!lang.isNullOrBlank()) normalize(lang).code3 else "und"
+        val cleanUrl = rawUrl?.trim() ?: ""
+        if (cleanUrl.isBlank()) return "$normLang:"
+
+        val target = extractProxyTarget(cleanUrl)
+        val queryStart = target.indexOf('?')
+        val basePath = if (queryStart != -1) target.substring(0, queryStart).substringBefore('#').trim() else target.substringBefore('#').trim()
+
+        val isSubFile = basePath.endsWith(".srt", ignoreCase = true) ||
+            basePath.endsWith(".vtt", ignoreCase = true) ||
+            basePath.endsWith(".ass", ignoreCase = true) ||
+            basePath.endsWith(".sub", ignoreCase = true) ||
+            basePath.endsWith(".ssa", ignoreCase = true)
+
+        if (isSubFile || queryStart == -1) {
+            return "$normLang:${basePath.lowercase()}"
+        }
+
+        val queryString = target.substring(queryStart + 1).substringBefore('#')
+        val filteredParams = queryString.split('&').filter { param ->
+            val key = param.substringBefore('=').trim().lowercase()
+            key !in TRANSIENT_QUERY_KEYS
+        }
+
+        val cleanFinal = if (filteredParams.isEmpty()) {
+            basePath
+        } else {
+            "$basePath?${filteredParams.sorted().joinToString("&")}"
+        }
+        return "$normLang:${cleanFinal.lowercase()}"
+    }
 }

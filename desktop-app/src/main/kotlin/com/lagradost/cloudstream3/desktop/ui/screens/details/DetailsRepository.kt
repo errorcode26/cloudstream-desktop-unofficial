@@ -129,8 +129,9 @@ object DetailsRepository {
             targetProvider is com.lagradost.cloudstream3.metaproviders.TmdbProvider
         val targetHost = runCatching { java.net.URI(targetUrl).host?.lowercase()?.removePrefix("www.") }.getOrNull()
         val providerHost = runCatching { java.net.URI(targetProvider.mainUrl).host?.lowercase()?.removePrefix("www.") }.getOrNull()
-        val isHostMismatch = isMetaProvider && targetHost != null && providerHost != null &&
-            targetHost != providerHost && !targetHost.endsWith(".$providerHost") && !providerHost.endsWith(".$targetHost")
+        val providerOwnsHost = targetHost != null && providerHost != null &&
+            (targetHost == providerHost || targetHost.endsWith(".$providerHost") || providerHost.endsWith(".$targetHost"))
+        val isHostMismatch = isMetaProvider && targetHost != null && providerHost != null && !providerOwnsHost
 
         if (isHostMismatch && !targetUrl.contains("themoviedb.org") && !targetUrl.contains("imdb.com")) {
             val effectiveTitle = fallbackName?.takeIf { it.isNotBlank() }
@@ -155,7 +156,7 @@ object DetailsRepository {
             }
         }
 
-        if (targetUrl.contains("themoviedb.org") && !fallbackName.isNullOrBlank()) {
+        if (targetUrl.contains("themoviedb.org") && !fallbackName.isNullOrBlank() && !providerOwnsHost) {
             try {
                 com.lagradost.common.logging.AppLogger.i("[DetailsRepo] TMDB link detected ($targetUrl). Searching active provider (${provider.name}) for: '$fallbackName'...")
                 val searchResults = SafePluginInvoker.invokeOrNull(
@@ -169,7 +170,15 @@ object DetailsRepository {
                     targetUrl = bestMatch.url
                 } else {
                     val candidateApis = com.lagradost.cloudstream3.APIHolder.allProviders
-                        .filter { it.name != provider.name && it.name != "TMDB" }
+                        .filter { api ->
+                            api.name != provider.name &&
+                                api.providerType != com.lagradost.cloudstream3.ProviderType.MetaProvider &&
+                                !api.name.equals("TMDB", ignoreCase = true) &&
+                                !api.name.equals("CrossTMDB", ignoreCase = true) &&
+                                !api.name.equals("Trakt", ignoreCase = true) &&
+                                !api.name.equals("Stremio", ignoreCase = true) &&
+                                !api.name.equals("NONE", ignoreCase = true)
+                        }
                         .take(6)
 
                     if (candidateApis.isNotEmpty()) {
@@ -258,6 +267,9 @@ object DetailsRepository {
                         DetailsCache.put(url, loaded)
                         if (targetUrl != url) DetailsCache.put(targetUrl, loaded)
                         return loaded
+                    } else {
+                        lastError = java.io.IOException("Provider '${targetProvider.name}' returned no media details for this title")
+                        break
                     }
                 } else {
                     lastError = result.exceptionOrNull()
@@ -278,7 +290,11 @@ object DetailsRepository {
                             }
                         }
                     }
-                    if (lastError is com.lagradost.cloudstream3.ErrorLoadingException ||
+                    if (lastError is kotlinx.coroutines.TimeoutCancellationException ||
+                        lastError is java.util.concurrent.TimeoutException ||
+                        errMessage.contains("timed out", ignoreCase = true) ||
+                        errMessage.contains("circuit", ignoreCase = true) ||
+                        lastError is com.lagradost.cloudstream3.ErrorLoadingException ||
                         lastError is NotImplementedError ||
                         errMessage.contains("not implemented", ignoreCase = true) ||
                         errMessage.contains("GEO-LOCKED", ignoreCase = true) ||
@@ -297,7 +313,16 @@ object DetailsRepository {
             }
         }
 
-        val finalErrorMsg = lastError?.message?.takeIf { it.isNotBlank() } ?: "Server unreachable or returned empty response"
+        val rawMsg = lastError?.message?.takeIf { it.isNotBlank() } ?: "Provider returned empty response"
+        val finalErrorMsg = when {
+            lastError is kotlinx.coroutines.TimeoutCancellationException ||
+            lastError is java.util.concurrent.TimeoutException ||
+            rawMsg.contains("timed out", ignoreCase = true) ->
+                "Request to ${targetProvider.name} timed out. Please check your network or try again."
+            rawMsg.contains("circuit", ignoreCase = true) ->
+                "${targetProvider.name} is temporarily paused due to consecutive errors."
+            else -> rawMsg
+        }
         com.lagradost.cloudstream3.desktop.ui.components.AppToastManager.showPluginError(
             pluginName = targetProvider.name,
             action = "Details fetch",

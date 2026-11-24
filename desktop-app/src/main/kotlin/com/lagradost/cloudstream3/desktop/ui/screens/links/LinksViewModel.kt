@@ -3,6 +3,7 @@ package com.lagradost.cloudstream3.desktop.ui.screens.links
 import com.lagradost.cloudstream3.MainAPI
 import com.lagradost.cloudstream3.ProviderType
 import com.lagradost.cloudstream3.SubtitleFile
+import com.lagradost.cloudstream3.desktop.subtitles.LanguageNormalizer
 import com.lagradost.cloudstream3.desktop.ui.base.BaseMviViewModel
 import com.lagradost.cloudstream3.desktop.ui.screens.links.contract.LinksUiEffect
 import com.lagradost.cloudstream3.desktop.ui.screens.links.contract.LinksUiEvent
@@ -180,7 +181,7 @@ class LinksViewModel : BaseMviViewModel<LinksUiState, LinksUiEvent, LinksUiEffec
 
                 val currentSubs = uiState.value.subtitles
                 val combinedSubs = if (drainedSubs.isNotEmpty()) {
-                    (currentSubs + drainedSubs).distinctBy { it.url.trim().lowercase() }
+                    (currentSubs + drainedSubs).distinctBy { LanguageNormalizer.getCanonicalKey(it.lang, it.url) }
                 } else {
                     currentSubs
                 }
@@ -199,12 +200,17 @@ class LinksViewModel : BaseMviViewModel<LinksUiState, LinksUiEvent, LinksUiEffec
                 pendingLinks.add(link)
             }
 
+            val seenSubKeys = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+
             val subCallback = SafePluginInvoker.wrapCallback("SubtitleCallback") { sub: SubtitleFile ->
                 val cleanUrl = sub.url.trim()
                 if (cleanUrl.isNotBlank()) {
                     val cleanSub = sub.copy(url = cleanUrl, lang = sub.lang.trim())
-                    AppLogger.i("Plugin:${provider.name}", "Extracted subtitle: [${cleanSub.lang}] ${cleanSub.url}")
-                    pendingSubs.add(cleanSub)
+                    val dedupeKey = LanguageNormalizer.getCanonicalKey(cleanSub.lang, cleanSub.url)
+                    if (seenSubKeys.add(dedupeKey)) {
+                        AppLogger.i("Plugin:${provider.name}", "Extracted subtitle: [${cleanSub.lang}] ${cleanSub.url}")
+                        pendingSubs.add(cleanSub)
+                    }
                 }
             }
 

@@ -1,13 +1,26 @@
 package com.lagradost.cloudstream3.desktop.ui.screens.details
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -16,6 +29,7 @@ import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.layout.ContentScale
@@ -554,6 +568,75 @@ fun DetailsMetadata(
                             )
                         }
 
+                        var isActionsExpanded by remember { mutableStateOf(false) }
+                        val toggleRotation by animateFloatAsState(
+                            targetValue = if (isActionsExpanded) 90f else 0f,
+                            animationSpec = spring(dampingRatio = 0.75f, stiffness = Spring.StiffnessMediumLow),
+                            label = "actionsToggleRotation",
+                        )
+                        val moreInteractionSource = remember { MutableInteractionSource() }
+                        val isMoreHovered by moreInteractionSource.collectIsHoveredAsState()
+
+                        val moreActionsToggle: @Composable (Boolean) -> Unit = { isNarrowBtn ->
+                            Surface(
+                                onClick = { isActionsExpanded = !isActionsExpanded },
+                                modifier = Modifier
+                                    .size(if (isNarrowBtn) 44.dp else 52.dp)
+                                    .pointerHoverIcon(PointerIcon.Hand),
+                                shape = RoundedCornerShape(if (isNarrowBtn) 10.dp else 12.dp),
+                                color = if (isMoreHovered || isActionsExpanded) Color.White.copy(alpha = 0.20f) else Color.White.copy(alpha = 0.12f),
+                                border = BorderStroke(
+                                    1.2.dp,
+                                    if (isMoreHovered || isActionsExpanded) Color.White.copy(alpha = 0.50f) else Color.White.copy(alpha = 0.28f),
+                                ),
+                                interactionSource = moreInteractionSource,
+                            ) {
+                                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                                    Icon(
+                                        imageVector = Icons.Default.MoreHoriz,
+                                        contentDescription = if (isActionsExpanded) "Hide secondary actions" else "Show more actions",
+                                        tint = Color.White,
+                                        modifier = Modifier
+                                            .size(if (isNarrowBtn) 20.dp else 22.dp)
+                                            .graphicsLayer { rotationZ = toggleRotation },
+                                    )
+                                }
+                            }
+                        }
+
+                        val bloomingCluster: @Composable (Boolean) -> Unit = { isNarrowBtn ->
+                            AnimatedVisibility(
+                                visible = isActionsExpanded,
+                                enter = fadeIn(spring(stiffness = Spring.StiffnessMediumLow)) +
+                                    expandHorizontally(
+                                        animationSpec = spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessMediumLow),
+                                        expandFrom = Alignment.Start,
+                                    ) +
+                                    scaleIn(
+                                        initialScale = 0.82f,
+                                        animationSpec = spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessMediumLow),
+                                    ),
+                                exit = fadeOut(tween(140)) +
+                                    shrinkHorizontally(
+                                        animationSpec = tween(170),
+                                        shrinkTowards = Alignment.Start,
+                                    ) +
+                                    scaleOut(
+                                        targetScale = 0.82f,
+                                        animationSpec = tween(170),
+                                    ),
+                            ) {
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(if (isNarrowBtn) 10.dp else 14.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    libraryButton(Modifier)
+                                    downloadAction?.invoke(Modifier)
+                                    webButton(Modifier)
+                                }
+                            }
+                        }
+
                         if (isButtonsNarrow) {
                             Row(
                                 horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -567,9 +650,8 @@ fun DetailsMetadata(
                                     heroAction(Modifier.fillMaxWidth())
                                 }
 
-                                libraryButton(Modifier)
-                                downloadAction?.invoke(Modifier)
-                                webButton(Modifier)
+                                moreActionsToggle(true)
+                                bloomingCluster(true)
                             }
                         } else {
                             Column(
@@ -581,9 +663,8 @@ fun DetailsMetadata(
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
                                     heroAction(Modifier.wrapContentWidth())
-                                    libraryButton(Modifier)
-                                    downloadAction?.invoke(Modifier)
-                                    webButton(Modifier)
+                                    moreActionsToggle(false)
+                                    bloomingCluster(false)
                                 }
                             }
                         }

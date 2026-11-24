@@ -69,12 +69,17 @@ class SandboxHostCallbackHandler(
         }
 
         if (cbReq.action == WorkerCallbackRequest.ACTION_ADD_REPOSITORY) {
-            val url = cbReq.repoUrl ?: return
-            if (SandboxSecurityPolicy.isBlockedOrPrivateUrl(url)) {
+            val url = cbReq.repoUrl?.trim() ?: return
+            if (url.isBlank() || SandboxSecurityPolicy.isBlockedOrPrivateUrl(url)) {
                 logger.warn("Rejected worker repository callback targeting a private or invalid URL: $url")
                 return
             }
-            val name = cbReq.repoName?.takeIf { it.isNotBlank() } ?: url
+            val rawName = cbReq.repoName?.trim()
+            if (rawName.isNullOrBlank() || rawName.equals("No name", ignoreCase = true)) {
+                logger.warn("Rejected worker repository callback with unparsed or empty repository name: '$rawName' ($url)")
+                return
+            }
+            val name = rawName
             val icon = cbReq.repoIcon
             val normalized = com.lagradost.cloudstream3.ui.settings.extensions.RepositoryData(iconUrl = icon, name = name, url = url)
             logger.info("Host handling ACTION_ADD_REPOSITORY from worker for: $name ($url)")

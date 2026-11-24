@@ -97,29 +97,47 @@
         return false;
     };
 
+    let lastKnownQualityLabel = 'Auto';
+    window._lastKnownQualityLabel = 'Auto';
+
     const formatStandardQualityLabel = (resStr, fallbackTrackName) => {
+        if (resStr && typeof resStr === 'string' && resStr.includes('x')) {
+            const parts = resStr.split('x');
+            const w = parseInt(parts[0].trim(), 10) || 0;
+            const h = parseInt(parts[1].trim(), 10) || 0;
+            if (w >= 3800 || h >= 1600) { lastKnownQualityLabel = '4K'; return '4K'; }
+            if (w >= 2500 || h >= 1300) { lastKnownQualityLabel = '1440p'; return '1440p'; }
+            if (w >= 1900 || (h >= 750 && h <= 1100)) { lastKnownQualityLabel = '1080p'; return '1080p'; }
+            if (w >= 1200 || (h >= 500 && h < 750)) { lastKnownQualityLabel = '720p'; return '720p'; }
+            if (w >= 800 || (h >= 400 && h < 500)) { lastKnownQualityLabel = '480p'; return '480p'; }
+            if (w >= 600 || (h >= 300 && h < 400)) { lastKnownQualityLabel = '360p'; return '360p'; }
+            if (h > 0) { lastKnownQualityLabel = `${h}p`; return `${h}p`; }
+        } else if (resStr && typeof resStr === 'string' && resStr.trim()) {
+            const clean = resStr.trim().toLowerCase();
+            if (clean.includes('4k') || clean.includes('2160')) { lastKnownQualityLabel = '4K'; return '4K'; }
+            if (clean.includes('1440') || clean.includes('2k')) { lastKnownQualityLabel = '1440p'; return '1440p'; }
+            if (clean.includes('1080')) { lastKnownQualityLabel = '1080p'; return '1080p'; }
+            if (clean.includes('720')) { lastKnownQualityLabel = '720p'; return '720p'; }
+            if (clean.includes('480')) { lastKnownQualityLabel = '480p'; return '480p'; }
+            if (clean.includes('360')) { lastKnownQualityLabel = '360p'; return '360p'; }
+        }
+
         if (fallbackTrackName) {
             const nameClean = String(fallbackTrackName).trim();
             const lower = nameClean.toLowerCase();
-            if (lower.includes('4k') || lower.includes('2160')) return '4K';
-            if (lower.includes('1440') || lower.includes('2k')) return '1440p';
-            if (lower.includes('1080')) return '1080p';
-            if (lower.includes('720')) return '720p';
-            if (lower.includes('480')) return '480p';
-            if (lower.includes('360')) return '360p';
+            if (lower.includes('4k') || lower.includes('2160')) { lastKnownQualityLabel = '4K'; return '4K'; }
+            if (lower.includes('1440') || lower.includes('2k')) { lastKnownQualityLabel = '1440p'; return '1440p'; }
+            if (lower.includes('1080')) { lastKnownQualityLabel = '1080p'; return '1080p'; }
+            if (lower.includes('720')) { lastKnownQualityLabel = '720p'; return '720p'; }
+            if (lower.includes('480')) { lastKnownQualityLabel = '480p'; return '480p'; }
+            if (lower.includes('360')) { lastKnownQualityLabel = '360p'; return '360p'; }
         }
-        if (!resStr) return fallbackTrackName || 'Auto';
-        const parts = resStr.split('x');
-        if (parts.length < 2) return resStr;
-        const w = parseInt(parts[0].trim(), 10) || 0;
-        const h = parseInt(parts[1].trim(), 10) || 0;
-        if (w >= 3800 || h >= 1600) return '4K';
-        if (w >= 2500 || h >= 1300) return '1440p';
-        if (w >= 1900 || (h >= 750 && h <= 1100)) return '1080p';
-        if (w >= 1200 || (h >= 500 && h < 750)) return '720p';
-        if (w >= 800 || (h >= 400 && h < 500)) return '480p';
-        if (w >= 600 || (h >= 300 && h < 400)) return '360p';
-        return h > 0 ? `${h}p` : resStr;
+
+        // Never expose raw internal MPV track names like "Track 1", "Video 1"
+        if (lastKnownQualityLabel && lastKnownQualityLabel !== 'Auto') {
+            return lastKnownQualityLabel;
+        }
+        return 'Auto';
     };
     window.formatStandardQualityLabel = formatStandardQualityLabel;
 
@@ -1763,11 +1781,22 @@
                     firstLine = firstLine.replace(/[\p{Extended_Pictographic}\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '').trim();
                     const bracketMatch = firstLine.match(/\[([^\]]+)\]/);
                     if (bracketMatch) {
-                        cleanSource = bracketMatch[1].trim();
-                    } else {
-                        cleanSource = firstLine.replace(/[\s\-_•/·:]+$/g, '').replace(/^[\s\-_•/·:]+/g, '').trim();
+                        const candidate = bracketMatch[1].trim();
+                        if (!/\b(2160p|4k|1440p|1080p|720p|480p|360p|hdr|dv|remux|bluray|web-?dl|web-?rip)\b/i.test(candidate)) {
+                            cleanSource = candidate;
+                        }
                     }
-                    if (cleanSource.length > 24) cleanSource = cleanSource.substring(0, 24).trim();
+                    if (!cleanSource) {
+                        let s = firstLine.replace(/\.[a-z0-9]{2,4}$/i, '');
+                        s = s.replace(/\b(2160p|4k|uhd|1440p|1080p|fhd|720p|hd|480p|360p|sd)\b/gi, '');
+                        s = s.replace(/\b(remux|bluray|blu-ray|bdrip|brrip|web-?dl|web-?rip|camrip|cam|telesync|hdts|hdrip|dvdrip)\b/gi, '');
+                        s = s.replace(/\b(hdr10\+|hdr10|hdr|dolby[\s._-]?vision|dv|dovi)\b/gi, '');
+                        s = s.replace(/\b(x265|h265|hevc|x264|h264|avc|av1|prores|10bit|10-bit)\b/gi, '');
+                        s = s.replace(/\b(atmos|truehd|dts-?hd|dts:x|dts|ddp5\.1|dd\+5\.1|dd5\.1|eac3|ac3|flac|aac|opus)\b/gi, '');
+                        s = s.replace(/[._]/g, ' ');
+                        s = s.replace(/\[\s*\]|\(\s*\)/g, '').replace(/[\s\-_•/·:]+$/g, '').replace(/^[\s\-_•/·:]+/g, '').replace(/\s{2,}/g, ' ').trim();
+                        if (s.length > 0 && s.length <= 24) cleanSource = s;
+                    }
                 }
                 if (!cleanSource && activeLink) {
                     cleanSource = `Source ${currIdx + 1}`;
@@ -1789,17 +1818,11 @@
                 }
 
                 if (!qualityStr && meta && meta.resolution) {
-                    // Fallback for adaptive HLS/DASH or undeclared streams (aspect-ratio aware)
-                    const parts = meta.resolution.split('x');
-                    const w = parts[0] ? parseInt(parts[0].trim(), 10) : 0;
-                    const h = parts[1] ? parseInt(parts[1].trim(), 10) : 0;
+                    qualityStr = formatStandardQualityLabel(meta.resolution, '');
+                }
 
-                    if (w >= 3800 || h >= 1600) qualityStr = '4K';
-                    else if (w >= 2500 || h >= 1300) qualityStr = '1440p';
-                    else if (w >= 1900 || h >= 800) qualityStr = '1080p';
-                    else if (w >= 1200 || h >= 530) qualityStr = '720p';
-                    else if (w >= 700 || h >= 400) qualityStr = '480p';
-                    else if (h > 0) qualityStr = `${h}p`;
+                if ((!qualityStr || qualityStr === 'Auto') && lastKnownQualityLabel && lastKnownQualityLabel !== 'Auto') {
+                    qualityStr = lastKnownQualityLabel;
                 }
 
                 if (!qualityStr) qualityStr = 'Auto';
@@ -2301,23 +2324,24 @@
             const serverSizeNum = parseFloat(String(rawSizeText || '').replace(/[^\d.]/g, ''));
             const sizeText = (!isNaN(serverSizeNum) && serverSizeNum > 0) ? String(rawSizeText).trim() : '';
 
-            // Clean title for display
+            // Clean title for display: strip file size, brackets, and redundant tech noise
             let cleanName = rawName.replace(/^⚡\s*/, '').trim();
             if (sizeText) {
                 cleanName = cleanName.replace(new RegExp(`\\[?\\s*${sizeText.replace('.', '\\.')}\\s*\\]?`, 'ig'), '').trim();
             }
             cleanName = cleanName.replace(/\[\s*0+(?:\.0+)?\s*(?:GB|MB|GiB|MiB|B|KB)\s*\]|\(\s*0+(?:\.0+)?\s*(?:GB|MB|GiB|MiB|B|KB)\s*\)|\b0+(?:\.0+)?\s*(?:GB|MB|GiB|MiB|B|KB)\b/gi, '').trim();
-            cleanName = cleanName.replace(/\[\s*\]|\(\s*\)/g, '').replace(/[\s\-_•/·:]+$/g, '').trim();
+            cleanName = cleanName.replace(/\b(2160p|4k|uhd|1440p|2k|1080p|fhd|720p|hd|480p|360p|sd)\b/gi, '').trim();
+            cleanName = cleanName.replace(/\b(remux|bluray|blu-ray|bdrip|brrip|web-?dl|web-?rip|camrip|cam|telesync|hdts|hdrip|dvdrip)\b/gi, '').trim();
+            cleanName = cleanName.replace(/\b(hdr10\+|hdr10|hdr|dolby[\s._-]?vision|dv|dovi)\b/gi, '').trim();
+            cleanName = cleanName.replace(/\b(x265|h265|hevc|x264|h264|avc|av1|prores|10bit|10-bit)\b/gi, '').trim();
+            cleanName = cleanName.replace(/\b(atmos|truehd|dts-?hd|dts:x|dts|ddp5\.1|dd\+5\.1|dd5\.1|eac3|ac3|flac|aac|opus)\b/gi, '').trim();
+            cleanName = cleanName.replace(/[._]/g, ' ');
+            cleanName = cleanName.replace(/\[\s*\]|\(\s*\)/g, '').replace(/[\s\-_•/·:]+$/g, '').replace(/^[\s\-_•/·:]+/g, '').replace(/\s{2,}/g, ' ').trim();
             cleanName = escapeHtml(cleanName || ('Source ' + (l.index + 1)));
 
-            // Extract tags
+            // Extract tags: render stable CSS cube badges directly to prevent 404 image thrashing
             const tags = parseStreamTechTags(rawName);
-            const badgesBaseUrl = window.__BADGES_BASE_URL__ || '';
             const tagsHtml = tags.map(t => {
-                if (t.badge && badgesBaseUrl) {
-                    const badgeSrc = escapeHtml(badgesBaseUrl + t.badge);
-                    return `<img src="${badgeSrc}" class="srv-badge-img" alt="${escapeHtml(t.text)}" title="${escapeHtml(t.text)}" onerror="this.style.display='none';this.nextElementSibling.style.display='inline-flex';" /><span class="srv-cube-badge tag-${t.type}" style="display:none;">${escapeHtml(t.text)}</span>`;
-                }
                 return `<span class="srv-cube-badge tag-${t.type}">${escapeHtml(t.text)}</span>`;
             }).join('');
             const sizeHtml = sizeText ? `<span class="srv-cube-badge tag-size">${escapeHtml(sizeText)}</span>` : '';
@@ -2619,6 +2643,8 @@
             const isAlreadyPlaying = globalIsPlaying || currentPosMs > 50 || window.hasDismissedInitialProbing;
 
             if (isNewSession) {
+                lastKnownQualityLabel = 'Auto';
+                window._lastKnownQualityLabel = 'Auto';
                 _trickplayThumbCache.clear();
                 if (isAlreadyPlaying && isInitialSession) {
                     userDismissedProbing = true;
@@ -3339,6 +3365,12 @@
                         statusBadgeHtml = `<span class="link-status-badge queue">QUEUED</span>`;
                     }
 
+                    const rawProbingName = l.name || ('Source ' + (i + 1));
+                    let cleanProbingName = rawProbingName.replace(/^[⚡\s]+/, '').trim();
+                    cleanProbingName = cleanProbingName.replace(/\[\s*0+(?:\.0+)?\s*(?:GB|MB|GiB|MiB|B|KB)\s*\]|\(\s*0+(?:\.0+)?\s*(?:GB|MB|GiB|MiB|B|KB)\s*\)|\b0+(?:\.0+)?\s*(?:GB|MB|GiB|MiB|B|KB)\b/gi, '').trim();
+                    cleanProbingName = cleanProbingName.replace(/\[\s*\]|\(\s*\)/g, '').replace(/[\s\-_•/·:]+$/g, '').trim();
+                    cleanProbingName = cleanProbingName || rawProbingName;
+
                     const targetClassName = `link-probing-item ${st}`;
                     let card = existingCards.get(l.url);
 
@@ -3353,6 +3385,17 @@
                         if (badgeContainer && badgeContainer.innerHTML !== statusBadgeHtml) {
                             badgeContainer.innerHTML = statusBadgeHtml;
                         }
+                        const qBadge = card.querySelector('.link-quality-badge');
+                        if (qualityHtml) {
+                            if (qBadge) {
+                                if (qBadge.outerHTML !== qualityHtml) qBadge.outerHTML = qualityHtml;
+                            } else {
+                                const titleWrap = card.querySelector('.link-title-wrap');
+                                if (titleWrap) titleWrap.insertAdjacentHTML('beforeend', qualityHtml);
+                            }
+                        } else if (qBadge) {
+                            qBadge.remove();
+                        }
                     } else {
                         // Create new card
                         card = document.createElement('div');
@@ -3361,8 +3404,8 @@
                         card.style.cursor = 'pointer';
                         card.onclick = () => { send('changeLink', l.url); };
                         card.innerHTML = `
-                            <div style="display: flex; align-items: center; gap: 4px; min-width: 0;">
-                                <span style="font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 420px;">${escapeHtml(l.name)}</span>
+                            <div class="link-title-wrap" style="display: flex; align-items: center; gap: 4px; min-width: 0;">
+                                <span style="font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 420px;">${escapeHtml(cleanProbingName)}</span>
                                 ${qualityHtml}
                             </div>
                             <div class="link-badge-container">${statusBadgeHtml}</div>
@@ -3769,6 +3812,14 @@
         if (meta.videoTracks && meta.videoTracks.length > 0) {
             const sel = meta.videoTracks.find(t => t.isSelected);
             if (sel && sel.name) fallbackTrackName = sel.name;
+        }
+        if ((!meta.resolution || meta.resolution === 'Auto') && meta.links) {
+            const currIdx = typeof currentLinkIndex === 'number' && currentLinkIndex >= 0 ? currentLinkIndex : 0;
+            const activeLink = meta.links[currIdx] || meta.links.find(l => l.isActive);
+            if (activeLink && typeof activeLink.quality === 'number' && activeLink.quality > 0 && activeLink.quality !== 400) {
+                const linkQ = activeLink.quality >= 2160 ? '4K' : `${activeLink.quality}p`;
+                if (!fallbackTrackName) fallbackTrackName = linkQ;
+            }
         }
         const activeQualityLabel = formatStandardQualityLabel(meta.resolution, fallbackTrackName);
         const qBadge = document.getElementById('qualityServerBadge');

@@ -35,9 +35,16 @@ object RepositoryManager {
     }
 
     suspend fun addRepository(repository: RepositoryData) {
+        val rawUrl = repository.url.trim()
+        val rawName = repository.name.trim()
+        if (rawUrl.isBlank() || rawName.equals("No name", ignoreCase = true)) {
+            AppLogger.w("RepositoryManager Stub: Ignoring invalid repository registration (name='$rawName', url='$rawUrl')")
+            return
+        }
+
         val icon = repository.iconUrl?.trim()?.takeIf { it.isNotEmpty() }
-        val name = if (repository.name.isNotBlank()) repository.name else repository.url
-        val normalized = RepositoryData(iconUrl = icon, name = name, url = repository.url)
+        val name = if (rawName.isNotBlank()) rawName else rawUrl
+        val normalized = RepositoryData(iconUrl = icon, name = name, url = rawUrl)
 
         val isWorker = System.getProperty("cloudstream.sandbox.worker") == "true"
         if (isWorker) {

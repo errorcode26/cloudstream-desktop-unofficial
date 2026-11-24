@@ -85,6 +85,7 @@ import com.lagradost.cloudstream3.desktop.ui.navigation.Config
 import com.lagradost.cloudstream3.desktop.ui.screens.home.HomeHeroCarousel
 import com.lagradost.cloudstream3.desktop.ui.screens.home.HomeHeroCarouselPlaceholder
 import com.lagradost.cloudstream3.desktop.ui.theme.AppearanceConfig
+import com.lagradost.cloudstream3.desktop.ui.theme.HeroBannerStyle
 import com.lagradost.cloudstream3.desktop.ui.theme.PosterMetadataPosition
 import com.lagradost.cloudstream3.desktop.ui.theme.PosterTextAlignment
 import com.lagradost.cloudstream3.desktop.ui.theme.PosterTitlePosition
@@ -114,6 +115,8 @@ fun ExploreScreen(
     val heroBackdropBlurRadius by AppearanceConfig.heroBackdropBlurRadius.collectAsState()
     val heroBackdropDarkening by AppearanceConfig.heroBackdropDarkening.collectAsState()
     val dockPosition by AppearanceConfig.dockPosition.collectAsState()
+    val heroBannerStyle by AppearanceConfig.heroBannerStyle.collectAsState()
+    val isCardsCarousel = heroBannerStyle == HeroBannerStyle.CARDS_CAROUSEL
     var currentHeroImageUrl by remember { mutableStateOf<String?>(null) }
 
     val gridState = rememberLazyGridState()
@@ -413,19 +416,21 @@ fun ExploreScreen(
                     .align(Alignment.TopCenter)
                     .zIndex(10f),
             ) {
-                // Subtle top gradient scrim for crisp contrast over light backdrops
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(115.dp)
-                        .background(
-                            Brush.verticalGradient(
-                                0.0f to Color.Black.copy(alpha = 0.20f),
-                                0.5f to Color.Black.copy(alpha = 0.05f),
-                                1.0f to Color.Transparent,
+                // Subtle top gradient scrim for crisp contrast over light backdrops (omitted in Cards Carousel to keep ambient backdrop clean)
+                if (!isCardsCarousel) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(115.dp)
+                            .background(
+                                Brush.verticalGradient(
+                                    0.0f to Color.Black.copy(alpha = 0.20f),
+                                    0.5f to Color.Black.copy(alpha = 0.05f),
+                                    1.0f to Color.Transparent,
+                                ),
                             ),
-                        ),
-                )
+                    )
+                }
 
                 // Header Controls Row
                 ExploreHeaderControls(

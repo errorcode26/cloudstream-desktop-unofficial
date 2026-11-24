@@ -12,12 +12,14 @@ import com.lagradost.cloudstream3.desktop.sandbox.windows.WindowsSandboxAcl
 import com.lagradost.common.platform.PlatformPaths
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import org.slf4j.LoggerFactory
 import java.io.BufferedWriter
 import java.io.Closeable
@@ -26,6 +28,7 @@ import java.io.IOException
 import java.io.OutputStreamWriter
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicLong
 
 class SandboxProcessManager(
     val containerName: String = "CloudStream.PluginWorker.Sandbox.v2",
@@ -38,15 +41,27 @@ class SandboxProcessManager(
         private val grantedSids = ConcurrentHashMap.newKeySet<String>()
     }
 
+    private data class PendingWorkerRequest(
+        val generation: Long,
+        val deferred: CompletableDeferred<WorkerResponse>,
+    )
+
     private val logger = LoggerFactory.getLogger(SandboxProcessManager::class.java)
 
     val mutex = Mutex()
-    private val pendingRequests = ConcurrentHashMap<Long, CompletableDeferred<WorkerResponse>>()
+    private val processStateLock = Any()
+    private val workerGeneration = AtomicLong(0L)
+    private val pendingRequests = ConcurrentHashMap<Long, PendingWorkerRequest>()
     private val activeWorkerNetworkRequests = ConcurrentHashMap<Long, Long>()
 
+    @Volatile
     private var currentJobObject: WindowsJobObject? = null
+    @Volatile
     private var currentProcess: WindowsAppContainerLauncher.SandboxedProcess? = null
+    @Volatile
     private var processWriter: BufferedWriter? = null
+    @Volatile
+    private var activeStartupJob: Deferred<Unit>? = null
     @Volatile
     private var lastExitCode: String = "none"
 
@@ -61,9 +76,36 @@ class SandboxProcessManager(
     }
 
     suspend fun ensureStartedLocked(onPostLaunch: (suspend () -> Unit)?) {
+        val inFlight = activeStartupJob
+        if (inFlight != null) {
+            if (inFlight.isActive) {
+                inFlight.await()
+                if (isAlive()) return
+            } else {
+                activeStartupJob = null
+            }
+        }
         if (isAlive()) return
-        launchWorkerInternal()
-        onPostLaunch?.invoke()
+
+        // Run worker spawn and plugin warmup on the manager's supervisor scope so an individual
+        // caller's short timeout cannot abort initialization mid-way and leave a half-mounted worker.
+        val startup = scope.async<Unit> {
+            try {
+                launchWorkerInternal()
+                onPostLaunch?.invoke()
+            } catch (t: Throwable) {
+                recycleWorker()
+                throw t
+            }
+        }
+        activeStartupJob = startup
+        try {
+            startup.await()
+        } finally {
+            if (activeStartupJob === startup && startup.isCompleted) {
+                activeStartupJob = null
+            }
+        }
     }
 
     private fun launchWorkerInternal() {
@@ -210,7 +252,6 @@ class SandboxProcessManager(
             jobName = "CS3_PluginWorker_Job_${System.currentTimeMillis()}",
             memoryLimitBytes = memoryLimitBytes
         )
-        this.currentJobObject = job
 
         val sandboxTmp = File(PlatformPaths.sandboxDir, "tmp").apply {
             try {
@@ -261,18 +302,27 @@ class SandboxProcessManager(
             "-cp \"$workerClasspath\" " +
             "com.lagradost.cloudstream3.desktop.sandbox.worker.PluginWorkerMain"
 
-        val process = WindowsAppContainerLauncher.launch(
-            commandLine = commandLine,
-            containerName = containerName,
-            workingDir = PlatformPaths.sandboxDir,
-            capabilities = listOf(
-                WindowsAppContainerApi.CAPABILITY_INTERNET_CLIENT
-            ),
-            jobObject = job
-        )
+        val process = try {
+            WindowsAppContainerLauncher.launch(
+                commandLine = commandLine,
+                containerName = containerName,
+                workingDir = PlatformPaths.sandboxDir,
+                capabilities = listOf(
+                    WindowsAppContainerApi.CAPABILITY_INTERNET_CLIENT
+                ),
+                jobObject = job
+            )
+        } catch (t: Throwable) {
+            try { job.close() } catch (_: Throwable) {}
+            throw t
+        }
 
-        this.currentProcess = process
-        this.processWriter = BufferedWriter(OutputStreamWriter(process.stdin, StandardCharsets.UTF_8), 65536)
+        val generation = workerGeneration.incrementAndGet()
+        synchronized(processStateLock) {
+            this.currentProcess = process
+            this.currentJobObject = job
+            this.processWriter = BufferedWriter(OutputStreamWriter(process.stdin, StandardCharsets.UTF_8), 65536)
+        }
 
         // Background stdout reader
         scope.launch {
@@ -300,8 +350,11 @@ class SandboxProcessManager(
 
                     try {
                         val resp = WorkerProtocolSerializer.deserializeResponse(trimmed)
-                        val deferred = pendingRequests.remove(resp.id)
-                        deferred?.complete(resp)
+                        val pending = pendingRequests[resp.id]
+                        if (pending != null && pending.generation == generation) {
+                            pendingRequests.remove(resp.id, pending)
+                            pending.deferred.complete(resp)
+                        }
                     } catch (e: Throwable) {
                         logger.error("Failed to parse response JSON from worker: $line", e)
                     }
@@ -309,7 +362,7 @@ class SandboxProcessManager(
             } catch (e: Throwable) {
                 logger.warn("Worker stdout reader stream closed: ${e.message}")
             } finally {
-                handleWorkerTermination()
+                handleWorkerTermination(process, job, generation)
             }
         }
 
@@ -388,42 +441,105 @@ class SandboxProcessManager(
         com.lagradost.common.logging.AppLogger.i("Sandbox:Process", "Sandboxed worker process started successfully (PID: ${process.pid})")
     }
 
-    private fun handleWorkerTermination() {
-        val pending = pendingRequests.values.toList()
-        pendingRequests.clear()
-        activeWorkerNetworkRequests.clear()
-
-        val exit = try { currentProcess?.exitValue() } catch (_: Throwable) { null }
-        val exitHex = exit?.let { "0x" + Integer.toHexString(it).uppercase() } ?: "unknown"
-        lastExitCode = "$exit ($exitHex)"
-
-        // Allow a brief window for background stderr reader to flush any JVM fatal error lines before closing handles
-        try { Thread.sleep(100) } catch (_: Throwable) {}
-
-        for (p in pending) {
-            p.completeExceptionally(IOException("Sandboxed worker process terminated unexpectedly (exit: $exitHex)"))
-        }
-
-        currentProcess?.close()
-        currentProcess = null
-        processWriter = null
-
-        scope.launch(Dispatchers.IO) {
-            try {
-                File(PlatformPaths.sandboxDir, "tmp").listFiles()?.forEach { file ->
-                    try { file.deleteRecursively() } catch (t: Throwable) {
-                        logger.debug("Failed cleaning sandbox tmp during termination: ${t.message}")
-                    }
-                }
-            } catch (t: Throwable) {
-                logger.debug("Failed accessing sandbox tmp during termination: ${t.message}")
+    private fun failPendingForGeneration(generation: Long, reason: String) {
+        val iterator = pendingRequests.entries.iterator()
+        while (iterator.hasNext()) {
+            val entry = iterator.next()
+            if (entry.value.generation == generation) {
+                iterator.remove()
+                entry.value.deferred.completeExceptionally(IOException(reason))
             }
         }
-        currentJobObject?.close()
-        currentJobObject = null
+    }
 
-        logger.warn("Sandboxed worker process terminated. Exit code: $exit ($exitHex). Ready for auto-recovery on next query.")
-        com.lagradost.common.logging.AppLogger.w("Sandbox:Process", "Sandboxed worker process terminated. Exit code: $exit ($exitHex). Ready for auto-recovery on next query.")
+    private fun handleWorkerTermination(
+        terminatedProcess: WindowsAppContainerLauncher.SandboxedProcess,
+        terminatedJob: WindowsJobObject,
+        terminatedGeneration: Long,
+    ) {
+        val exit = try { terminatedProcess.exitValue() } catch (_: Throwable) { null }
+        val exitHex = exit?.let { "0x" + Integer.toHexString(it).uppercase() } ?: "unknown"
+
+        // Allow a brief window for background stderr reader to flush any fatal error lines before closing handles.
+        try { Thread.sleep(100) } catch (_: Throwable) {}
+
+        val isActiveInstance = synchronized(processStateLock) {
+            if (currentProcess === terminatedProcess) {
+                lastExitCode = "$exit ($exitHex)"
+                currentProcess = null
+                processWriter = null
+                currentJobObject = null
+                activeWorkerNetworkRequests.clear()
+                true
+            } else {
+                false
+            }
+        }
+
+        failPendingForGeneration(
+            generation = terminatedGeneration,
+            reason = "Sandboxed worker process terminated unexpectedly (exit: $exitHex)",
+        )
+
+        try { terminatedProcess.close() } catch (_: Throwable) {}
+        try { terminatedJob.close() } catch (_: Throwable) {}
+
+        if (isActiveInstance) {
+            scope.launch(Dispatchers.IO) {
+                try {
+                    File(PlatformPaths.sandboxDir, "tmp").listFiles()?.forEach { file ->
+                        try { file.deleteRecursively() } catch (t: Throwable) {
+                            logger.debug("Failed cleaning sandbox tmp during termination: ${t.message}")
+                        }
+                    }
+                } catch (t: Throwable) {
+                    logger.debug("Failed accessing sandbox tmp during termination: ${t.message}")
+                }
+            }
+            logger.warn("Sandboxed worker process terminated. Exit code: $exit ($exitHex). Ready for auto-recovery on next query.")
+            com.lagradost.common.logging.AppLogger.w("Sandbox:Process", "Sandboxed worker process terminated. Exit code: $exit ($exitHex). Ready for auto-recovery on next query.")
+        } else {
+            logger.debug("Stale worker generation {} finished cleanup (exit: {} ({}))", terminatedGeneration, exit, exitHex)
+        }
+    }
+
+    private fun registerAndWriteLocked(request: WorkerRequest): PendingWorkerRequest {
+        val activeGen: Long
+        synchronized(processStateLock) {
+            if (!isAlive() || processWriter == null) {
+                throw IOException("Sandboxed worker process failed to start or terminated immediately (exit: $lastExitCode)")
+            }
+            activeGen = workerGeneration.get()
+        }
+        val pending = PendingWorkerRequest(activeGen, CompletableDeferred())
+        pendingRequests[request.id] = pending
+        try {
+            sendDirect(request)
+        } catch (t: Throwable) {
+            pendingRequests.remove(request.id, pending)
+            throw t
+        }
+        return pending
+    }
+
+    private suspend fun awaitRegisteredResponse(
+        request: WorkerRequest,
+        pending: PendingWorkerRequest,
+        timeoutMs: Long,
+    ): WorkerResponse {
+        try {
+            // Only recycle the worker if THIS IPC wait exceeds timeoutMs; outer coroutine
+            // cancellation (such as shorter caller deadlines) propagates without killing the worker.
+            return withTimeoutOrNull(timeoutMs) {
+                pending.deferred.await()
+            } ?: run {
+                logger.warn("Request ${request.id} (action: '${request.action}') timed out after ${timeoutMs}ms on host. Recycling worker.")
+                recycleWorker(expectedGeneration = pending.generation)
+                throw IOException("Sandbox worker request timed out after ${timeoutMs}ms (action: ${request.action})")
+            }
+        } finally {
+            pendingRequests.remove(request.id, pending)
+        }
     }
 
     suspend fun sendRequest(
@@ -431,39 +547,16 @@ class SandboxProcessManager(
         timeoutMs: Long = 30_000L,
         onEnsureStarted: (suspend () -> Unit)? = null
     ): WorkerResponse {
-        val deferred = CompletableDeferred<WorkerResponse>()
-        pendingRequests[request.id] = deferred
-
-        try {
-            mutex.withLock {
-                if (!isAlive()) {
-                    ensureStartedLocked(onEnsureStarted)
-                }
-                if (!isAlive() || processWriter == null) {
-                    throw IOException("Sandboxed worker process failed to start or terminated immediately (exit: $lastExitCode)")
-                }
-                sendDirect(request)
-            }
-
-            return withTimeout(timeoutMs) {
-                deferred.await()
-            }
-        } finally {
-            pendingRequests.remove(request.id)
+        val pending = mutex.withLock {
+            ensureStartedLocked(onEnsureStarted)
+            registerAndWriteLocked(request)
         }
+        return awaitRegisteredResponse(request, pending, timeoutMs)
     }
 
     suspend fun sendDirectAwaitLocked(request: WorkerRequest, timeoutMs: Long): WorkerResponse {
-        val deferred = CompletableDeferred<WorkerResponse>()
-        pendingRequests[request.id] = deferred
-        sendDirect(request)
-        return try {
-            withTimeout(timeoutMs) {
-                deferred.await()
-            }
-        } finally {
-            pendingRequests.remove(request.id)
-        }
+        val pending = registerAndWriteLocked(request)
+        return awaitRegisteredResponse(request, pending, timeoutMs)
     }
 
     fun sendDirect(request: WorkerRequest) {
@@ -486,15 +579,41 @@ class SandboxProcessManager(
         }
     }
 
-    fun recycleWorker() {
+    fun recycleWorker(expectedGeneration: Long? = null) {
+        var oldProc: WindowsAppContainerLauncher.SandboxedProcess? = null
+        var oldJob: WindowsJobObject? = null
+        var oldGen: Long = 0L
+        var oldStartup: Deferred<Unit>? = null
+        synchronized(processStateLock) {
+            val currentGen = workerGeneration.get()
+            if (expectedGeneration != null && currentGen != expectedGeneration) {
+                return
+            }
+            oldProc = currentProcess
+            oldJob = currentJobObject
+            oldGen = currentGen
+            oldStartup = activeStartupJob
+            currentProcess = null
+            processWriter = null
+            currentJobObject = null
+            activeStartupJob = null
+            activeWorkerNetworkRequests.clear()
+        }
+        oldStartup?.cancel()
+        if (oldGen > 0L) {
+            failPendingForGeneration(
+                generation = oldGen,
+                reason = "Sandboxed worker process recycled (exit: $lastExitCode)",
+            )
+        }
         try {
-            currentProcess?.destroy()
+            oldProc?.destroy()
         } catch (t: Throwable) {
             logger.debug("Worker process destroy: ${t.message}")
         }
-        currentProcess = null
-        currentJobObject?.close()
-        currentJobObject = null
+        try {
+            oldJob?.close()
+        } catch (_: Throwable) {}
     }
 
     override fun close() {

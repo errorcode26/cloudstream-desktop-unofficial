@@ -172,14 +172,30 @@ object PluginWorkerMain {
                 inFlightRequests.incrementAndGet()
                 scope.launch {
                     try {
-                    val resp = try {
-                        handleRequest(req)
-                    } catch (e: Throwable) {
-                        logger.error("Error executing action '${req.action}' for ID ${req.id}", e)
-                        WorkerResponse(id = req.id, success = false, error = "${e.javaClass.simpleName}: ${e.message}")
-                    }
+                        val actionTimeoutMs = when (req.action) {
+                            WorkerRequest.ACTION_LOAD -> 20_000L
+                            WorkerRequest.ACTION_SEARCH -> 15_000L
+                            WorkerRequest.ACTION_MAIN_PAGE -> 15_000L
+                            WorkerRequest.ACTION_LOAD_LINKS -> 25_000L
+                            else -> 15_000L
+                        }
+                        val resp = try {
+                            kotlinx.coroutines.withTimeout(actionTimeoutMs) {
+                                handleRequest(req)
+                            }
+                        } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
+                            logger.warn("Worker request ${req.id} (action: '${req.action}') timed out after ${actionTimeoutMs}ms in plugin runtime")
+                            WorkerResponse(
+                                id = req.id,
+                                success = false,
+                                error = "Operation timed out after ${actionTimeoutMs}ms inside plugin runtime"
+                            )
+                        } catch (e: Throwable) {
+                            logger.error("Error executing action '${req.action}' for ID ${req.id}", e)
+                            WorkerResponse(id = req.id, success = false, error = "${e.javaClass.simpleName}: ${e.message}")
+                        }
 
-                    sendResponse(writer, resp)
+                        sendResponse(writer, resp)
                     } finally {
                         if (inFlightRequests.decrementAndGet() == 0) {
                             scope.launch {

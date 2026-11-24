@@ -1,6 +1,7 @@
 package com.lagradost.cloudstream3.desktop.ui.screens.player
 
 import com.lagradost.cloudstream3.SubtitleFile
+import com.lagradost.cloudstream3.desktop.subtitles.LanguageNormalizer
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import java.util.concurrent.ConcurrentHashMap
 
@@ -54,9 +55,10 @@ object LinkCache {
         if (validKeys.isEmpty()) return
         val now = System.currentTimeMillis()
         prune(now)
+        val distinctSubs = subtitles.distinctBy { LanguageNormalizer.getCanonicalKey(it.lang, it.url) }
         val entry = CachedLinks(
             links = links,
-            subtitles = subtitles,
+            subtitles = distinctSubs,
             timestamp = now,
         )
         validKeys.forEach { cache[it] = entry }
@@ -73,9 +75,9 @@ object LinkCache {
             newLinks.distinctBy { it.url }
         }
         val mergedSubs = if (existing != null) {
-            (existing.subtitles + newSubtitles).distinctBy { it.url }
+            (existing.subtitles + newSubtitles).distinctBy { LanguageNormalizer.getCanonicalKey(it.lang, it.url) }
         } else {
-            newSubtitles.distinctBy { it.url }
+            newSubtitles.distinctBy { LanguageNormalizer.getCanonicalKey(it.lang, it.url) }
         }
         prune(now)
         val entry = CachedLinks(

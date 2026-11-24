@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.DeserializationContext
 import com.fasterxml.jackson.databind.DeserializationFeature
 import com.fasterxml.jackson.databind.JsonDeserializer
 import com.fasterxml.jackson.databind.JsonNode
+import com.fasterxml.jackson.databind.MapperFeature
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.module.SimpleModule
 import com.fasterxml.jackson.module.kotlin.kotlinModule
@@ -216,6 +217,7 @@ class SearchResponseDeserializer : JsonDeserializer<SearchResponse>() {
 object WorkerProtocolSerializer {
     val mapper: ObjectMapper = com.lagradost.cloudstream3.mapper.copy().apply {
         configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+        configure(MapperFeature.USE_GETTERS_AS_SETTERS, false)
         val module = SimpleModule().apply {
             addDeserializer(SearchResponse::class.java, SearchResponseDeserializer())
         }

@@ -149,6 +149,28 @@ class AutoRetryInterceptor(private val maxRetries: Int = 1) : okhttp3.Intercepto
 }
 
 /**
+ * Normalizes HTTP 407 (Proxy Authentication Required) status codes received on direct
+ * non-proxy connections to HTTP 403. This prevents OkHttp's RetryAndFollowUpInterceptor
+ * from throwing a fatal ProtocolException when anti-bot CDNs return 407 to direct clients.
+ */
+class DirectConnection407Interceptor : okhttp3.Interceptor {
+    override fun intercept(chain: okhttp3.Interceptor.Chain): okhttp3.Response {
+        val response = chain.proceed(chain.request())
+        if (response.code == 407) {
+            val isDirect = chain.connection()?.route()?.proxy?.type() != java.net.Proxy.Type.HTTP
+            if (isDirect) {
+                AppLogger.d("Network:HTTP", "Direct connection received HTTP 407 from ${chain.request().url.host}; normalizing to 403.")
+                return response.newBuilder()
+                    .code(403)
+                    .message("Proxy Authentication Required (Direct Connection)")
+                    .build()
+            }
+        }
+        return response
+    }
+}
+
+/**
  * Named interceptor class so it can be identified and deduplicated
  * when updateGlobalNetworkClients() is called multiple times (e.g. on DoH switch).
  */
@@ -220,6 +242,50 @@ class TmdbMirrorInterceptor : okhttp3.Interceptor {
             }
             throw e
         }
+    }
+}
+
+/**
+ * Proactive DNS failure detector and advisor.
+ * When internet connectivity is active (NetworkMonitor.isOnline == true) but DNS lookups
+ * fail consecutively (e.g. ISP blocks or unresolvable domains), surfaces a debounced
+ * advisory guiding the user to enable or reconfigure DNS-over-HTTPS.
+ */
+object DnsFailureAdvisor {
+    private val failureCount = java.util.concurrent.atomic.AtomicInteger(0)
+    private val lastAlertTime = java.util.concurrent.atomic.AtomicLong(0L)
+    private const val ALERT_COOLDOWN_MS = 180_000L // 3 minutes cooldown between notifications
+    private const val FAILURE_ALERT_THRESHOLD = 3 // Alert after 3 consecutive failures
+
+    fun onDnsFailure(hostname: String, provider: DohProvider, error: Throwable) {
+        val count = failureCount.incrementAndGet()
+        val now = System.currentTimeMillis()
+        val last = lastAlertTime.get()
+
+        if (count >= FAILURE_ALERT_THRESHOLD && (now - last > ALERT_COOLDOWN_MS)) {
+            val isOnline = com.lagradost.cloudstream3.desktop.network.NetworkMonitor.isOnline.value
+            if (isOnline) {
+                lastAlertTime.set(now)
+                failureCount.set(0)
+
+                val message = if (provider == DohProvider.NONE) {
+                    "DNS lookup failed for '$hostname'. Your network may be blocking domains. Try enabling DNS-over-HTTPS in Settings > Network."
+                } else {
+                    "DNS lookup failed using ${provider.title}. Your configured DoH provider may be unresponsive. Try switching DNS providers in Settings > Network."
+                }
+
+                AppLogger.w("Network:DNS", "DnsFailureAdvisor: $message (Caused by: ${error.message})")
+                com.lagradost.cloudstream3.desktop.ui.components.AppToastManager.showToast(
+                    text = message,
+                    type = com.lagradost.cloudstream3.desktop.ui.components.ToastType.WARNING,
+                    durationMs = 6000L
+                )
+            }
+        }
+    }
+
+    fun onDnsSuccess() {
+        failureCount.set(0)
     }
 }
 
@@ -315,24 +381,36 @@ object NetworkConfig {
         // an anti-flapping circuit breaker for DoH resolution.
         try {
             val upstreamDns = baseBuilder.build().dns
-            val autoFallback = DesktopDataStore.getKey<Boolean>(PREF_DOH_AUTO_FALLBACK) ?: true
+            val autoFallback = DesktopDataStore.getKey<Boolean>(PREF_DOH_AUTO_FALLBACK) ?: false
 
             baseBuilder.dns(object : okhttp3.Dns {
                 override fun lookup(hostname: String): List<java.net.InetAddress> {
                     // System default or fallback explicitly disabled by user
                     if (provider == DohProvider.NONE || !autoFallback) {
-                        val addresses = upstreamDns.lookup(hostname)
-                        val ipv4Only = addresses.filter { it is java.net.Inet4Address }
-                        return ipv4Only.ifEmpty { addresses }
+                        return try {
+                            val addresses = upstreamDns.lookup(hostname)
+                            val ipv4Only = addresses.filter { it is java.net.Inet4Address }
+                            DnsFailureAdvisor.onDnsSuccess()
+                            ipv4Only.ifEmpty { addresses }
+                        } catch (e: Exception) {
+                            DnsFailureAdvisor.onDnsFailure(hostname, provider, e)
+                            throw e
+                        }
                     }
 
                     // Anti-Flapping Circuit Breaker:
                     // If in degraded state, bypass DoH entirely to prevent request hangs and IP jitter
                     val now = System.currentTimeMillis()
                     if (now < dohDegradedUntilMs) {
-                        val sysAddresses = okhttp3.Dns.SYSTEM.lookup(hostname)
-                        val ipv4Only = sysAddresses.filter { it is java.net.Inet4Address }
-                        return ipv4Only.ifEmpty { sysAddresses }
+                        return try {
+                            val sysAddresses = okhttp3.Dns.SYSTEM.lookup(hostname)
+                            val ipv4Only = sysAddresses.filter { it is java.net.Inet4Address }
+                            DnsFailureAdvisor.onDnsSuccess()
+                            ipv4Only.ifEmpty { sysAddresses }
+                        } catch (e: Exception) {
+                            DnsFailureAdvisor.onDnsFailure(hostname, provider, e)
+                            throw e
+                        }
                     }
 
                     // DoH is healthy or cooldown period has ended (probing DoH)
@@ -345,6 +423,7 @@ object NetworkConfig {
                             dohDegradedUntilMs = 0L
                             AppLogger.i("Network:DNS", "DoH connection restored. Circuit breaker reset.")
                         }
+                        DnsFailureAdvisor.onDnsSuccess()
                         ipv4Only.ifEmpty { addresses }
                     } catch (dohEx: Exception) {
                         val failures = dohFailureCount.incrementAndGet()
@@ -357,8 +436,10 @@ object NetworkConfig {
                         try {
                             val sysAddresses = okhttp3.Dns.SYSTEM.lookup(hostname)
                             val ipv4Only = sysAddresses.filter { it is java.net.Inet4Address }
+                            DnsFailureAdvisor.onDnsSuccess()
                             ipv4Only.ifEmpty { sysAddresses }
                         } catch (sysEx: Exception) {
+                            DnsFailureAdvisor.onDnsFailure(hostname, provider, dohEx)
                             throw dohEx
                         }
                     }
@@ -399,6 +480,12 @@ object NetworkConfig {
         val hasDevNetwork = baseBuilder.interceptors().any { it is DevNetworkInterceptor }
         if (!hasDevNetwork) {
             baseBuilder.addInterceptor(DevNetworkInterceptor())
+        }
+
+        // Add DirectConnection407Interceptor to prevent OkHttp ProtocolException on direct connections
+        val has407Interceptor = baseBuilder.networkInterceptors().any { it is DirectConnection407Interceptor }
+        if (!has407Interceptor) {
+            baseBuilder.addNetworkInterceptor(DirectConnection407Interceptor())
         }
 
         // Apply to main client

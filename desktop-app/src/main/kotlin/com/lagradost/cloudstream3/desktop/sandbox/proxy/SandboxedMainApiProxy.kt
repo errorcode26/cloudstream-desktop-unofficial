@@ -11,6 +11,7 @@ import com.lagradost.cloudstream3.SearchResponse
 import com.lagradost.cloudstream3.SearchResponseList
 import com.lagradost.cloudstream3.SubtitleFile
 import com.lagradost.cloudstream3.TvType
+import com.lagradost.cloudstream3.desktop.subtitles.LanguageNormalizer
 import com.lagradost.cloudstream3.newHomePageResponse
 import com.lagradost.cloudstream3.newSearchResponseList
 import com.lagradost.cloudstream3.utils.ExtractorLink
@@ -90,9 +91,27 @@ class SandboxedMainApiProxy(
                 }
             }
             newSearchResponseList(items, hasNext = hasNext)
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            if (e is kotlinx.coroutines.TimeoutCancellationException) {
+                logger.debug("Sandboxed search timed out for provider '{}': {}", name, e.message)
+                newSearchResponseList(emptyList(), hasNext = false)
+            } else {
+                throw e
+            }
         } catch (e: Throwable) {
-            logger.error("Sandboxed search failed for provider '$name'", e)
-            null
+            val msg = e.message.orEmpty()
+            val isRecoverable = e is java.io.IOException ||
+                msg.contains("timed out", ignoreCase = true) ||
+                msg.contains("not found", ignoreCase = true) ||
+                msg.contains("canceled", ignoreCase = true)
+
+            if (isRecoverable) {
+                logger.debug("Sandboxed search gracefully returning empty for provider '{}': {}", name, msg)
+                newSearchResponseList(emptyList(), hasNext = false)
+            } else {
+                logger.error("Sandboxed search failed for provider '$name'", e)
+                throw e
+            }
         }
     }
 
@@ -116,9 +135,15 @@ class SandboxedMainApiProxy(
                 }
             }
             WorkerProtocolSerializer.mapper.treeToValue(typed.json, clazz) as? LoadResponse
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
         } catch (e: Throwable) {
-            logger.error("Sandboxed load failed for provider '$name' at URL '$url'", e)
-            null
+            if (e is java.io.IOException) {
+                logger.warn("Sandboxed load failed for provider '$name' at URL '$url': ${e.message}")
+            } else {
+                logger.error("Sandboxed load failed for provider '$name' at URL '$url'", e)
+            }
+            throw e
         }
     }
 
@@ -152,9 +177,27 @@ class SandboxedMainApiProxy(
                 )
             }
             newHomePageResponse(lists, hasNext = typedResp.hasNext)
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            if (e is kotlinx.coroutines.TimeoutCancellationException) {
+                logger.debug("Sandboxed getMainPage timed out for provider '{}' (page {}, req '{}'): {}", name, page, request.name, e.message)
+                null
+            } else {
+                throw e
+            }
         } catch (e: Throwable) {
-            logger.error("Sandboxed getMainPage failed for provider '$name'", e)
-            null
+            val msg = e.message.orEmpty()
+            val isRecoverable = e is java.io.IOException ||
+                msg.contains("timed out", ignoreCase = true) ||
+                msg.contains("not found", ignoreCase = true) ||
+                msg.contains("canceled", ignoreCase = true)
+
+            if (isRecoverable) {
+                logger.debug("Sandboxed getMainPage gracefully returning null for provider '{}': {}", name, msg)
+                null
+            } else {
+                logger.error("Sandboxed getMainPage failed for provider '$name'", e)
+                throw e
+            }
         }
     }
 
@@ -164,16 +207,16 @@ class SandboxedMainApiProxy(
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
+        val streamedLinkUrls = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+        val streamedSubUrls = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
         return try {
-            val streamedLinkUrls = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
-            val streamedSubUrls = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
-
             val json = host.loadLinks(
                 providerName = this.name,
                 data = data,
                 isCasting = isCasting,
                 subtitleCallback = { sub ->
-                    if (streamedSubUrls.add(sub.url)) {
+                    val key = LanguageNormalizer.getCanonicalKey(sub.lang, sub.url)
+                    if (streamedSubUrls.add(key)) {
                         subtitleCallback(sub)
                     }
                 },
@@ -209,8 +252,11 @@ class SandboxedMainApiProxy(
                 for (elem in subsNode) {
                     try {
                         val sub = WorkerProtocolSerializer.mapper.treeToValue(elem, SubtitleFile::class.java)
-                        if (sub != null && streamedSubUrls.add(sub.url)) {
-                            subtitleCallback(sub)
+                        if (sub != null) {
+                            val key = LanguageNormalizer.getCanonicalKey(sub.lang, sub.url)
+                            if (streamedSubUrls.add(key)) {
+                                subtitleCallback(sub)
+                            }
                         }
                     } catch (e: Throwable) {
                         logger.warn("Failed to deserialize SubtitleFile: ${e.message}")
@@ -221,7 +267,11 @@ class SandboxedMainApiProxy(
             streamedLinkUrls.isNotEmpty() || (linksNode != null && !linksNode.isEmpty)
         } catch (e: Throwable) {
             logger.error("Sandboxed loadLinks failed for provider '$name'", e)
-            false
+            if (streamedLinkUrls.isNotEmpty()) {
+                true
+            } else {
+                throw e
+            }
         }
     }
 }

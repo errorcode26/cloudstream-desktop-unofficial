@@ -457,7 +457,7 @@ fun HomeHeroCardsCarousel(
             }
         }
 
-        // Desktop Floating Navigation Chevrons (Visible on hover)
+        // Desktop Floating Navigation Chevrons (Visible on hover, placed inside active card bounds)
         val chevronAlpha by animateFloatAsState(
             targetValue = if (isCarouselHovered && displayItems.size > 1) 1f else 0f,
             animationSpec = tween(200),
@@ -465,22 +465,45 @@ fun HomeHeroCardsCarousel(
         )
 
         if (chevronAlpha > 0f && !isCompact) {
-            // Left Chevron (infinite left scroll)
+            val chevronButtonSize = 34.dp
+            val chevronCardOffset = horizontalPeekPadding + 14.dp
+
+            val leftInteractionSource = remember { MutableInteractionSource() }
+            val isLeftHovered by leftInteractionSource.collectIsHoveredAsState()
+
+            val rightInteractionSource = remember { MutableInteractionSource() }
+            val isRightHovered by rightInteractionSource.collectIsHoveredAsState()
+
+            // Left Chevron (hugging the center active card's left edge)
             Box(
                 modifier = Modifier
                     .align(Alignment.CenterStart)
-                    .padding(start = 16.dp)
-                    .size(44.dp)
+                    .padding(start = chevronCardOffset)
+                    .size(chevronButtonSize)
                     .graphicsLayer {
                         this.alpha = chevronAlpha
                         this.clip = true
                         this.shape = CircleShape
                     }
+                    .shadow(
+                        elevation = 8.dp,
+                        shape = CircleShape,
+                        spotColor = Color.Black.copy(alpha = 0.50f),
+                        ambientColor = Color.Transparent,
+                    )
                     .clip(CircleShape)
-                    .background(Color(0xFF14141A).copy(alpha = 0.80f * chevronAlpha))
-                    .border(1.dp, Color.White.copy(alpha = 0.20f * chevronAlpha), CircleShape)
+                    .background(
+                        if (isLeftHovered) Color(0xFF22222E).copy(alpha = 0.92f * chevronAlpha)
+                        else Color(0xFF14141A).copy(alpha = 0.78f * chevronAlpha),
+                    )
+                    .border(
+                        1.dp,
+                        if (isLeftHovered) Color.White.copy(alpha = 0.45f * chevronAlpha)
+                        else Color.White.copy(alpha = 0.20f * chevronAlpha),
+                        CircleShape,
+                    )
                     .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
+                        interactionSource = leftInteractionSource,
                         indication = null,
                     ) {
                         navigateToPage(pagerState.currentPage - 1)
@@ -491,26 +514,40 @@ fun HomeHeroCardsCarousel(
                     Icons.Default.ChevronLeft,
                     contentDescription = "Previous Slide",
                     tint = Color.White,
-                    modifier = Modifier.size(26.dp),
+                    modifier = Modifier.size(20.dp),
                 )
             }
 
-            // Right Chevron (infinite right scroll)
+            // Right Chevron (hugging the center active card's right edge)
             Box(
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
-                    .padding(end = 16.dp)
-                    .size(44.dp)
+                    .padding(end = chevronCardOffset)
+                    .size(chevronButtonSize)
                     .graphicsLayer {
                         this.alpha = chevronAlpha
                         this.clip = true
                         this.shape = CircleShape
                     }
+                    .shadow(
+                        elevation = 8.dp,
+                        shape = CircleShape,
+                        spotColor = Color.Black.copy(alpha = 0.50f),
+                        ambientColor = Color.Transparent,
+                    )
                     .clip(CircleShape)
-                    .background(Color(0xFF14141A).copy(alpha = 0.80f * chevronAlpha))
-                    .border(1.dp, Color.White.copy(alpha = 0.20f * chevronAlpha), CircleShape)
+                    .background(
+                        if (isRightHovered) Color(0xFF22222E).copy(alpha = 0.92f * chevronAlpha)
+                        else Color(0xFF14141A).copy(alpha = 0.78f * chevronAlpha),
+                    )
+                    .border(
+                        1.dp,
+                        if (isRightHovered) Color.White.copy(alpha = 0.45f * chevronAlpha)
+                        else Color.White.copy(alpha = 0.20f * chevronAlpha),
+                        CircleShape,
+                    )
                     .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
+                        interactionSource = rightInteractionSource,
                         indication = null,
                     ) {
                         navigateToPage(pagerState.currentPage + 1)
@@ -521,7 +558,7 @@ fun HomeHeroCardsCarousel(
                     Icons.Default.ChevronRight,
                     contentDescription = "Next Slide",
                     tint = Color.White,
-                    modifier = Modifier.size(26.dp),
+                    modifier = Modifier.size(20.dp),
                 )
             }
         }

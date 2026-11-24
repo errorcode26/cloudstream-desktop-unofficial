@@ -265,7 +265,7 @@ class SandboxedPluginHost(
             query = query,
             page = page,
         )
-        val resp = sendRequest(req, timeoutMs = 45_000L)
+        val resp = sendRequest(req, timeoutMs = 18_000L)
         if (!resp.success) throw IOException(resp.error ?: "Search failed")
         return resp.payloadJson
     }
@@ -277,7 +277,7 @@ class SandboxedPluginHost(
             providerName = providerName,
             url = url
         )
-        val resp = sendRequest(req, timeoutMs = 45_000L)
+        val resp = sendRequest(req, timeoutMs = 23_000L)
         if (!resp.success) throw IOException(resp.error ?: "Load failed")
         return resp.payloadJson
     }
@@ -303,7 +303,7 @@ class SandboxedPluginHost(
             )
         }
         return try {
-            val resp = sendRequest(req, timeoutMs = 90_000L)
+            val resp = sendRequest(req, timeoutMs = 30_000L)
             if (!resp.success) throw IOException(resp.error ?: "LoadLinks failed")
             resp.payloadJson
         } finally {
@@ -327,7 +327,7 @@ class SandboxedPluginHost(
             requestData = requestData,
             horizontalImages = horizontalImages
         )
-        val resp = sendRequest(req, timeoutMs = 45_000L)
+        val resp = sendRequest(req, timeoutMs = 20_000L)
         if (!resp.success) throw IOException(resp.error ?: "MainPage failed")
         return resp.payloadJson
     }

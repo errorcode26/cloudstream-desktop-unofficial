@@ -31,13 +31,13 @@ sealed interface PluginCallResult<out T> {
  */
 object SafePluginInvoker {
 
-    const val TIMEOUT_SEARCH_MS: Long = 25_000L
-    const val TIMEOUT_LOAD_MS: Long = 90_000L
+    const val TIMEOUT_SEARCH_MS: Long = 15_000L
+    const val TIMEOUT_LOAD_MS: Long = 15_000L
 
     // Scraping uses callbacks that stream results incrementally — the timeout is a safety cap
     // on the TOTAL call, not an indicator of failure. Links may have already been delivered.
-    const val TIMEOUT_SCRAPE_MS: Long = 60_000L
-    const val TIMEOUT_DEFAULT_MS: Long = 30_000L
+    const val TIMEOUT_SCRAPE_MS: Long = 30_000L
+    const val TIMEOUT_DEFAULT_MS: Long = 15_000L
 
     /**
      * Executes a plugin operation with full typed diagnostic results.

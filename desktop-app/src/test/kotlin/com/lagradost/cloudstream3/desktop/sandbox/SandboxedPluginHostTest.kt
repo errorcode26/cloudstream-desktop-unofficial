@@ -6,9 +6,11 @@ import com.lagradost.cloudstream3.desktop.sandbox.protocol.SandboxedProviderMeta
 import com.lagradost.cloudstream3.desktop.sandbox.proxy.SandboxedMainApiProxy
 import com.lagradost.cloudstream3.desktop.sandbox.windows.WindowsAppContainerApi
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeoutOrNull
 import org.junit.jupiter.api.Assumptions.assumeTrue
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class SandboxedPluginHostTest {
@@ -52,6 +54,19 @@ class SandboxedPluginHostTest {
             // Calling search on unloaded provider returns empty list without crashing host process
             val searchResults = proxy.search("test query")
             assertTrue(searchResults.isEmpty(), "Search on unloaded provider in worker should safely return empty list")
+
+            // Calling load on unloaded provider propagates IOException instead of falsely returning null
+            assertFailsWith<java.io.IOException> {
+                proxy.load("https://example.com/item1")
+            }
+
+            // Outer short coroutine timeout must cancel the caller without destroying the healthy worker
+            withTimeoutOrNull(1L) {
+                repeat(50) {
+                    host.ping()
+                }
+            }
+            assertTrue(host.ping(), "Worker should stay alive after outer caller timeout cancellation")
         } finally {
             host.close()
             WindowsAppContainerApi.deleteAppContainer(containerName)

@@ -49,7 +49,7 @@ class SafePluginClassLoader(parent: ClassLoader, private val isTrusted: Boolean 
         if (loaded != null) return loaded
         ghostCache[name]?.let { return it }
 
-        println("[GhostStub] Dynamically generated stub for missing Android API: $name")
+        com.lagradost.common.logging.AppLogger.d("[GhostStub] Dynamically generated stub for missing Android API: $name")
 
         val internalName = name.replace('.', '/')
         val cw = org.objectweb.asm.ClassWriter(0)

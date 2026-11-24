@@ -5,6 +5,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -49,7 +52,15 @@ internal fun ExploreHeaderControls(
     val isAmoled = theme.isAmoled
     val isLightMode = theme.isLightMode
     val performanceModeEnabled by AppearanceConfig.performanceModeEnabled.collectAsState()
-    val barShape = RoundedCornerShape(16.dp)
+
+    val drilledCat = uiState.drilledCatalog
+    val drilledPlat = uiState.drilledPlatform
+    val drilledSearchCat = uiState.drilledSearchCategory
+    val selectedCollection = uiState.selectedCollection
+    val isDrilled = drilledCat != null || drilledPlat != null || drilledSearchCat != null || selectedCollection != null
+
+    val barShape = RoundedCornerShape(24.dp)
+    val capsuleAlignment = if (isDrilled) Alignment.CenterStart else Alignment.Center
 
     val hazeModifier = if (hazeState != null && !isAmoled && !performanceModeEnabled) {
         Modifier
@@ -82,11 +93,6 @@ internal fun ExploreHeaderControls(
         )
     }
 
-    val drilledCat = uiState.drilledCatalog
-    val drilledPlat = uiState.drilledPlatform
-    val drilledSearchCat = uiState.drilledSearchCategory
-    val selectedCollection = uiState.selectedCollection
-
     // ── Header Controls (Left Catalog Capsule + Centered Search Bar) ──
     BoxWithConstraints(
         modifier = modifier
@@ -102,15 +108,15 @@ internal fun ExploreHeaderControls(
             ),
         )
 
-        // ── Left: Navigation & Catalog Filter Tabs Capsule ──
+        // ── Floating Island Pill: Navigation & Catalog Filter Tabs ──
         Box(
             modifier = Modifier
-                .align(Alignment.CenterStart)
+                .align(capsuleAlignment)
                 .widthIn(max = leftMaxW)
                 .wrapContentWidth()
                 .height(48.dp)
                 .shadow(
-                    elevation = 12.dp,
+                    elevation = 14.dp,
                     shape = barShape,
                     clip = false,
                     spotColor = Color.Black.copy(alpha = 0.35f),
@@ -314,40 +320,49 @@ internal fun ExploreHeaderControls(
                         // Explore primary category pills (My Add-ons, Streaming Hubs, Franchise Sagas, Anime, Movies, TV Shows)
                         Surface(
                             modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
+                                .clip(RoundedCornerShape(18.dp))
                                 .border(
                                     0.5.dp,
                                     if (isLightMode) theme.Divider.copy(alpha = 0.5f) else Color.White.copy(alpha = 0.12f),
-                                    RoundedCornerShape(8.dp),
+                                    RoundedCornerShape(18.dp),
                                 ),
                             color = if (isLightMode) theme.SurfaceElevated.copy(alpha = 0.6f) else Color.White.copy(alpha = 0.05f),
-                            shape = RoundedCornerShape(8.dp),
+                            shape = RoundedCornerShape(18.dp),
                         ) {
                             Row(
-                                modifier = Modifier.padding(2.dp),
-                                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                                modifier = Modifier.padding(2.5.dp),
+                                horizontalArrangement = Arrangement.spacedBy(3.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 uiState.availableTypes.forEach { type ->
                                     val isSelected = uiState.selectedType.equals(type, ignoreCase = true)
                                     val title = viewModel.formatTypeTitle(type)
+                                    val tabInteractionSource = remember { MutableInteractionSource() }
+                                    val isTabHovered by tabInteractionSource.collectIsHoveredAsState()
 
                                     Box(
                                         modifier = Modifier
                                             .height(30.dp)
-                                            .clip(RoundedCornerShape(6.dp))
+                                            .clip(RoundedCornerShape(15.dp))
                                             .background(
-                                                if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
+                                                when {
+                                                    isSelected -> MaterialTheme.colorScheme.primary
+                                                    isTabHovered -> if (isLightMode) Color.Black.copy(alpha = 0.08f) else Color.White.copy(alpha = 0.08f)
+                                                    else -> Color.Transparent
+                                                },
                                             )
-                                            .clickable { viewModel.onEvent(ExploreUiEvent.SelectType(type)) }
-                                            .padding(horizontal = 12.dp),
+                                            .clickable(
+                                                interactionSource = tabInteractionSource,
+                                                indication = null,
+                                            ) { viewModel.onEvent(ExploreUiEvent.SelectType(type)) }
+                                            .padding(horizontal = 13.dp),
                                         contentAlignment = Alignment.Center,
                                     ) {
                                         Text(
                                             text = title,
                                             fontSize = 12.sp,
-                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                            color = if (isSelected) Color.Black else theme.TextMuted,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
+                                            color = if (isSelected) Color.Black else (if (isTabHovered) theme.TextPrimary else theme.TextMuted),
                                             letterSpacing = 0.2.sp,
                                         )
                                     }

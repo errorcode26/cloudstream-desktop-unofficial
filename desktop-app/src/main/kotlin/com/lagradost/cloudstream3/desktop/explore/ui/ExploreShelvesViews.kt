@@ -36,6 +36,7 @@ import com.lagradost.cloudstream3.desktop.ui.navigation.Config
 import com.lagradost.cloudstream3.desktop.ui.screens.home.HomeHeroCarousel
 import com.lagradost.cloudstream3.desktop.ui.screens.home.HomeHeroCarouselPlaceholder
 import com.lagradost.cloudstream3.desktop.ui.theme.AppearanceConfig
+import com.lagradost.cloudstream3.desktop.ui.theme.HeroBannerStyle
 import com.lagradost.common.storage.DesktopDataStore
 import com.lagradost.common.storage.WatchHistory
 import kotlinx.coroutines.Dispatchers
@@ -251,14 +252,21 @@ internal fun ExploreShelvesView(
         return
     }
 
+    val heroBannerStyle by AppearanceConfig.heroBannerStyle.collectAsState()
+    val isCardsCarousel = heroBannerStyle == HeroBannerStyle.CARDS_CAROUSEL
     val isHeroVisible = searchQuery.isBlank() && (heroItems.isNotEmpty() || isShelvesLoading)
     val shouldPadTop = !isHeroVisible
+    val topPadding = when {
+        shouldPadTop -> 124.dp
+        isCardsCarousel -> 116.dp
+        else -> 0.dp
+    }
     LazyColumn(
         state = state,
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy((homeVerticalSpacingDp * 0.5f).dp),
         contentPadding = PaddingValues(
-            top = if (shouldPadTop) 124.dp else 0.dp,
+            top = topPadding,
             bottom = 32.dp,
         ),
     ) {

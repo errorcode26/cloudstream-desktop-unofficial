@@ -283,13 +283,15 @@ object StremioAddonManager {
             }
         }
 
+        val seenSubKeys = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+
         // 1. Emit embedded streams first if available
         if (effectiveMediaId != null) {
             val embedded = embeddedStreamsCache[effectiveMediaId]
             if (!embedded.isNullOrEmpty()) {
                 AppLogger.i(TAG, "Emitting ${embedded.size} embedded streams for $effectiveMediaId")
                 for (item in embedded) {
-                    emitStreamItem(item, "Embedded", onSubtitle, onLink)
+                    emitStreamItem(item, "Embedded", onSubtitle, onLink, seenSubKeys)
                 }
             }
         }
@@ -312,7 +314,7 @@ object StremioAddonManager {
                         val streams = parsed.streams ?: return@withTimeoutOrNull
 
                         for (item in streams) {
-                            emitStreamItem(item, addon.name, onSubtitle, onLink)
+                            emitStreamItem(item, addon.name, onSubtitle, onLink, seenSubKeys)
                         }
                     } catch (e: Exception) {
                         val msg = e.message ?: ""
@@ -334,17 +336,21 @@ object StremioAddonManager {
         sourceAddonName: String,
         onSubtitle: ((SubtitleFile) -> Unit)?,
         onLink: (ExtractorLink) -> Unit,
+        seenSubKeys: MutableSet<String>? = null,
     ) {
         item.subtitles?.forEach { sub ->
             val subUrl = sub.url?.trim() ?: return@forEach
             if (subUrl.startsWith("http", ignoreCase = true)) {
                 val lang = sub.lang ?: "eng"
-                onSubtitle?.invoke(
-                    newSubtitleFile(
-                        lang = lang,
-                        url = subUrl,
-                    ),
-                )
+                val dedupeKey = LanguageNormalizer.getCanonicalKey(lang, subUrl)
+                if (seenSubKeys == null || seenSubKeys.add(dedupeKey)) {
+                    onSubtitle?.invoke(
+                        newSubtitleFile(
+                            lang = lang,
+                            url = subUrl,
+                        ),
+                    )
+                }
             }
         }
 
