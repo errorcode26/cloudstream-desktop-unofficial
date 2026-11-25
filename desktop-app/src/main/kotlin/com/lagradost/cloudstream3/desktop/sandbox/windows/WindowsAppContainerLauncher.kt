@@ -430,16 +430,21 @@ object WindowsAppContainerLauncher {
             if (len == 0) return 0
             val bytesRead = IntByReference()
             val buf = if (off == 0 && len == b.size) b else ByteArray(len)
-            val ok = Kernel32.INSTANCE.ReadFile(handle, buf, len, bytesRead, null)
-            if (!ok) {
-                val err = Native.getLastError()
-                if (err != 109) { // 109 = ERROR_BROKEN_PIPE (normal EOF when child closes pipe)
-                    logger.warn("Win32HandleInputStream ReadFile failed with Win32 error $err")
+            while (true) {
+                val ok = Kernel32.INSTANCE.ReadFile(handle, buf, len, bytesRead, null)
+                if (!ok) {
+                    val err = Native.getLastError()
+                    if (err != 109) { // 109 = ERROR_BROKEN_PIPE (normal EOF when child closes pipe)
+                        logger.warn("Win32HandleInputStream ReadFile failed with Win32 error $err")
+                    }
+                    return -1
                 }
-                return -1
-            }
-            if (bytesRead.value == 0) {
-                return -1
+                if (bytesRead.value > 0) {
+                    break
+                }
+                // Win32 anonymous pipe EOF is signaled via ERROR_BROKEN_PIPE; a 0-byte ReadFile
+                // success happens if the writer emits an empty write before flushing actual bytes.
+                logger.warn("Win32HandleInputStream ReadFile succeeded with 0 bytes; continuing read")
             }
             if (buf !== b) {
                 System.arraycopy(buf, 0, b, off, bytesRead.value)
