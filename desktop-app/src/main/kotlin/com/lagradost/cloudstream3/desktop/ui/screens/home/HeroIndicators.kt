@@ -7,6 +7,7 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -23,11 +24,17 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -48,6 +55,9 @@ import coil3.request.ImageRequest
 import com.lagradost.cloudstream3.MainAPI
 import com.lagradost.cloudstream3.SearchResponse
 import com.lagradost.cloudstream3.desktop.repo.HeroMeta
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton
+import com.lagradost.cloudstream3.desktop.ui.components.LocalDesktopTheme
+import com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes
 import com.lagradost.cloudstream3.fixUrlNull
 
 @Composable
@@ -193,6 +203,8 @@ internal fun BoxScope.HeroDashes(
     autoAdvanceIntervalMs: Long,
     onSelectIndex: (Int) -> Unit,
 ) {
+    val isLightMode = LocalDesktopTheme.current.isLightMode
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -200,51 +212,114 @@ internal fun BoxScope.HeroDashes(
         contentAlignment = if (isCompact) Alignment.BottomCenter else Alignment.BottomEnd,
     ) {
         Row(
-            modifier = Modifier
-                .padding(horizontal = 14.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            displayItems.forEachIndexed { index, _ ->
-                val isSelected = index == currentIndex
-                val dashWidth by animateDpAsState(
-                    targetValue = if (isSelected) 36.dp else 12.dp,
-                    animationSpec = spring(
-                        stiffness = Spring.StiffnessLow,
-                        dampingRatio = Spring.DampingRatioNoBouncy,
-                    ),
-                    label = "dash_width",
-                )
-                val dashAlpha by animateFloatAsState(
-                    targetValue = if (isSelected) 1f else 0.4f,
-                    animationSpec = spring(
-                        stiffness = Spring.StiffnessLow,
-                        dampingRatio = Spring.DampingRatioNoBouncy,
-                    ),
-                    label = "dash_alpha",
-                )
+            Row(
+                modifier = Modifier
+                    .padding(horizontal = 14.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                displayItems.forEachIndexed { index, _ ->
+                    val isSelected = index == currentIndex
+                    val dashWidth by animateDpAsState(
+                        targetValue = if (isSelected) 36.dp else 12.dp,
+                        animationSpec = spring(
+                            stiffness = Spring.StiffnessLow,
+                            dampingRatio = Spring.DampingRatioNoBouncy,
+                        ),
+                        label = "dash_width",
+                    )
+                    val dashAlpha by animateFloatAsState(
+                        targetValue = if (isSelected) 1f else 0.4f,
+                        animationSpec = spring(
+                            stiffness = Spring.StiffnessLow,
+                            dampingRatio = Spring.DampingRatioNoBouncy,
+                        ),
+                        label = "dash_alpha",
+                    )
 
-                // Invisible Hit-Box (Massive touch target)
-                Box(
-                    modifier = Modifier
-                        .height(24.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                        ) { onSelectIndex(index) }
-                        .padding(horizontal = 4.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    // Visual Dash
+                    // Invisible Hit-Box (Massive touch target)
                     Box(
                         modifier = Modifier
-                            .width(dashWidth)
-                            .height(4.dp)
-                            .clip(RoundedCornerShape(2.dp))
-                            .background(Color.White.copy(alpha = dashAlpha)),
-                    )
+                            .height(24.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                            ) { onSelectIndex(index) }
+                            .padding(horizontal = 4.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        // Visual Dash
+                        Box(
+                            modifier = Modifier
+                                .width(dashWidth)
+                                .height(4.dp)
+                                .clip(RoundedCornerShape(2.dp))
+                                .background(Color.White.copy(alpha = dashAlpha)),
+                        )
+                    }
                 }
+            }
+
+            if (displayItems.size > 1 && !isCompact) {
+                HeroStepControlsPill(
+                    isLightMode = isLightMode,
+                    onPrev = {
+                        onSelectIndex(HomeHeroCardsLayoutMath.safeWrapIndex(currentIndex - 1, displayItems.size))
+                    },
+                    onNext = {
+                        onSelectIndex((currentIndex + 1) % displayItems.size)
+                    },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+internal fun HeroStepControlsPill(
+    isLightMode: Boolean,
+    onPrev: () -> Unit,
+    onNext: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val pillShape = LocalDesktopButtonShapes.current.compact
+    val fgColor = if (isLightMode) LocalDesktopTheme.current.TextPrimary else Color.White
+
+    Surface(
+        shape = pillShape,
+        color = if (isLightMode) Color.Black.copy(alpha = 0.08f) else Color.White.copy(alpha = 0.14f),
+        border = BorderStroke(
+            1.dp,
+            if (isLightMode) Color.Black.copy(alpha = 0.12f) else Color.White.copy(alpha = 0.18f),
+        ),
+        modifier = modifier,
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            DesktopIconButton(
+                onClick = onPrev,
+                modifier = Modifier.size(28.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Default.ChevronLeft,
+                    contentDescription = "Previous spotlight item",
+                    tint = fgColor,
+                    modifier = Modifier.size(16.dp),
+                )
+            }
+            DesktopIconButton(
+                onClick = onNext,
+                modifier = Modifier.size(28.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Default.ChevronRight,
+                    contentDescription = "Next spotlight item",
+                    tint = fgColor,
+                    modifier = Modifier.size(16.dp),
+                )
             }
         }
     }

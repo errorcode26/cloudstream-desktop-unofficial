@@ -43,6 +43,8 @@ import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
@@ -63,115 +65,129 @@ import com.lagradost.cloudstream3.desktop.utils.ImageUtils
 import com.lagradost.cloudstream3.desktop.utils.TitleUtils
 
 @Composable
+internal fun HeroLogoOrTitle(
+    item: SearchResponse,
+    meta: HeroMeta?,
+    isCompact: Boolean,
+    logoMinWidth: Dp = if (isCompact) 120.dp else DesktopDimens.HeroLogoMinWidth,
+    logoMaxWidth: Dp = if (isCompact) 220.dp else DesktopDimens.HeroLogoMaxWidth,
+    logoMaxHeight: Dp = if (isCompact) 85.dp else DesktopDimens.HeroLogoMaxHeight,
+    fallbackFontSize: TextUnit = if (isCompact) 26.sp else 46.sp,
+    alignment: Alignment = Alignment.BottomStart,
+    modifier: Modifier = Modifier,
+) {
+    val performanceModeEnabled by AppearanceConfig.performanceModeEnabled.collectAsState()
+    val displayTitle = meta?.title ?: HeroRepository.cleanHeroTitle(item.name)
+
+    if (!meta?.logoUrl.isNullOrBlank()) {
+        var isValidLogo by remember(meta.logoUrl) {
+            mutableStateOf(ImageUtils.isClearLogoCached(meta.logoUrl) ?: true)
+        }
+        if (isValidLogo) {
+            Box(
+                modifier = modifier
+                    .widthIn(min = logoMinWidth, max = logoMaxWidth)
+                    .heightIn(max = logoMaxHeight),
+                contentAlignment = alignment,
+            ) {
+                var isDarkLogo by remember(meta.logoUrl) {
+                    mutableStateOf(ImageUtils.isDarkLogoCached(meta.logoUrl) ?: false)
+                }
+                val platformContext = LocalPlatformContext.current
+
+                val logoRequest = remember(meta.logoUrl, platformContext) {
+                    ImageRequest.Builder(platformContext)
+                        .data(meta.logoUrl)
+                        .size(1600, 800)
+                        .crossfade(true)
+                        .listener(
+                            onSuccess = { _, result ->
+                                val isClear = ImageUtils.isClearLogo(result.image)
+                                ImageUtils.cacheClearLogo(meta.logoUrl, isClear)
+                                isValidLogo = isClear
+
+                                if (isClear) {
+                                    val dark = ImageUtils.isDarkImage(result.image)
+                                    ImageUtils.cacheDarkLogo(meta.logoUrl, dark)
+                                    isDarkLogo = dark
+                                }
+                            },
+                        )
+                        .build()
+                }
+                if (!performanceModeEnabled) {
+                    AsyncImage(
+                        model = logoRequest,
+                        contentDescription = null,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .offset(
+                                x = DesktopDimens.LogoShadowOffsetX,
+                                y = DesktopDimens.LogoShadowOffsetY,
+                            )
+                            .blur(
+                                DesktopDimens.LogoShadowBlur,
+                                edgeTreatment = BlurredEdgeTreatment.Unbounded,
+                            ),
+                        contentScale = ContentScale.Fit,
+                        alignment = alignment,
+                        colorFilter = DesktopDimens.LogoShadowFilter,
+                    )
+                }
+                SubcomposeAsyncImage(
+                    model = logoRequest,
+                    contentDescription = "Logo",
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Fit,
+                    alignment = alignment,
+                    colorFilter = if (isDarkLogo) ColorFilter.colorMatrix(ImageUtils.InvertColorMatrix) else null,
+                    error = {
+                        if (displayTitle.isNotBlank()) {
+                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = alignment) {
+                                CinematicTitle(
+                                    text = displayTitle,
+                                    isCompact = isCompact,
+                                    fontSize = fallbackFontSize,
+                                )
+                            }
+                        }
+                    },
+                )
+            }
+        } else if (displayTitle.isNotBlank()) {
+            CinematicTitle(
+                text = displayTitle,
+                isCompact = isCompact,
+                fontSize = fallbackFontSize,
+                modifier = modifier,
+            )
+        }
+    } else if (displayTitle.isNotBlank()) {
+        CinematicTitle(
+            text = displayTitle,
+            isCompact = isCompact,
+            fontSize = fallbackFontSize,
+            modifier = modifier,
+        )
+    }
+}
+
+@Composable
 internal fun HeroMetadataLayer(
     item: SearchResponse,
     meta: HeroMeta?,
     isCompact: Boolean,
     heroBannerStyle: HeroBannerStyle,
 ) {
-    val performanceModeEnabled by AppearanceConfig.performanceModeEnabled.collectAsState()
     Column(
         modifier = if (isCompact || heroBannerStyle == HeroBannerStyle.CINEMA_PEEKING) Modifier.wrapContentHeight() else Modifier.height(350.dp),
         verticalArrangement = Arrangement.Bottom,
     ) {
-        if (!meta?.logoUrl.isNullOrBlank()) {
-            val displayTitle = meta.title ?: HeroRepository.cleanHeroTitle(item.name)
-            var isValidLogo by remember(meta.logoUrl) {
-                mutableStateOf(ImageUtils.isClearLogoCached(meta.logoUrl) ?: true)
-            }
-            if (isValidLogo) {
-                Box(
-                    modifier = Modifier
-                        .widthIn(
-                            min = if (isCompact) 120.dp else DesktopDimens.HeroLogoMinWidth,
-                            max = if (isCompact) 220.dp else DesktopDimens.HeroLogoMaxWidth,
-                        )
-                        .heightIn(max = if (isCompact) 85.dp else DesktopDimens.HeroLogoMaxHeight),
-                    contentAlignment = Alignment.BottomStart,
-                ) {
-                    var isDarkLogo by remember(meta.logoUrl) {
-                        mutableStateOf(ImageUtils.isDarkLogoCached(meta.logoUrl) ?: false)
-                    }
-                    val platformContext = LocalPlatformContext.current
-
-                    val logoRequest = remember(meta.logoUrl, platformContext) {
-                        ImageRequest.Builder(platformContext)
-                            .data(meta.logoUrl)
-                            .size(1600, 800)
-                            .crossfade(true)
-                            .listener(
-                                onSuccess = { _, result ->
-                                    val isClear = ImageUtils.isClearLogo(result.image)
-                                    ImageUtils.cacheClearLogo(meta.logoUrl, isClear)
-                                    isValidLogo = isClear
-
-                                    if (isClear) {
-                                        val dark = ImageUtils.isDarkImage(result.image)
-                                        ImageUtils.cacheDarkLogo(meta.logoUrl, dark)
-                                        isDarkLogo = dark
-                                    }
-                                },
-                            )
-                            .build()
-                    }
-                    if (!performanceModeEnabled) {
-                        AsyncImage(
-                            model = logoRequest,
-                            contentDescription = null,
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .offset(
-                                    x = DesktopDimens.LogoShadowOffsetX,
-                                    y = DesktopDimens.LogoShadowOffsetY,
-                                    )
-                                .blur(
-                                    DesktopDimens.LogoShadowBlur,
-                                    edgeTreatment = BlurredEdgeTreatment.Unbounded,
-                                ),
-                            contentScale = ContentScale.Fit,
-                            alignment = Alignment.BottomStart,
-                            colorFilter = DesktopDimens.LogoShadowFilter,
-                        )
-                    }
-                    SubcomposeAsyncImage(
-                        model = logoRequest,
-                        contentDescription = "Logo",
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Fit,
-                        alignment = Alignment.BottomStart,
-                        colorFilter = if (isDarkLogo) ColorFilter.colorMatrix(ImageUtils.InvertColorMatrix) else null,
-                        error = {
-                            if (displayTitle.isNotBlank()) {
-                                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.BottomStart) {
-                                    CinematicTitle(
-                                        text = displayTitle,
-                                        isCompact = isCompact,
-                                        fontSize = if (isCompact) 26.sp else 46.sp,
-                                    )
-                                }
-                            }
-                        },
-                    )
-                }
-            } else {
-                if (displayTitle.isNotBlank()) {
-                    CinematicTitle(
-                        text = displayTitle,
-                        isCompact = isCompact,
-                        fontSize = if (isCompact) 26.sp else 46.sp,
-                    )
-                }
-            }
-        } else {
-            val displayTitle = meta?.title ?: HeroRepository.cleanHeroTitle(item.name)
-            if (displayTitle.isNotBlank()) {
-                CinematicTitle(
-                    text = displayTitle,
-                    isCompact = isCompact,
-                    fontSize = if (isCompact) 26.sp else 46.sp,
-                )
-            }
-        }
+        HeroLogoOrTitle(
+            item = item,
+            meta = meta,
+            isCompact = isCompact,
+        )
 
         Spacer(Modifier.height(if (isCompact) 8.dp else 20.dp))
         Row(verticalAlignment = Alignment.Bottom) {

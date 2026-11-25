@@ -224,6 +224,18 @@ fun HomeHeroCarousel(
         return
     }
 
+    if (heroBannerStyle == HeroBannerStyle.GLASS_SPOTLIGHT_STACK) {
+        HomeHeroGlassSpotlightStack(
+            items = items,
+            provider = provider,
+            heroMetaMap = heroMetaMap,
+            onPrefetchHeroItem = onPrefetchHeroItem,
+            onHeroBackgroundChanged = onHeroBackgroundChanged,
+            onItemClick = onItemClick,
+        )
+        return
+    }
+
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxWidth()

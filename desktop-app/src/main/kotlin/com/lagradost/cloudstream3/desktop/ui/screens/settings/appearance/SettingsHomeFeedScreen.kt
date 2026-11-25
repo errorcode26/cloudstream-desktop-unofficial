@@ -76,12 +76,13 @@ fun SettingsHomeFeedScreen(onNavigateToSubScreen: (SettingsSubScreen) -> Unit = 
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
                 SettingsDropdownItem(
                     label = "Hero Banner Layout Style",
-                    subtitle = "Choose between cinema peeking edges, fullscreen banner, and filmstrip",
+                    subtitle = "Choose between cinema peeking edges, fullscreen banner, filmstrip, cards carousel, and glass spotlight stack",
                     options = listOf(
                         com.lagradost.cloudstream3.desktop.ui.theme.HeroBannerStyle.CINEMA_PEEKING to "Cinema (Peeking Rails)",
                         com.lagradost.cloudstream3.desktop.ui.theme.HeroBannerStyle.FULLSCREEN_IMMERSIVE to "Fullscreen Immersive",
                         com.lagradost.cloudstream3.desktop.ui.theme.HeroBannerStyle.THUMBNAIL_STRIP to "Thumbnail Filmstrip",
                         com.lagradost.cloudstream3.desktop.ui.theme.HeroBannerStyle.CARDS_CAROUSEL to "Cards Carousel (Peeking)",
+                        com.lagradost.cloudstream3.desktop.ui.theme.HeroBannerStyle.GLASS_SPOTLIGHT_STACK to "Glass Spotlight Stack",
                     ),
                     currentValue = heroBannerStyle,
                     onSelectionChanged = { AppearanceConfig.setHeroBannerStyle(it) },
