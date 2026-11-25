@@ -104,7 +104,7 @@ fun LinksHeaderBar(
 
             Spacer(modifier = Modifier.width(6.dp))
 
-            IconButton(
+            com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton(
                 onClick = onRefresh,
                 modifier = Modifier.size(32.dp),
             ) {
@@ -118,7 +118,7 @@ fun LinksHeaderBar(
 
             Spacer(modifier = Modifier.width(4.dp))
 
-            IconButton(
+            com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton(
                 onClick = onClose,
                 modifier = Modifier.size(32.dp),
             ) {
@@ -172,7 +172,7 @@ fun LinksScrapingProgress(
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-                TextButton(
+                com.lagradost.cloudstream3.desktop.ui.components.DesktopTextButton(
                     onClick = onStopScraping,
                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
                     modifier = Modifier.height(24.dp),

@@ -22,6 +22,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton
 import com.lagradost.cloudstream3.desktop.ui.components.DesktopUi
 
 @Composable
@@ -75,7 +76,7 @@ fun StreamLoadingOverlay(
 
         // Top-left Back button
         if (onCancel != null) {
-            IconButton(
+            DesktopIconButton(
                 onClick = onCancel,
                 modifier = Modifier.align(Alignment.TopStart).padding(24.dp),
             ) {
@@ -95,7 +96,7 @@ fun StreamLoadingOverlay(
         ) {
             Box {
                 if (onCancel != null) {
-                    IconButton(
+                    DesktopIconButton(
                         onClick = onCancel,
                         modifier = Modifier.align(Alignment.TopEnd).padding(8.dp),
                     ) {
@@ -231,7 +232,7 @@ fun PlayerLoadingOverlay(
         )
 
         // Back button — top-left
-        IconButton(
+        DesktopIconButton(
             onClick = onCancel,
             modifier = Modifier.align(Alignment.TopStart).padding(20.dp),
         ) {

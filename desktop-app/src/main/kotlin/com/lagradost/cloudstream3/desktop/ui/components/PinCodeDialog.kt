@@ -299,7 +299,7 @@ fun PinCodeDialog(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.Center,
             ) {
-                TextButton(
+                DesktopTextButton(
                     onClick = onDismiss,
                     enabled = !isVerifying && !isSuccess,
                 ) {

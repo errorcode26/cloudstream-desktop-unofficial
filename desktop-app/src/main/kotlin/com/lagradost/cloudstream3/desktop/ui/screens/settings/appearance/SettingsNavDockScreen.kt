@@ -30,6 +30,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.lagradost.cloudstream3.desktop.ui.DockPosition
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopOutlinedButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopTextButton
 import com.lagradost.cloudstream3.desktop.ui.screens.settings.SettingsDropdownItem
 import com.lagradost.cloudstream3.desktop.ui.screens.settings.SettingsGroupCard
 import com.lagradost.cloudstream3.desktop.ui.theme.AppearanceConfig
@@ -104,10 +106,10 @@ fun SettingsNavDockScreen() {
                             color = MaterialTheme.colorScheme.primary,
                         )
                         if (globalUiScale != 1.0f) {
-                            OutlinedButton(
+                            DesktopOutlinedButton(
                                 onClick = { AppearanceConfig.resetZoom() },
+                                shape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact,
                                 contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                                shape = RoundedCornerShape(8.dp),
                             ) {
                                 Text("Reset (100%)", style = MaterialTheme.typography.labelSmall)
                             }
@@ -134,7 +136,7 @@ fun SettingsNavDockScreen() {
                     Text("Reorder Navigation Items", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
                     Text("Drag the handles (⠿) to rearrange buttons on your dock, or toggle optional tabs on/off", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                TextButton(onClick = { AppearanceConfig.resetDockItemOrder() }) {
+                DesktopTextButton(onClick = { AppearanceConfig.resetDockItemOrder() }) {
                     Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(4.dp))
                     Text("Reset Order")

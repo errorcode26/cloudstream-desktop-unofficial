@@ -18,6 +18,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lagradost.cloudstream3.desktop.AppConfig
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopOutlinedButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopTextButton
 import com.lagradost.cloudstream3.desktop.utils.appScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -81,7 +83,7 @@ fun SettingsAbout() {
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                OutlinedButton(
+                DesktopOutlinedButton(
                     onClick = {
                         val diagnosticInfo = buildString {
                             appendLine("CloudStream Desktop Diagnostic Report")
@@ -100,7 +102,6 @@ fun SettingsAbout() {
                             com.lagradost.common.logging.AppLogger.e("SettingsAbout: Failed to copy diagnostic info", e)
                         }
                     },
-                    shape = RoundedCornerShape(8.dp),
                 ) {
                     Icon(
                         imageVector = if (copiedDiagnostics) Icons.Default.Check else Icons.Default.ContentCopy,
@@ -212,7 +213,7 @@ fun SettingsAbout() {
                                 )
                             }
 
-                            TextButton(
+                            DesktopTextButton(
                                 onClick = {
                                     val fullLegalText = """
 LEGAL STATEMENT & NOMINATIVE FAIR USE NOTICE

@@ -53,7 +53,7 @@ fun ComposeHistoryScreen(
         title = { Text("Clear Watch History?") },
         text = { Text("This will permanently remove all your watch history. You won't be able to resume anything.") },
         confirmButton = {
-            TextButton(
+            com.lagradost.cloudstream3.desktop.ui.components.DesktopTextButton(
                 onClick = {
                     showClearConfirmDialog = false
                     viewModel.onEvent(HistoryUiEvent.ClearAll)
@@ -62,7 +62,7 @@ fun ComposeHistoryScreen(
             ) { Text("Clear All") }
         },
         dismissButton = {
-            TextButton(onClick = { showClearConfirmDialog = false }) { Text("Cancel") }
+            com.lagradost.cloudstream3.desktop.ui.components.DesktopTextButton(onClick = { showClearConfirmDialog = false }) { Text("Cancel") }
         },
     )
 
@@ -86,7 +86,7 @@ fun ComposeHistoryScreen(
                     color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.padding(bottom = 16.dp),
                 )
-                Button(onClick = { onNavigate(Config.Home) }) {
+                com.lagradost.cloudstream3.desktop.ui.components.DesktopButton(onClick = { onNavigate(Config.Home) }) {
                     Text("Browse Home")
                 }
             }
@@ -121,7 +121,7 @@ fun ComposeHistoryScreen(
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface,
                     )
-                    TextButton(
+                    com.lagradost.cloudstream3.desktop.ui.components.DesktopTextButton(
                         onClick = { showClearConfirmDialog = true },
                         colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
                     ) {

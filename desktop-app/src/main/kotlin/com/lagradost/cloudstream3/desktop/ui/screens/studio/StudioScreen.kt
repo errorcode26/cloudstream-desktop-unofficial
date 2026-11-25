@@ -111,7 +111,7 @@ fun StudioScreen(
                         color = theme.TextMuted,
                     )
                     Spacer(modifier = Modifier.height(16.dp))
-                    Button(
+                    com.lagradost.cloudstream3.desktop.ui.components.DesktopButton(
                         onClick = { viewModel.onEvent(StudioUiEvent.Retry) },
                         colors = ButtonDefaults.buttonColors(containerColor = theme.Accent),
                     ) {
@@ -518,11 +518,12 @@ private fun CategoryTabPill(
         label = "textColor",
     )
 
+    val pillShape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact
     Surface(
-        shape = RoundedCornerShape(10.dp),
+        onClick = onClick,
+        shape = pillShape,
         color = pillBg,
         border = BorderStroke(1.dp, pillBorder),
-        modifier = Modifier.clickable { onClick() },
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),

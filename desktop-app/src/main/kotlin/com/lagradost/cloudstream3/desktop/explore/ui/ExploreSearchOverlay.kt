@@ -174,12 +174,10 @@ fun ExploreSpotlightSearchModal(
                         )
                     }
 
-                    IconButton(
+                    com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton(
                         onClick = onClear,
-                        modifier = Modifier
-                            .size(24.dp)
-                            .clip(CircleShape)
-                            .background(Color.White.copy(alpha = 0.08f)),
+                        colors = IconButtonDefaults.iconButtonColors(containerColor = Color.White.copy(alpha = 0.08f)),
+                        modifier = Modifier.size(24.dp),
                     ) {
                         Icon(
                             imageVector = Icons.Default.Close,

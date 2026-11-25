@@ -449,7 +449,7 @@ internal fun TorboxCloudItemCard(
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    IconButton(
+                    com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton(
                         onClick = onDeleteClick,
                         modifier = Modifier.size(32.dp),
                     ) {
@@ -463,7 +463,7 @@ internal fun TorboxCloudItemCard(
 
                     if (videoFiles.size > 1) {
                         if (latestHistory != null && latestHistory.position > 0) {
-                            IconButton(
+                            com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton(
                                 onClick = onBrowseFilesClick,
                                 modifier = Modifier.size(32.dp),
                             ) {
@@ -474,9 +474,10 @@ internal fun TorboxCloudItemCard(
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
-                            FilledTonalButton(
+                            com.lagradost.cloudstream3.desktop.ui.components.DesktopFilledTonalButton(
                                 onClick = { onResumeEpisode(latestHistory) },
                                 enabled = !isCurrentResolving,
+                                shape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact,
                                 contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
                                 modifier = Modifier.height(32.dp),
                             ) {
@@ -492,9 +493,10 @@ internal fun TorboxCloudItemCard(
                                 }
                             }
                         } else {
-                            FilledTonalButton(
+                            com.lagradost.cloudstream3.desktop.ui.components.DesktopFilledTonalButton(
                                 onClick = onBrowseFilesClick,
                                 enabled = !isCurrentResolving,
+                                shape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact,
                                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
                                 modifier = Modifier.height(32.dp),
                             ) {
@@ -512,9 +514,10 @@ internal fun TorboxCloudItemCard(
                     } else {
                         val isResumeSingle = latestHistory != null && latestHistory.position > 0 && !PlayerLinkHandler.isCompleted(latestHistory.position, latestHistory.duration)
 
-                        FilledTonalButton(
+                        com.lagradost.cloudstream3.desktop.ui.components.DesktopFilledTonalButton(
                             onClick = onPlayClick,
                             enabled = !isCurrentResolving,
+                            shape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact,
                             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
                             modifier = Modifier.height(32.dp),
                         ) {

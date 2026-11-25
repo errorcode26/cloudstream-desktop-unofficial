@@ -4,11 +4,6 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.TooltipArea
 import androidx.compose.foundation.TooltipPlacement
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -21,12 +16,13 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.lagradost.cloudstream3.desktop.ui.components.HeroPrimaryCtaButton
+import com.lagradost.cloudstream3.desktop.ui.components.HeroSecondaryButton
 import com.lagradost.cloudstream3.desktop.ui.components.LocalDesktopTheme
 import com.lagradost.cloudstream3.LoadResponse
 import com.lagradost.cloudstream3.MainAPI
@@ -191,54 +187,32 @@ fun DetailsPlayButton(
 
     BoxWithConstraints(modifier = modifier) {
         val isNarrow = maxWidth != androidx.compose.ui.unit.Dp.Infinity && maxWidth < 260.dp
-        val shape = RoundedCornerShape(if (isNarrow) 10.dp else 12.dp)
+        val shape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.primary
 
-        Box(
+        HeroPrimaryCtaButton(
+            text = if (isUnavailable && isNarrow) "Unavailable" else finalButtonText,
+            icon = if (isUnavailable) Icons.Default.CloudOff else Icons.Default.PlayArrow,
+            contentDescription = if (isUnavailable) "Unavailable" else "Play",
+            isUnavailable = isUnavailable,
+            shape = shape,
+            contentPadding = PaddingValues(horizontal = if (isNarrow) 20.dp else 36.dp),
+            iconSize = if (isNarrow) 20.dp else 24.dp,
+            fontSize = if (isNarrow) 14.sp else 16.sp,
+            iconSpacing = if (isNarrow) 6.dp else 10.dp,
             modifier = Modifier
                 .wrapContentWidth()
                 .widthIn(min = if (isNarrow) 240.dp else 420.dp, max = 580.dp)
-                .height(if (isNarrow) 44.dp else 52.dp)
-                .clip(shape)
-                .background(if (isUnavailable) Color(0xFFE50914).copy(alpha = 0.15f) else Color.White)
-                .border(
-                    BorderStroke(
-                        1.2.dp,
-                        if (isUnavailable) Color(0xFFE50914).copy(alpha = 0.5f) else Color.Transparent,
-                    ),
-                    shape,
-                )
-                .clickable {
-                    if (isUnavailable) {
-                        com.lagradost.cloudstream3.desktop.ui.components.AppToastManager.showInfo(
-                            "No streaming links or episodes were found on ${provider.name} for this title.",
-                        )
-                    } else {
-                        onPlay(targetActionEp)
-                    }
+                .height(if (isNarrow) 44.dp else 52.dp),
+            onClick = {
+                if (isUnavailable) {
+                    com.lagradost.cloudstream3.desktop.ui.components.AppToastManager.showInfo(
+                        "No streaming links or episodes were found on ${provider.name} for this title.",
+                    )
+                } else {
+                    onPlay(targetActionEp)
                 }
-                .padding(horizontal = if (isNarrow) 20.dp else 36.dp),
-            contentAlignment = Alignment.Center,
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center,
-            ) {
-                Icon(
-                    imageVector = if (isUnavailable) Icons.Default.CloudOff else Icons.Default.PlayArrow,
-                    contentDescription = if (isUnavailable) "Unavailable" else "Play",
-                    tint = if (isUnavailable) Color(0xFFFF6B6B) else Color(0xFF0F0F0F),
-                    modifier = Modifier.size(if (isNarrow) 20.dp else 24.dp),
-                )
-                Spacer(Modifier.width(if (isNarrow) 6.dp else 10.dp))
-                Text(
-                    text = if (isUnavailable && isNarrow) "Unavailable" else finalButtonText,
-                    color = if (isUnavailable) Color(0xFFFF6B6B) else Color(0xFF0F0F0F),
-                    fontWeight = FontWeight.ExtraBold,
-                    fontSize = if (isNarrow) 14.sp else 16.sp,
-                    maxLines = 1,
-                )
-            }
-        }
+            },
+        )
     }
 }
 
@@ -301,8 +275,6 @@ fun DetailsDownloadButton(
         }
     }
 
-    val interactionSource = remember { MutableInteractionSource() }
-    val isHovered by interactionSource.collectIsHoveredAsState()
     val theme = LocalDesktopTheme.current
 
     TooltipArea(
@@ -325,13 +297,9 @@ fun DetailsDownloadButton(
         delayMillis = 400,
         tooltipPlacement = TooltipPlacement.CursorPoint(offset = DpOffset(0.dp, 16.dp)),
     ) {
-        Surface(
+        HeroSecondaryButton(
             onClick = { targetActionEp?.let { onDownload(it) } },
             modifier = modifier.size(52.dp),
-            shape = RoundedCornerShape(12.dp),
-            color = if (isHovered) Color.White.copy(alpha = 0.22f) else Color.White.copy(alpha = 0.12f),
-            border = BorderStroke(1.2.dp, if (isHovered) Color.White.copy(alpha = 0.50f) else Color.White.copy(alpha = 0.28f)),
-            interactionSource = interactionSource,
         ) {
             Box(
                 modifier = Modifier.fillMaxSize(),

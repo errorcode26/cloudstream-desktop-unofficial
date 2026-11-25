@@ -52,7 +52,7 @@ internal fun ActiveQueueCard(
                     )
                 }
 
-                TextButton(
+                com.lagradost.cloudstream3.desktop.ui.components.DesktopTextButton(
                     onClick = onViewAll,
                     colors = ButtonDefaults.textButtonColors(contentColor = Color.White),
                 ) {
@@ -174,16 +174,16 @@ internal fun ActiveDownloadRow(
 
         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             if (task.status == DownloadStatus.DOWNLOADING) {
-                IconButton(onClick = { onPause(task.id) }) {
+                com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton(onClick = { onPause(task.id) }) {
                     Icon(Icons.Default.Pause, contentDescription = "Pause")
                 }
             } else if (task.status == DownloadStatus.PAUSED || task.status == DownloadStatus.FAILED) {
-                IconButton(onClick = { onResume(task.id) }) {
+                com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton(onClick = { onResume(task.id) }) {
                     Icon(Icons.Default.PlayArrow, contentDescription = "Resume")
                 }
             }
 
-            IconButton(onClick = { onCancel(task.id) }) {
+            com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton(onClick = { onCancel(task.id) }) {
                 Icon(Icons.Default.Close, contentDescription = "Cancel")
             }
         }

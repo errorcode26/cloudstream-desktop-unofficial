@@ -17,6 +17,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lagradost.cloudstream3.desktop.ui.components.AppToastManager
 import com.lagradost.cloudstream3.desktop.ui.components.CloudstreamAlertDialog
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopFilledTonalButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopOutlinedButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopTextButton
 import com.lagradost.cloudstream3.desktop.ui.screens.settings.contract.*
 import com.lagradost.common.platform.PlatformPaths
 import kotlinx.coroutines.Dispatchers
@@ -101,10 +106,10 @@ private fun StorageTelemetryCard(
                     color = MaterialTheme.colorScheme.onSurface,
                 )
 
-                FilledTonalButton(
+                DesktopFilledTonalButton(
                     onClick = onAction,
                     enabled = !isActionLoading,
-                    shape = RoundedCornerShape(8.dp),
+                    shape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact,
                     colors = if (isDestructive) {
                         ButtonDefaults.filledTonalButtonColors(
                             containerColor = MaterialTheme.colorScheme.errorContainer,
@@ -189,7 +194,7 @@ fun SettingsAdvanced(viewModel: SettingsViewModel) {
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary,
                         )
-                        IconButton(onClick = { viewModel.onEvent(SettingsUiEvent.RefreshStorageMetrics) }) {
+                        DesktopIconButton(onClick = { viewModel.onEvent(SettingsUiEvent.RefreshStorageMetrics) }) {
                             Icon(Icons.Default.Refresh, contentDescription = "Refresh", modifier = Modifier.size(20.dp))
                         }
                     }
@@ -308,7 +313,7 @@ fun SettingsAdvanced(viewModel: SettingsViewModel) {
                         Text(title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
                         Text(file.absolutePath, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
                     }
-                    OutlinedButton(
+                    DesktopOutlinedButton(
                         onClick = {
                             scope.launch(Dispatchers.IO) {
                                 try {
@@ -318,7 +323,7 @@ fun SettingsAdvanced(viewModel: SettingsViewModel) {
                                 }
                             }
                         },
-                        shape = RoundedCornerShape(8.dp),
+                        shape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact,
                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                         modifier = Modifier.height(32.dp),
                     ) {
@@ -357,9 +362,8 @@ fun SettingsAdvanced(viewModel: SettingsViewModel) {
                         )
                     }
                     Spacer(Modifier.width(16.dp))
-                    OutlinedButton(
+                    DesktopOutlinedButton(
                         onClick = { showSoftResetDialog = true },
-                        shape = RoundedCornerShape(8.dp),
                     ) {
                         Icon(Icons.Default.RestartAlt, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(6.dp))
@@ -376,10 +380,9 @@ fun SettingsAdvanced(viewModel: SettingsViewModel) {
                         Text("Deletes all extensions, watch history, bookmarks, settings, and cached data. This cannot be undone.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Spacer(Modifier.width(16.dp))
-                    FilledTonalButton(
+                    DesktopFilledTonalButton(
                         onClick = { showResetDialog = true },
                         colors = ButtonDefaults.filledTonalButtonColors(containerColor = MaterialTheme.colorScheme.errorContainer, contentColor = MaterialTheme.colorScheme.onErrorContainer),
-                        shape = RoundedCornerShape(8.dp),
                     ) {
                         Icon(Icons.Default.DeleteForever, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(6.dp))
@@ -395,7 +398,7 @@ fun SettingsAdvanced(viewModel: SettingsViewModel) {
                     title = { Text("Reset Settings?") },
                     text = { Text("Are you sure you want to reset all settings to defaults? Your bookmarks and watch history will be preserved.") },
                     confirmButton = {
-                        Button(
+                        DesktopButton(
                             onClick = {
                                 showSoftResetDialog = false
                                 viewModel.onEvent(SettingsUiEvent.ResetSettingsToDefault)
@@ -403,7 +406,7 @@ fun SettingsAdvanced(viewModel: SettingsViewModel) {
                         ) { Text("Reset") }
                     },
                     dismissButton = {
-                        TextButton(onClick = { showSoftResetDialog = false }) { Text("Cancel") }
+                        DesktopTextButton(onClick = { showSoftResetDialog = false }) { Text("Cancel") }
                     },
                 )
             }
@@ -415,7 +418,7 @@ fun SettingsAdvanced(viewModel: SettingsViewModel) {
                     title = { Text("Factory Reset") },
                     text = { Text("Are you absolutely sure? This will permanently wipe all your data, plugins, and settings. The app will immediately close to perform the wipe.") },
                     confirmButton = {
-                        Button(
+                        DesktopButton(
                             onClick = {
                                 showResetDialog = false
                                 viewModel.onEvent(SettingsUiEvent.FactoryReset)
@@ -424,7 +427,7 @@ fun SettingsAdvanced(viewModel: SettingsViewModel) {
                         ) { Text("Yes, wipe everything") }
                     },
                     dismissButton = {
-                        TextButton(onClick = { showResetDialog = false }) { Text("Cancel") }
+                        DesktopTextButton(onClick = { showResetDialog = false }) { Text("Cancel") }
                     },
                 )
             }

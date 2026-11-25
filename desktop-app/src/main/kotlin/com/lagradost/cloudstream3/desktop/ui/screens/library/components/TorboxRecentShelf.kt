@@ -137,7 +137,7 @@ internal fun TorboxRecentCard(
                     )
                 }
 
-                IconButton(
+                com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton(
                     onClick = onRemove,
                     modifier = Modifier.size(20.dp),
                 ) {

@@ -20,13 +20,10 @@ import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Security
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -44,6 +41,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.lagradost.cloudstream3.desktop.network.webview.EmbeddedVerificationState
 import com.lagradost.cloudstream3.desktop.ui.components.CloudstreamCustomDialog
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopOutlinedButton
 import com.lagradost.cloudstream3.desktop.ui.components.LocalDesktopTheme
 import com.lagradost.cloudstream3.desktop.ui.theme.AppearanceConfig
 import com.lagradost.cloudstream3.desktop.ui.theme.accentColorFromName
@@ -149,7 +149,7 @@ fun EmbeddedVerificationHost() {
                             }
 
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                IconButton(
+                                DesktopIconButton(
                                     onClick = { EmbeddedVerificationState.reloadCurrentSession() },
                                 ) {
                                     Icon(
@@ -161,7 +161,7 @@ fun EmbeddedVerificationHost() {
 
                                 Spacer(Modifier.width(4.dp))
 
-                                IconButton(
+                                DesktopIconButton(
                                     onClick = { EmbeddedVerificationState.dismiss() },
                                 ) {
                                     Icon(
@@ -209,26 +209,24 @@ fun EmbeddedVerificationHost() {
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                             ) {
-                                OutlinedButton(
+                                DesktopOutlinedButton(
                                     onClick = {
                                         dialogScope.launch(Dispatchers.IO) {
                                             com.lagradost.common.storage.DesktopDataStore.silenceDomainForSession(session.hostName)
                                         }
                                         EmbeddedVerificationState.dismiss()
                                     },
-                                    shape = RoundedCornerShape(8.dp),
                                 ) {
                                     Text("Dismiss for now", style = MaterialTheme.typography.labelMedium)
                                 }
 
-                                Button(
+                                DesktopButton(
                                     onClick = {
                                         dialogScope.launch(Dispatchers.IO) {
                                             com.lagradost.common.storage.DesktopDataStore.setDomainCfIgnored(session.hostName, true)
                                         }
                                         EmbeddedVerificationState.dismiss()
                                     },
-                                    shape = RoundedCornerShape(8.dp),
                                     colors = ButtonDefaults.buttonColors(
                                         containerColor = colorScheme.error.copy(alpha = 0.85f),
                                         contentColor = colorScheme.onError,

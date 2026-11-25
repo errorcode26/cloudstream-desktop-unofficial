@@ -137,13 +137,12 @@ fun P2pTorrentDisclaimerDialog(
             }
         },
         confirmButton = {
-            Button(
+            DesktopButton(
                 onClick = onConfirm,
                 colors = ButtonDefaults.buttonColors(
                     containerColor = warningColor,
                     contentColor = Color.Black,
                 ),
-                shape = RoundedCornerShape(10.dp),
                 modifier = Modifier.height(44.dp),
             ) {
                 Text(
@@ -154,9 +153,8 @@ fun P2pTorrentDisclaimerDialog(
             }
         },
         dismissButton = {
-            OutlinedButton(
+            DesktopOutlinedButton(
                 onClick = onDismiss,
-                shape = RoundedCornerShape(10.dp),
                 modifier = Modifier.height(44.dp),
             ) {
                 Text(

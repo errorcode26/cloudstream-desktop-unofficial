@@ -201,7 +201,7 @@ fun ComposeSearchScreen(
                                 enter = fadeIn() + scaleIn(),
                                 exit = fadeOut() + scaleOut(),
                             ) {
-                                IconButton(
+                                com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton(
                                     onClick = { viewModel.onEvent(SearchUiEvent.OnClearSearch) },
                                     modifier = Modifier.size(24.dp),
                                 ) {
@@ -225,7 +225,7 @@ fun ComposeSearchScreen(
 
                                 // Embedded Multi-Source Selector Chip (Matches Upstream SearchFilter)
                                 Surface(
-                                    shape = RoundedCornerShape(10.dp),
+                                    shape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact,
                                     color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
                                     onClick = { showProviderDropdown = true },
                                 ) {
@@ -289,8 +289,9 @@ fun ComposeSearchScreen(
                             )
 
                             // Mode Switcher Segmented Pill (Addons vs Extensions)
+                            val switcherShapes = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current
                             Surface(
-                                shape = RoundedCornerShape(10.dp),
+                                shape = switcherShapes.medium,
                                 color = Color.White.copy(alpha = 0.05f),
                                 border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.12f)),
                                 modifier = Modifier.height(36.dp),
@@ -300,75 +301,53 @@ fun ComposeSearchScreen(
                                     horizontalArrangement = Arrangement.spacedBy(3.dp),
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
-                                    // Addons Pill
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxHeight()
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .background(if (uiState.isAddonMode) Color.White.copy(alpha = 0.16f) else Color.Transparent)
-                                            .then(if (uiState.isAddonMode) Modifier.border(BorderStroke(0.5.dp, Color.White.copy(alpha = 0.22f)), RoundedCornerShape(8.dp)) else Modifier)
-                                            .clickable {
-                                                if (!uiState.isAddonMode) {
-                                                    viewModel.onEvent(SearchUiEvent.OnToggleSearchMode(true))
+                                    listOf(
+                                        Triple(true, Icons.Default.Explore, "Addons"),
+                                        Triple(false, Icons.Default.Extension, "Extensions"),
+                                    ).forEach { (targetAddonMode, icon, label) ->
+                                        val isTabSelected = uiState.isAddonMode == targetAddonMode
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxHeight()
+                                                .clip(switcherShapes.compact)
+                                                .background(if (isTabSelected) Color.White.copy(alpha = 0.16f) else Color.Transparent)
+                                                .then(
+                                                    if (isTabSelected) {
+                                                        Modifier.border(
+                                                            BorderStroke(0.5.dp, Color.White.copy(alpha = 0.22f)),
+                                                            switcherShapes.compact,
+                                                        )
+                                                    } else {
+                                                        Modifier
+                                                    },
+                                                )
+                                                .clickable {
+                                                    if (!isTabSelected) {
+                                                        viewModel.onEvent(SearchUiEvent.OnToggleSearchMode(targetAddonMode))
+                                                    }
                                                 }
-                                            }
-                                            .padding(horizontal = 12.dp),
-                                        contentAlignment = Alignment.Center,
-                                    ) {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.Center,
+                                                .padding(horizontal = 12.dp),
+                                            contentAlignment = Alignment.Center,
                                         ) {
-                                            Icon(
-                                                Icons.Default.Explore,
-                                                contentDescription = null,
-                                                modifier = Modifier.size(14.dp),
-                                                tint = if (uiState.isAddonMode) Color.White else Color.White.copy(alpha = 0.55f),
-                                            )
-                                            Spacer(Modifier.width(5.dp))
-                                            Text(
-                                                text = "Addons",
-                                                fontSize = 12.sp,
-                                                letterSpacing = 0.2.sp,
-                                                fontWeight = if (uiState.isAddonMode) FontWeight.SemiBold else FontWeight.Normal,
-                                                color = if (uiState.isAddonMode) Color.White else Color.White.copy(alpha = 0.55f),
-                                            )
-                                        }
-                                    }
-
-                                    // Extensions Pill
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxHeight()
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .background(if (!uiState.isAddonMode) Color.White.copy(alpha = 0.16f) else Color.Transparent)
-                                            .then(if (!uiState.isAddonMode) Modifier.border(BorderStroke(0.5.dp, Color.White.copy(alpha = 0.22f)), RoundedCornerShape(8.dp)) else Modifier)
-                                            .clickable {
-                                                if (uiState.isAddonMode) {
-                                                    viewModel.onEvent(SearchUiEvent.OnToggleSearchMode(false))
-                                                }
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.Center,
+                                            ) {
+                                                Icon(
+                                                    icon,
+                                                    contentDescription = null,
+                                                    modifier = Modifier.size(14.dp),
+                                                    tint = if (isTabSelected) Color.White else Color.White.copy(alpha = 0.55f),
+                                                )
+                                                Spacer(Modifier.width(5.dp))
+                                                Text(
+                                                    text = label,
+                                                    fontSize = 12.sp,
+                                                    letterSpacing = 0.2.sp,
+                                                    fontWeight = if (isTabSelected) FontWeight.SemiBold else FontWeight.Normal,
+                                                    color = if (isTabSelected) Color.White else Color.White.copy(alpha = 0.55f),
+                                                )
                                             }
-                                            .padding(horizontal = 12.dp),
-                                        contentAlignment = Alignment.Center,
-                                    ) {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.Center,
-                                        ) {
-                                            Icon(
-                                                Icons.Default.Extension,
-                                                contentDescription = null,
-                                                modifier = Modifier.size(14.dp),
-                                                tint = if (!uiState.isAddonMode) Color.White else Color.White.copy(alpha = 0.55f),
-                                            )
-                                            Spacer(Modifier.width(5.dp))
-                                            Text(
-                                                text = "Extensions",
-                                                fontSize = 12.sp,
-                                                letterSpacing = 0.2.sp,
-                                                fontWeight = if (!uiState.isAddonMode) FontWeight.SemiBold else FontWeight.Normal,
-                                                color = if (!uiState.isAddonMode) Color.White else Color.White.copy(alpha = 0.55f),
-                                            )
                                         }
                                     }
                                 }
@@ -553,9 +532,9 @@ fun ComposeSearchScreen(
                         )
                         if (!uiState.isAddonMode && uiState.providers.isEmpty()) {
                             Spacer(modifier = Modifier.height(16.dp))
-                            Button(
+                            com.lagradost.cloudstream3.desktop.ui.components.DesktopButton(
                                 onClick = { onNavigate(Config.Extensions(initialTab = 0)) },
-                                shape = RoundedCornerShape(8.dp),
+                                shape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact,
                             ) {
                                 Icon(Icons.Default.Extension, contentDescription = null, modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(6.dp))

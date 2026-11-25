@@ -411,12 +411,13 @@ fun ScreenshotLightbox(
                 }
 
                 // Close Button
+                val closeShape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.icon
                 Surface(
-                    shape = CircleShape,
+                    shape = closeShape,
                     color = Color.White.copy(alpha = 0.08f),
                     border = BorderStroke(1.dp, Color.White.copy(alpha = 0.14f)),
                 ) {
-                    IconButton(
+                    com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton(
                         onClick = onDismiss,
                         modifier = Modifier.size(38.dp),
                     ) {
@@ -561,13 +562,15 @@ private fun NavArrow(
 
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
+    val navShape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.icon
 
     Surface(
-        shape = CircleShape,
+        shape = navShape,
         color = if (isHovered) Color.White.copy(alpha = 0.18f) else Color.White.copy(alpha = 0.08f),
         border = BorderStroke(1.dp, Color.White.copy(alpha = if (isHovered) 0.25f else 0.12f)),
         modifier = modifier
             .size(46.dp)
+            .clip(navShape)
             .hoverable(interactionSource)
             .clickable(interactionSource = interactionSource, indication = null) { onClick() },
     ) {

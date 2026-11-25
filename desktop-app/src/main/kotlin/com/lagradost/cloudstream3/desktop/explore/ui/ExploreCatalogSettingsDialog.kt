@@ -144,7 +144,7 @@ fun ExploreCatalogSettingsDialog(
                     }
                 }
 
-                IconButton(onClick = onDismissRequest) {
+                com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton(onClick = onDismissRequest) {
                     Icon(
                         imageVector = Icons.Default.Close,
                         contentDescription = "Close",
@@ -168,7 +168,7 @@ fun ExploreCatalogSettingsDialog(
                     color = theme.TextMuted,
                 )
 
-                TextButton(
+                com.lagradost.cloudstream3.desktop.ui.components.DesktopTextButton(
                     onClick = {
                         ExploreCatalogSettingsManager.resetToDefaults(userCatalogs)
                     },
@@ -315,7 +315,7 @@ fun ExploreCatalogSettingsDialog(
 
                                 // Discrete Up/Down arrow buttons
                                 Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                                    IconButton(
+                                    com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton(
                                         onClick = {
                                             if (index > 0) {
                                                 ExploreCatalogSettingsManager.moveByIndex(orderedKeys, index, index - 1)
@@ -332,7 +332,7 @@ fun ExploreCatalogSettingsDialog(
                                         )
                                     }
 
-                                    IconButton(
+                                    com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton(
                                         onClick = {
                                             if (index < sortedCatalogs.size - 1) {
                                                 ExploreCatalogSettingsManager.moveByIndex(orderedKeys, index, index + 1)
@@ -393,10 +393,9 @@ fun ExploreCatalogSettingsDialog(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End,
             ) {
-                Button(
+                com.lagradost.cloudstream3.desktop.ui.components.DesktopButton(
                     onClick = onDismissRequest,
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                    shape = RoundedCornerShape(8.dp),
                 ) {
                     Text(
                         text = "Done",

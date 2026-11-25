@@ -142,7 +142,7 @@ fun ComposeDetailsScreen(
         title = { Text("Playback Failed") },
         text = { Text(uiState.playbackError ?: "Unknown error") },
         confirmButton = {
-            TextButton(onClick = { viewModel.onEvent(DetailsUiEvent.OnDismissPlaybackError) }) {
+            com.lagradost.cloudstream3.desktop.ui.components.DesktopTextButton(onClick = { viewModel.onEvent(DetailsUiEvent.OnDismissPlaybackError) }) {
                 Text("OK")
             }
         },
@@ -337,17 +337,15 @@ fun ComposeDetailsScreen(
                                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                                         verticalAlignment = Alignment.CenterVertically,
                                     ) {
-                                        OutlinedButton(
+                                        com.lagradost.cloudstream3.desktop.ui.components.DesktopOutlinedButton(
                                             onClick = { viewModel.onEvent(DetailsUiEvent.OnRefresh) },
-                                            shape = RoundedCornerShape(12.dp),
                                         ) {
                                             Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
                                             Spacer(modifier = Modifier.width(6.dp))
                                             Text("Retry")
                                         }
-                                        Button(
+                                        com.lagradost.cloudstream3.desktop.ui.components.DesktopButton(
                                             onClick = onBack,
-                                            shape = RoundedCornerShape(12.dp),
                                         ) {
                                             Text("Go Back")
                                         }

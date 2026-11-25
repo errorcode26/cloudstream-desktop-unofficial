@@ -148,20 +148,18 @@ fun TorrServerInstallRequiredDialog(
         },
         confirmButton = {
             if (isDownloading) {
-                OutlinedButton(
+                com.lagradost.cloudstream3.desktop.ui.components.DesktopOutlinedButton(
                     onClick = { AppDownloadManager.cancelDownload("torrserver") },
-                    shape = RoundedCornerShape(10.dp),
                 ) {
                     Text("Cancel Download")
                 }
             } else {
-                Button(
+                com.lagradost.cloudstream3.desktop.ui.components.DesktopButton(
                     onClick = {
                         DesktopTorrentEngine.binary.downloadWithManager {
                             onInstalled()
                         }
                     },
-                    shape = RoundedCornerShape(10.dp),
                 ) {
                     Text("Install TorrServer (~28 MB)", fontWeight = FontWeight.Bold)
                 }
@@ -169,9 +167,8 @@ fun TorrServerInstallRequiredDialog(
         },
         dismissButton = {
             if (!isDownloading) {
-                OutlinedButton(
+                com.lagradost.cloudstream3.desktop.ui.components.DesktopOutlinedButton(
                     onClick = onDismiss,
-                    shape = RoundedCornerShape(10.dp),
                 ) {
                     Text("Cancel")
                 }

@@ -17,6 +17,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lagradost.cloudstream3.DubStatus
+import com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes
 
 @Composable
 fun SeasonSelectorButton(
@@ -24,11 +25,13 @@ fun SeasonSelectorButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val buttonShape = LocalDesktopButtonShapes.current.compact
     Surface(
-        shape = RoundedCornerShape(8.dp),
+        onClick = onClick,
+        shape = buttonShape,
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f),
         border = BorderStroke(1.dp, Color.White.copy(alpha = 0.18f)),
-        modifier = modifier.clickable { onClick() },
+        modifier = modifier,
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp),
@@ -59,8 +62,9 @@ fun SubDubSegmentedSwitch(
 ) {
     if (dubStatuses.size <= 1) return
 
+    val buttonShapes = LocalDesktopButtonShapes.current
     Surface(
-        shape = RoundedCornerShape(10.dp),
+        shape = buttonShapes.medium,
         color = Color.White.copy(alpha = 0.05f),
         border = BorderStroke(1.dp, Color.White.copy(alpha = 0.12f)),
         modifier = modifier.height(40.dp),
@@ -82,7 +86,7 @@ fun SubDubSegmentedSwitch(
 
                 Surface(
                     onClick = { onSelectDub(dub) },
-                    shape = RoundedCornerShape(7.dp),
+                    shape = buttonShapes.compact,
                     color = if (isSelected) {
                         Color.White.copy(alpha = 0.20f)
                     } else if (isHovered) {

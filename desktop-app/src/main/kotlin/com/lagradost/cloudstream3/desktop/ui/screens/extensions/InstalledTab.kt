@@ -17,6 +17,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lagradost.cloudstream3.desktop.ui.components.CloudstreamAlertDialog
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopFilledTonalButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopTextButton
 import com.lagradost.cloudstream3.desktop.ui.components.ExtensionCard
 import com.lagradost.cloudstream3.desktop.ui.screens.PluginSettingsDialog
 import com.lagradost.cloudstream3.desktop.ui.screens.extensions.contract.ExtensionsUiEvent
@@ -76,7 +79,7 @@ fun InstalledTab(
             title = { Text("Confirm Uninstall") },
             text = { Text("Are you sure you want to uninstall ${selectedPlugins.size} plugins? This action cannot be undone.") },
             confirmButton = {
-                TextButton(
+                DesktopTextButton(
                     onClick = {
                         showDeleteConfirm = false
                         val toDelete = selectedPlugins.toList()
@@ -90,7 +93,7 @@ fun InstalledTab(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showDeleteConfirm = false }) {
+                DesktopTextButton(onClick = { showDeleteConfirm = false }) {
                     Text("Cancel")
                 }
             },
@@ -107,7 +110,7 @@ fun InstalledTab(
 
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 val coroutineScope = rememberCoroutineScope()
-                FilledTonalButton(
+                DesktopFilledTonalButton(
                     onClick = {
                         coroutineScope.launch(kotlinx.coroutines.Dispatchers.IO) {
                             val sourceFile = com.lagradost.cloudstream3.desktop.utils.NativeFileDialog.open(
@@ -129,7 +132,7 @@ fun InstalledTab(
                     enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.expandHorizontally(),
                     exit = androidx.compose.animation.fadeOut() + androidx.compose.animation.shrinkHorizontally(),
                 ) {
-                    Button(
+                    DesktopButton(
                         onClick = { showDeleteConfirm = true },
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
                     ) {
@@ -207,9 +210,8 @@ fun InstalledTab(
                             textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                         )
                         Spacer(Modifier.height(8.dp))
-                        Button(
+                        DesktopButton(
                             onClick = onNavigateToBrowse,
-                            shape = androidx.compose.foundation.shape.RoundedCornerShape(10.dp),
                             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
                         ) {
                             Text("Browse Catalog", fontSize = 13.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)

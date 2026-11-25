@@ -62,7 +62,7 @@ fun DownloadSettingsDialog(
                     )
                 }
 
-                IconButton(onClick = onDismiss) {
+                com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton(onClick = onDismiss) {
                     Icon(Icons.Default.Close, contentDescription = "Close")
                 }
             }
@@ -88,7 +88,7 @@ fun DownloadSettingsDialog(
                     )
 
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Button(
+                        com.lagradost.cloudstream3.desktop.ui.components.DesktopButton(
                             onClick = {
                                 scope.launch(Dispatchers.IO) {
                                     val selected = NativeFileDialog.chooseDirectory(
@@ -101,14 +101,14 @@ fun DownloadSettingsDialog(
                                     }
                                 }
                             },
-                            shape = RoundedCornerShape(8.dp),
+                            shape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact,
                         ) {
                             Icon(Icons.Default.FolderOpen, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(6.dp))
                             Text("Change Directory...")
                         }
 
-                        OutlinedButton(
+                        com.lagradost.cloudstream3.desktop.ui.components.DesktopOutlinedButton(
                             onClick = {
                                 scope.launch(Dispatchers.IO) {
                                     try {
@@ -116,7 +116,7 @@ fun DownloadSettingsDialog(
                                     } catch (e: Exception) { com.lagradost.common.logging.AppLogger.d("DownloadSettingsDialog", "Explorer open note: ${e.message}") }
                                 }
                             },
-                            shape = RoundedCornerShape(8.dp),
+                            shape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact,
                         ) {
                             Text("Open in Explorer")
                         }
@@ -241,9 +241,9 @@ fun DownloadSettingsDialog(
                         )
                     }
 
-                    OutlinedButton(
+                    com.lagradost.cloudstream3.desktop.ui.components.DesktopOutlinedButton(
                         onClick = onCleanJunk,
-                        shape = RoundedCornerShape(8.dp),
+                        shape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact,
                     ) {
                         Icon(Icons.Default.CleaningServices, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(6.dp))
@@ -257,7 +257,7 @@ fun DownloadSettingsDialog(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End,
             ) {
-                Button(onClick = onDismiss, shape = RoundedCornerShape(8.dp)) {
+                com.lagradost.cloudstream3.desktop.ui.components.DesktopButton(onClick = onDismiss) {
                     Text("Done")
                 }
             }

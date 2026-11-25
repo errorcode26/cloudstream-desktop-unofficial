@@ -24,6 +24,9 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.lagradost.cloudstream3.desktop.stremio.ManagedStremioAddon
 import com.lagradost.cloudstream3.desktop.ui.components.CloudstreamCustomDialog
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopOutlinedButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopTextButton
 
 @Composable
 fun AddonDetailsDialog(
@@ -156,7 +159,7 @@ fun AddonDetailsDialog(
                             overflow = TextOverflow.Ellipsis,
                         )
 
-                        OutlinedButton(
+                        DesktopOutlinedButton(
                             onClick = {
                                 clipboardManager.setText(AnnotatedString(addon.manifestUrl))
                                 copiedToast = true
@@ -168,7 +171,7 @@ fun AddonDetailsDialog(
                             Text(if (copiedToast) "Copied!" else "Copy URL")
                         }
 
-                        OutlinedButton(
+                        DesktopOutlinedButton(
                             onClick = {
                                 try {
                                     uriHandler.openUri(addon.manifestUrl)
@@ -318,20 +321,20 @@ fun AddonDetailsDialog(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                TextButton(onClick = onDelete) {
+                DesktopTextButton(onClick = onDelete) {
                     Icon(imageVector = Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error)
                     Spacer(Modifier.width(6.dp))
                     Text("Delete Addon", color = MaterialTheme.colorScheme.error)
                 }
 
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    OutlinedButton(onClick = onRefresh) {
+                    DesktopOutlinedButton(onClick = onRefresh) {
                         Icon(imageVector = Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(6.dp))
                         Text("Refresh Manifest")
                     }
 
-                    Button(onClick = onDismiss) {
+                    DesktopButton(onClick = onDismiss) {
                         Text("Done")
                     }
                 }

@@ -13,12 +13,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -139,12 +137,11 @@ fun WelcomeDialog() {
             }
         },
         confirmButton = {
-            Button(
+            DesktopButton(
                 onClick = {
                     openDiscordInvite()
                     handleDismiss()
                 },
-                shape = RoundedCornerShape(8.dp),
             ) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.OpenInNew,
@@ -156,9 +153,8 @@ fun WelcomeDialog() {
             }
         },
         dismissButton = {
-            TextButton(
+            DesktopTextButton(
                 onClick = handleDismiss,
-                shape = RoundedCornerShape(8.dp),
             ) {
                 Text("Close")
             }

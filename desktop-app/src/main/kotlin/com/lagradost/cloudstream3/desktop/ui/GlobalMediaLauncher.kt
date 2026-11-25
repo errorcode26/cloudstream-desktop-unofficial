@@ -157,7 +157,7 @@ object GlobalMediaLauncher {
                 }
             },
             confirmButton = {
-                androidx.compose.material3.TextButton(
+                com.lagradost.cloudstream3.desktop.ui.components.DesktopTextButton(
                     onClick = {
                         if (streamUrl.isNotBlank()) {
                             playStreamUrl(streamUrl, scope)
@@ -169,7 +169,7 @@ object GlobalMediaLauncher {
                 }
             },
             dismissButton = {
-                androidx.compose.material3.TextButton(onClick = { showNetworkStreamDialog = false }) {
+                com.lagradost.cloudstream3.desktop.ui.components.DesktopTextButton(onClick = { showNetworkStreamDialog = false }) {
                     androidx.compose.material3.Text("Cancel")
                 }
             },

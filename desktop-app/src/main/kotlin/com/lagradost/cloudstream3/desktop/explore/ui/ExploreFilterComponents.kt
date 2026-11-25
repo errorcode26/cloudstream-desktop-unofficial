@@ -55,10 +55,12 @@ internal fun CompactCatalogChip(
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
 
+    val chipShape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact
+
     Surface(
         modifier = Modifier
             .height(28.dp)
-            .clip(RoundedCornerShape(6.dp))
+            .clip(chipShape)
             .hoverable(interactionSource)
             .clickable(interactionSource = interactionSource, indication = null, onClick = onClick),
         color = if (isSelected) {
@@ -68,7 +70,7 @@ internal fun CompactCatalogChip(
         } else {
             Color.White.copy(alpha = 0.05f)
         },
-        shape = RoundedCornerShape(6.dp),
+        shape = chipShape,
         border = BorderStroke(
             width = if (isSelected) 1.dp else 0.5.dp,
             color = if (isSelected) {
@@ -108,15 +110,17 @@ internal fun GenreDropdown(
     val allOptions = remember(genres) { listOf("All") + genres }
     val displayText = if (selectedGenre.equals("All", ignoreCase = true)) "All Genres" else selectedGenre
 
+    val dropdownShape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact
+
     Box {
         Surface(
             modifier = Modifier
                 .height(28.dp)
-                .clip(RoundedCornerShape(6.dp))
+                .clip(dropdownShape)
                 .clickable { expanded = true },
             color = Color.White.copy(alpha = 0.05f),
             border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.12f)),
-            shape = RoundedCornerShape(6.dp),
+            shape = dropdownShape,
         ) {
             Row(
                 modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp),
@@ -179,15 +183,17 @@ internal fun YearDropdown(
     var expanded by remember { mutableStateOf(false) }
     val theme = LocalDesktopTheme.current
 
+    val dropdownShape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact
+
     Box {
         Surface(
             modifier = Modifier
                 .height(32.dp)
-                .clip(RoundedCornerShape(6.dp))
+                .clip(dropdownShape)
                 .clickable { expanded = true },
             color = Color.White.copy(alpha = 0.05f),
             border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.12f)),
-            shape = RoundedCornerShape(6.dp),
+            shape = dropdownShape,
         ) {
             Row(
                 modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp),
@@ -339,13 +345,14 @@ internal fun ExploreSearchField(
                 ) {
                     ExploreSearchScope.entries.forEach { scope ->
                         val isScopeSelected = searchScope == scope
+                        val scopeShape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact
                         Surface(
                             modifier = Modifier
                                 .height(26.dp)
-                                .clip(RoundedCornerShape(6.dp))
+                                .clip(scopeShape)
                                 .clickable { onSelectScope(scope) },
                             color = if (isScopeSelected) MaterialTheme.colorScheme.primary else (if (isLightMode) theme.Divider.copy(alpha = 0.5f) else Color.White.copy(alpha = 0.08f)),
-                            shape = RoundedCornerShape(6.dp),
+                            shape = scopeShape,
                         ) {
                             Box(modifier = Modifier.padding(horizontal = 7.dp), contentAlignment = Alignment.Center) {
                                 Text(
@@ -388,15 +395,16 @@ internal fun ExploreSearchField(
                 enter = fadeIn(tween(150)) + expandHorizontally(),
                 exit = fadeOut(tween(100)) + shrinkHorizontally(),
             ) {
+                val cancelShape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact
                 Surface(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(6.dp))
+                        .clip(cancelShape)
                         .clickable {
                             focusManager.clearFocus()
                             if (query.isNotBlank()) onClear()
                         },
                     color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
-                    shape = RoundedCornerShape(6.dp),
+                    shape = cancelShape,
                 ) {
                     Text(
                         text = "Cancel",
@@ -452,10 +460,10 @@ internal fun EmptyCatalogState(
                 color = theme.TextMuted,
             )
 
-            Button(
+            com.lagradost.cloudstream3.desktop.ui.components.DesktopButton(
                 onClick = onNavigateToSettings,
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                shape = RoundedCornerShape(8.dp),
+                shape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact,
             ) {
                 Text("Install Add-ons", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 12.sp)
             }

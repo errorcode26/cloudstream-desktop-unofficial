@@ -35,6 +35,8 @@ import androidx.compose.ui.unit.sp
 import com.lagradost.cloudstream3.desktop.profile.Profile
 import com.lagradost.cloudstream3.desktop.profile.ProfileAvatar
 import com.lagradost.cloudstream3.desktop.ui.DesktopAppShell
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopOutlinedButton
 import com.lagradost.cloudstream3.desktop.ui.components.PinCodeDialog
 import com.lagradost.cloudstream3.desktop.ui.screens.profile.contract.ProfileUiEffect
 import com.lagradost.cloudstream3.desktop.ui.screens.profile.contract.ProfileUiEvent
@@ -197,17 +199,15 @@ fun ProfileSelectScreen(
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                     if (uiState.isManageMode) {
-                        Button(
+                        DesktopButton(
                             onClick = { viewModel.onEvent(ProfileUiEvent.OnToggleManageMode(false)) },
-                            shape = RoundedCornerShape(10.dp),
                             contentPadding = PaddingValues(horizontal = 32.dp, vertical = 12.dp),
                         ) {
                             Text("Done", fontWeight = FontWeight.Bold)
                         }
                     } else {
-                        OutlinedButton(
+                        DesktopOutlinedButton(
                             onClick = { viewModel.onEvent(ProfileUiEvent.OnToggleManageMode(true)) },
-                            shape = RoundedCornerShape(10.dp),
                             colors = ButtonDefaults.outlinedButtonColors(
                                 containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
                             ),

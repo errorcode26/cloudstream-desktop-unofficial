@@ -7,7 +7,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -22,6 +21,7 @@ import com.lagradost.cloudstream3.MainAPI
 import com.lagradost.cloudstream3.desktop.ui.badges.CardMetadataConfig
 import com.lagradost.cloudstream3.desktop.ui.components.CategoryRowWithHeader
 import com.lagradost.cloudstream3.desktop.ui.components.CloudstreamAlertDialog
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopTextButton
 import com.lagradost.cloudstream3.desktop.ui.components.DesktopUi
 import com.lagradost.cloudstream3.desktop.ui.components.WatchHistoryCard
 import com.lagradost.cloudstream3.desktop.ui.components.WatchHistoryCardDetailed
@@ -62,7 +62,7 @@ fun HomeHistoryRow(
             title = { Text("Clear Watch History?") },
             text = { Text("This will permanently remove all your watch history. You won't be able to resume anything from here.") },
             confirmButton = {
-                TextButton(
+                DesktopTextButton(
                     onClick = {
                         showClearConfirmDialog = false
                         onClearHistory()
@@ -71,7 +71,7 @@ fun HomeHistoryRow(
                 ) { Text("Clear All") }
             },
             dismissButton = {
-                TextButton(onClick = { showClearConfirmDialog = false }) { Text("Cancel") }
+                DesktopTextButton(onClick = { showClearConfirmDialog = false }) { Text("Cancel") }
             },
         )
 
@@ -115,7 +115,7 @@ fun HomeHistoryRow(
                 ),
                 trailingHeaderExtra = if (!isCompact) {
                     {
-                        TextButton(onClick = { showClearConfirmDialog = true }) {
+                        DesktopTextButton(onClick = { showClearConfirmDialog = true }) {
                             Text("Clear History", color = DesktopUi.TextMuted)
                         }
                     }

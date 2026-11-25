@@ -20,6 +20,10 @@ import androidx.compose.ui.unit.sp
 import com.lagradost.cloudstream3.desktop.shadowui.ShadowDialog
 import com.lagradost.cloudstream3.desktop.shadowui.ShadowUi
 import com.lagradost.cloudstream3.desktop.ui.components.CloudstreamCustomDialog
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopOutlinedButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopTextButton
 import com.lagradost.cloudstream3.desktop.ui.components.LocalDesktopTheme
 
 @Composable
@@ -67,7 +71,7 @@ fun ShadowDialogFrame(shadow: ShadowDialog, version: Int) {
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface,
                         )
-                        IconButton(
+                        DesktopIconButton(
                             onClick = {
                                 ShadowUi.dispatch("fallback-dismiss") {
                                     ShadowUi.pop(shadow.platform)
@@ -117,7 +121,7 @@ internal fun FragmentBody(shadow: ShadowDialog, fragment: androidx.fragment.app.
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface,
             )
-            IconButton(
+            DesktopIconButton(
                 onClick = {
                     ShadowUi.dispatch("fragment-dismiss") {
                         when (fragment) {
@@ -182,7 +186,7 @@ internal fun PlatformDialogBody(shadow: ShadowDialog, dialog: android.app.Dialog
                 )
             } ?: Spacer(Modifier.width(1.dp))
 
-            IconButton(
+            DesktopIconButton(
                 onClick = {
                     ShadowUi.dispatch("dialog-dismiss-x") {
                         dialog.cancel()
@@ -321,24 +325,22 @@ internal fun ShadowDialogButtons(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         neutralText?.let {
-            TextButton(onClick = onNeutral) {
+            DesktopTextButton(onClick = onNeutral) {
                 Text(it.toString(), color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Spacer(Modifier.width(8.dp))
         }
         negativeText?.let {
-            OutlinedButton(
+            DesktopOutlinedButton(
                 onClick = onNegative,
-                shape = RoundedCornerShape(12.dp),
             ) {
                 Text(it.toString(), color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Spacer(Modifier.width(10.dp))
         }
         positiveText?.let {
-            Button(
+            DesktopButton(
                 onClick = onPositive,
-                shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary,

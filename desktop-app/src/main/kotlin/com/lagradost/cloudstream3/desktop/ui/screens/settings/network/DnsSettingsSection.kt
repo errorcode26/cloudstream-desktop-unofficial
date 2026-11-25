@@ -16,6 +16,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.lagradost.cloudstream3.desktop.network.DohProvider
 import com.lagradost.cloudstream3.desktop.network.NetworkConfig
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopOutlinedButton
 import com.lagradost.cloudstream3.desktop.ui.screens.settings.MviSettingsDropdown
 import com.lagradost.cloudstream3.desktop.ui.screens.settings.MviSettingsToggle
 import com.lagradost.cloudstream3.desktop.ui.screens.settings.SettingsGroupCard
@@ -100,12 +101,11 @@ fun DnsCustomAndTestSection(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         modifier = Modifier.fillMaxWidth(),
     ) {
-        OutlinedButton(
+        DesktopOutlinedButton(
             onClick = {
                 onEvent(SettingsUiEvent.TestDns(provider = currentProvider, customEndpoint = if (isCustomProvider) customEndpoint else null))
             },
             enabled = !uiState.dnsTestState.isTesting,
-            shape = RoundedCornerShape(10.dp),
         ) {
             if (uiState.dnsTestState.isTesting) {
                 CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)

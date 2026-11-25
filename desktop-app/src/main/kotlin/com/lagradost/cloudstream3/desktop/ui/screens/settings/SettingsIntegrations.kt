@@ -22,6 +22,9 @@ import androidx.compose.ui.unit.sp
 import com.lagradost.cloudstream3.desktop.metadata.MetadataConfig
 import com.lagradost.cloudstream3.desktop.stremio.StremioAddonManager
 import com.lagradost.cloudstream3.desktop.ui.components.AppToastManager
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopFilledTonalButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopOutlinedButton
 import com.lagradost.cloudstream3.desktop.ui.theme.AppearanceConfig
 
 /**
@@ -185,9 +188,8 @@ fun SettingsIntegrations(
                     }
                 }
                 Spacer(Modifier.width(16.dp))
-                FilledTonalButton(
+                DesktopFilledTonalButton(
                     onClick = { SettingsSession.selectedLeaf = LeafTab.EXTENSIONS },
-                    shape = RoundedCornerShape(10.dp),
                 ) {
                     Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(6.dp))
@@ -245,9 +247,8 @@ fun SettingsIntegrations(
                     }
                 }
                 Spacer(Modifier.width(16.dp))
-                FilledTonalButton(
+                DesktopFilledTonalButton(
                     onClick = { onNavigateToSubScreen(SettingsSubScreen.EXPLORE_CATALOGS) },
-                    shape = RoundedCornerShape(10.dp),
                 ) {
                     Icon(Icons.Default.Tune, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(6.dp))
@@ -331,12 +332,12 @@ fun SettingsTmdbScreen() {
                         shape = RoundedCornerShape(10.dp),
                         trailingIcon = {
                             if (editingTmdbKey != customTmdbKey) {
-                                Button(
+                                DesktopButton(
                                     onClick = {
                                         MetadataConfig.setCustomTmdbApiKey(editingTmdbKey)
                                         AppToastManager.showSuccess("TMDB API Key updated")
                                     },
-                                    shape = RoundedCornerShape(8.dp),
+                                    shape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact,
                                     modifier = Modifier.padding(end = 4.dp),
                                 ) {
                                     Text("Save", fontSize = 12.sp)
@@ -638,9 +639,8 @@ private fun IntegrationHubCard(
                     }
                 }
 
-                Button(
+                DesktopButton(
                     onClick = onConfigureClick,
-                    shape = RoundedCornerShape(8.dp),
                 ) {
                     Text(buttonLabel, fontSize = 13.sp)
                     Spacer(Modifier.width(6.dp))
@@ -695,9 +695,8 @@ private fun <T> SettingDropdownRow(
         }
 
         Box {
-            OutlinedButton(
+            DesktopOutlinedButton(
                 onClick = { expanded = true },
-                shape = RoundedCornerShape(8.dp),
             ) {
                 Text(
                     text = options.find { it.first == currentValue }?.second ?: currentValue.toString(),

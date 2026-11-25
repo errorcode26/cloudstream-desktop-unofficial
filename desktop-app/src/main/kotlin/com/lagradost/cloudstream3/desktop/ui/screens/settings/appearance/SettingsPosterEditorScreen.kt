@@ -9,6 +9,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.lagradost.cloudstream3.desktop.ui.badges.CardMetadataConfig
 import com.lagradost.cloudstream3.desktop.ui.components.CloudstreamAlertDialog
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopTextButton
 import com.lagradost.cloudstream3.desktop.ui.components.LocalDesktopTheme
 import com.lagradost.cloudstream3.desktop.ui.theme.AppearanceConfig
 import com.lagradost.cloudstream3.desktop.ui.theme.ContinueWatchingStyle
@@ -316,7 +317,7 @@ fun SettingsPosterEditorScreen(
                 )
             },
             confirmButton = {
-                TextButton(
+                DesktopTextButton(
                     onClick = {
                         PosterStudioPresets.applyDefaults()
                         showResetDialog = false
@@ -326,7 +327,7 @@ fun SettingsPosterEditorScreen(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showResetDialog = false }) {
+                DesktopTextButton(onClick = { showResetDialog = false }) {
                     Text("Cancel")
                 }
             },

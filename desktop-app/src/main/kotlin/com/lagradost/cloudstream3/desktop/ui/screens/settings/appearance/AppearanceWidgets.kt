@@ -24,6 +24,10 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.lagradost.cloudstream3.desktop.ui.components.CloudstreamCustomDialog
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopOutlinedButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopTextButton
 
 fun colorToHsv(color: Color): FloatArray {
     val r = color.red
@@ -177,7 +181,7 @@ fun CustomColorStudioDialog(
                         fontWeight = FontWeight.Bold,
                     )
                 }
-                IconButton(onClick = onDismiss, modifier = Modifier.size(32.dp)) {
+                DesktopIconButton(onClick = onDismiss, modifier = Modifier.size(32.dp)) {
                     Icon(Icons.Default.Close, contentDescription = "Close", modifier = Modifier.size(18.dp))
                 }
             }
@@ -327,7 +331,7 @@ fun CustomColorStudioDialog(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                TextButton(
+                DesktopTextButton(
                     onClick = { syncFromHex(defaultHex) },
                 ) {
                     Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
@@ -339,19 +343,17 @@ fun CustomColorStudioDialog(
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    OutlinedButton(
+                    DesktopOutlinedButton(
                         onClick = onDismiss,
-                        shape = RoundedCornerShape(10.dp),
                     ) {
                         Text("Cancel")
                     }
-                    Button(
+                    DesktopButton(
                         onClick = {
                             val finalHex = if (currentHexInput.startsWith("#")) currentHexInput else "#$currentHexInput"
                             onColorConfirmed(finalHex)
                             onDismiss()
                         },
-                        shape = RoundedCornerShape(10.dp),
                     ) {
                         Text("Apply & Save")
                     }

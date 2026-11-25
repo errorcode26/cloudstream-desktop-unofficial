@@ -214,7 +214,7 @@ fun StreamingPlatformRow(
                         )
                     }
 
-                    IconButton(
+                    com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton(
                         onClick = { isViewAllDialogOpen = false },
                         modifier = Modifier.size(36.dp),
                     ) {

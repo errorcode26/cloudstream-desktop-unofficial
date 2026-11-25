@@ -21,6 +21,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton
 import com.lagradost.cloudstream3.desktop.ui.screens.player.PlayerState
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -86,7 +87,7 @@ fun TimelineBar(
             // Left Side Controls (Play/Pause, Rewind, Forward, Volume)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 val isPaused by playerState.isPaused.collectAsState()
-                IconButton(onClick = { playerState.togglePlayPause() }) {
+                DesktopIconButton(onClick = { playerState.togglePlayPause() }) {
                     Icon(
                         imageVector = if (isPaused) Icons.Default.PlayArrow else Icons.Default.Pause,
                         contentDescription = "Play/Pause",
@@ -97,7 +98,7 @@ fun TimelineBar(
 
                 Spacer(modifier = Modifier.width(8.dp))
 
-                IconButton(onClick = { playerState.seekBy(-10000L) }) {
+                DesktopIconButton(onClick = { playerState.seekBy(-10000L) }) {
                     Icon(
                         imageVector = Icons.Default.Replay10,
                         contentDescription = "Rewind 10s",
@@ -106,7 +107,7 @@ fun TimelineBar(
                     )
                 }
 
-                IconButton(onClick = { playerState.seekBy(10000L) }) {
+                DesktopIconButton(onClick = { playerState.seekBy(10000L) }) {
                     Icon(
                         imageVector = Icons.Default.Forward10,
                         contentDescription = "Forward 10s",
@@ -118,7 +119,7 @@ fun TimelineBar(
                 Spacer(modifier = Modifier.width(16.dp))
 
                 val volume by playerState.volume.collectAsState()
-                IconButton(onClick = {
+                DesktopIconButton(onClick = {
                     if (volume > 0f) playerState.setVolume(0f) else playerState.setVolume(100f)
                 }) {
                     Icon(
@@ -135,19 +136,19 @@ fun TimelineBar(
 
             // Right Side Controls (Cloud/Sources, Episodes, Settings, Fullscreen)
             Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onSourcesClick) {
+                DesktopIconButton(onClick = onSourcesClick) {
                     Icon(Icons.Default.Cloud, contentDescription = "Sources", tint = Color.White, modifier = Modifier.size(24.dp))
                 }
 
-                IconButton(onClick = onEpisodesClick) {
+                DesktopIconButton(onClick = onEpisodesClick) {
                     Icon(Icons.AutoMirrored.Filled.List, contentDescription = "Episodes", tint = Color.White, modifier = Modifier.size(24.dp))
                 }
 
-                IconButton(onClick = onSettingsClick) {
+                DesktopIconButton(onClick = onSettingsClick) {
                     Icon(Icons.Default.Settings, contentDescription = "Settings", tint = Color.White, modifier = Modifier.size(24.dp))
                 }
 
-                IconButton(onClick = onFullscreenClick) {
+                DesktopIconButton(onClick = onFullscreenClick) {
                     Icon(
                         imageVector = if (isFullscreen) Icons.Default.FullscreenExit else Icons.Default.Fullscreen,
                         contentDescription = "Fullscreen",

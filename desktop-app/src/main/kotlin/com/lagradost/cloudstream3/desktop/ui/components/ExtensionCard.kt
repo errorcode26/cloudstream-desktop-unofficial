@@ -50,7 +50,7 @@ fun ExtensionCard(
         title = { Text("Confirm Uninstall") },
         text = { Text("Are you sure you want to uninstall '$name'? This will remove the extension from your app.") },
         confirmButton = {
-            TextButton(
+            DesktopTextButton(
                 onClick = {
                     showConfirmDialog = false
                     if (onUninstallClick != null) onUninstallClick()
@@ -60,7 +60,7 @@ fun ExtensionCard(
             }
         },
         dismissButton = {
-            TextButton(onClick = { showConfirmDialog = false }) {
+            DesktopTextButton(onClick = { showConfirmDialog = false }) {
                 Text("Cancel")
             }
         },
@@ -180,7 +180,7 @@ fun ExtensionCard(
                 }
 
                 if (showSettings) {
-                    IconButton(
+                    DesktopIconButton(
                         onClick = onSettingsClick,
                         modifier = Modifier.size(36.dp),
                     ) {
@@ -252,13 +252,13 @@ fun ExtensionCard(
 
                 // Actions
                 if (onUninstallClick != null && isInstalled) {
-                    OutlinedButton(
+                    DesktopOutlinedButton(
                         onClick = { showConfirmDialog = true },
                         modifier = Modifier.height(32.dp),
                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
                         border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.6f)),
-                        shape = RoundedCornerShape(8.dp),
+                        shape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact,
                     ) {
                         Text("Uninstall", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
                     }
@@ -276,12 +276,12 @@ fun ExtensionCard(
                         )
                     }
                 } else {
-                    FilledTonalButton(
+                    DesktopFilledTonalButton(
                         onClick = onInstallClick,
                         enabled = !isInstalling,
                         contentPadding = PaddingValues(horizontal = 14.dp, vertical = 0.dp),
                         modifier = Modifier.height(32.dp),
-                        shape = RoundedCornerShape(8.dp),
+                        shape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact,
                     ) {
                         if (isInstalling) {
                             CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp)

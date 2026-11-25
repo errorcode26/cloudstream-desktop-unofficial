@@ -14,6 +14,7 @@ data class DesktopAppearance(
     val amoledMode: Boolean = false,
     val dockPosition: DockPosition = DockPosition.LEFT,
     val navigationStyle: NavigationStyle = NavigationStyle.FLOATING_DOCK,
+    val buttonShapeStyle: ButtonShapeStyle = ButtonShapeStyle.ROUNDED,
     val ambientGlowEnabled: Boolean = false,
     val ambientGlowIntensity: Float = 0.15f,
     val ambientGlowPositions: Set<String> = setOf("Center"),
@@ -40,6 +41,7 @@ fun rememberDesktopAppearance(): DesktopAppearance {
     val amoledMode by AppearanceConfig.amoledMode.collectAsState()
     val dockPosition by AppearanceConfig.dockPosition.collectAsState()
     val navigationStyle by AppearanceConfig.navigationStyle.collectAsState()
+    val buttonShapeStyle by AppearanceConfig.buttonShapeStyle.collectAsState()
     val ambientGlowEnabled by AppearanceConfig.ambientGlowEnabled.collectAsState()
     val ambientGlowIntensity by AppearanceConfig.ambientGlowIntensity.collectAsState()
     val ambientGlowPositions by AppearanceConfig.ambientGlowPositions.collectAsState()
@@ -62,6 +64,7 @@ fun rememberDesktopAppearance(): DesktopAppearance {
         amoledMode,
         dockPosition,
         navigationStyle,
+        buttonShapeStyle,
         ambientGlowEnabled,
         ambientGlowIntensity,
         ambientGlowPositions,
@@ -84,6 +87,7 @@ fun rememberDesktopAppearance(): DesktopAppearance {
             amoledMode = amoledMode,
             dockPosition = dockPosition,
             navigationStyle = navigationStyle,
+            buttonShapeStyle = buttonShapeStyle,
             ambientGlowEnabled = ambientGlowEnabled,
             ambientGlowIntensity = ambientGlowIntensity,
             ambientGlowPositions = ambientGlowPositions,

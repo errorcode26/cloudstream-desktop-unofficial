@@ -217,7 +217,7 @@ fun LibraryRecoveryDialog(
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Button(
+                    com.lagradost.cloudstream3.desktop.ui.components.DesktopButton(
                         onClick = onSearchGlobal,
                     ) {
                         Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(16.dp))
@@ -225,7 +225,7 @@ fun LibraryRecoveryDialog(
                         Text("Search Providers")
                     }
 
-                    OutlinedButton(
+                    com.lagradost.cloudstream3.desktop.ui.components.DesktopOutlinedButton(
                         onClick = onDelete,
                         colors = ButtonDefaults.outlinedButtonColors(
                             contentColor = MaterialTheme.colorScheme.error,
@@ -237,7 +237,7 @@ fun LibraryRecoveryDialog(
                     }
                 }
 
-                OutlinedButton(onClick = onDismiss) {
+                com.lagradost.cloudstream3.desktop.ui.components.DesktopOutlinedButton(onClick = onDismiss) {
                     Text("Close")
                 }
             }

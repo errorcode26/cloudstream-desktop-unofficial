@@ -29,6 +29,9 @@ import com.lagradost.cloudstream3.desktop.ui.components.AboutVersionDialog
 import com.lagradost.cloudstream3.desktop.ui.components.DesktopVerticalScrollbar
 import com.lagradost.cloudstream3.desktop.ui.components.AppToastManager
 import com.lagradost.cloudstream3.desktop.ui.components.CloudstreamAlertDialog
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopFilledTonalButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopOutlinedButton
 import com.lagradost.cloudstream3.desktop.ui.components.ReleaseHistoryDialog
 import com.lagradost.cloudstream3.desktop.ui.screens.settings.contract.SettingsUiEvent
 import com.lagradost.cloudstream3.desktop.updates.UnifiedUpdateManager
@@ -128,7 +131,7 @@ fun SettingsUpdates(viewModel: SettingsViewModel) {
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        OutlinedButton(
+                        DesktopOutlinedButton(
                             onClick = { showAboutVersionDialog = true },
                             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
                         ) {
@@ -141,7 +144,7 @@ fun SettingsUpdates(viewModel: SettingsViewModel) {
                             Text("About Version", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                         }
 
-                        OutlinedButton(
+                        DesktopOutlinedButton(
                             onClick = { showReleaseHistoryDialog = true },
                             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
                         ) {
@@ -154,7 +157,7 @@ fun SettingsUpdates(viewModel: SettingsViewModel) {
                             Text("Version History", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                         }
 
-                        FilledTonalButton(
+                        DesktopFilledTonalButton(
                             onClick = {
                                 viewModel.onEvent(SettingsUiEvent.CheckUpdates(force = true))
                             },
@@ -210,7 +213,7 @@ fun SettingsUpdates(viewModel: SettingsViewModel) {
                                     )
                                 }
 
-                                Button(
+                                DesktopButton(
                                     onClick = { UnifiedUpdateManager.showDialogForUpdate(update) },
                                     contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
                                 ) {
@@ -346,7 +349,7 @@ fun SettingsUpdates(viewModel: SettingsViewModel) {
             )
         },
         confirmButton = {
-            Button(
+            DesktopButton(
                 onClick = {
                     showDeleteTorrConfirm = false
                     scope.launch(Dispatchers.IO) {
@@ -364,7 +367,7 @@ fun SettingsUpdates(viewModel: SettingsViewModel) {
             }
         },
         dismissButton = {
-            OutlinedButton(onClick = { showDeleteTorrConfirm = false }) {
+            DesktopOutlinedButton(onClick = { showDeleteTorrConfirm = false }) {
                 Text("Cancel")
             }
         },
@@ -386,7 +389,7 @@ fun SettingsUpdates(viewModel: SettingsViewModel) {
             )
         },
         confirmButton = {
-            Button(
+            DesktopButton(
                 onClick = {
                     showDeleteYtdlConfirm = false
                     scope.launch(Dispatchers.IO) {
@@ -404,7 +407,7 @@ fun SettingsUpdates(viewModel: SettingsViewModel) {
             }
         },
         dismissButton = {
-            OutlinedButton(onClick = { showDeleteYtdlConfirm = false }) {
+            DesktopOutlinedButton(onClick = { showDeleteYtdlConfirm = false }) {
                 Text("Cancel")
             }
         },
@@ -526,7 +529,7 @@ private fun BinaryPackageItem(
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 if (!isInstalled && !isDownloading) {
-                    FilledTonalButton(
+                    DesktopFilledTonalButton(
                         onClick = onDownloadClick,
                         contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
                     ) {
@@ -540,8 +543,9 @@ private fun BinaryPackageItem(
                     }
                 } else if (isInstalled && !isDownloading) {
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        OutlinedButton(
+                        DesktopOutlinedButton(
                             onClick = onOpenFolderClick,
+                            shape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact,
                             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
                         ) {
                             Icon(
@@ -553,8 +557,9 @@ private fun BinaryPackageItem(
                             Text("Folder", fontSize = 12.sp)
                         }
 
-                        OutlinedButton(
+                        DesktopOutlinedButton(
                             onClick = onDeleteClick,
+                            shape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact,
                             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
                             colors = ButtonDefaults.outlinedButtonColors(
                                 contentColor = MaterialTheme.colorScheme.error,

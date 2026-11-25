@@ -141,13 +141,12 @@ internal fun ExploreSearchResultsView(
                                 fontSize = 12.5.sp,
                                 color = theme.TextMuted,
                             )
-                            Button(
+                            com.lagradost.cloudstream3.desktop.ui.components.DesktopButton(
                                 onClick = onClearSearch,
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = MaterialTheme.colorScheme.primary,
                                     contentColor = Color.Black,
                                 ),
-                                shape = RoundedCornerShape(8.dp),
                                 modifier = Modifier.padding(top = 4.dp),
                             ) {
                                 Text("Clear Search", fontWeight = FontWeight.Bold, fontSize = 12.sp)

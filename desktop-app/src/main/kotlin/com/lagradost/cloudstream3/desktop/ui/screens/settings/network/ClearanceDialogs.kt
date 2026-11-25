@@ -18,6 +18,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.lagradost.cloudstream3.desktop.ui.components.CloudstreamAlertDialog
 import com.lagradost.cloudstream3.desktop.ui.components.CloudstreamCustomDialog
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopFilledTonalButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopOutlinedButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopTextButton
 import com.lagradost.cloudstream3.desktop.ui.components.LocalDesktopTheme
 import com.lagradost.cloudstream3.desktop.ui.screens.settings.SettingsViewModel
 import com.lagradost.cloudstream3.desktop.ui.screens.settings.contract.SettingsUiEvent
@@ -103,13 +108,12 @@ fun ManageCookiesDialog(
 
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 if (cookiesMap.isNotEmpty()) {
-                                    Button(
+                                    DesktopButton(
                                         onClick = { showClearAllConfirm = true },
                                         colors = ButtonDefaults.buttonColors(
                                             containerColor = MaterialTheme.colorScheme.error,
                                             contentColor = MaterialTheme.colorScheme.onError,
                                         ),
-                                        shape = RoundedCornerShape(10.dp),
                                     ) {
                                         Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
                                         Spacer(modifier = Modifier.width(6.dp))
@@ -117,9 +121,8 @@ fun ManageCookiesDialog(
                                     }
                                 }
 
-                                FilledTonalButton(
+                                DesktopFilledTonalButton(
                                     onClick = onDismiss,
-                                    shape = RoundedCornerShape(10.dp),
                                 ) {
                                     Text("Done")
                                 }
@@ -135,7 +138,7 @@ fun ManageCookiesDialog(
                             leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
                             trailingIcon = {
                                 if (searchQuery.isNotEmpty()) {
-                                    IconButton(onClick = { searchQuery = "" }) {
+                                    DesktopIconButton(onClick = { searchQuery = "" }) {
                                         Icon(Icons.Default.Close, contentDescription = "Clear search")
                                     }
                                 }
@@ -219,7 +222,7 @@ fun ManageCookiesDialog(
                                                     }
                                                 }
 
-                                                IconButton(
+                                                DesktopIconButton(
                                                     onClick = {
                                                         viewModel.onEvent(SettingsUiEvent.ClearDomainCookies(domain))
                                                     },
@@ -278,7 +281,7 @@ fun ManageCookiesDialog(
                     Text("This will remove all saved session cookies and Cloudflare clearance tokens across all providers.")
                 },
                 confirmButton = {
-                    Button(
+                    DesktopButton(
                         onClick = {
                             showClearAllConfirm = false
                             viewModel.onEvent(SettingsUiEvent.ClearAllClearanceCookies)
@@ -289,7 +292,7 @@ fun ManageCookiesDialog(
                     }
                 },
                 dismissButton = {
-                    TextButton(onClick = { showClearAllConfirm = false }) {
+                    DesktopTextButton(onClick = { showClearAllConfirm = false }) {
                         Text("Cancel")
                     }
                 },
@@ -336,7 +339,7 @@ fun ManualClearanceDialog(
             }
         },
         confirmButton = {
-            Button(
+            DesktopButton(
                 onClick = {
                     val rawUrl = urlInput.trim()
                     if (rawUrl.isNotBlank()) {
@@ -350,7 +353,7 @@ fun ManualClearanceDialog(
             }
         },
         dismissButton = {
-            TextButton(
+            DesktopTextButton(
                 onClick = onDismiss,
                 enabled = !isLaunching,
             ) {
@@ -441,7 +444,7 @@ fun ManageIgnoredDomainsDialog(
 
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 if (ignoredList.isNotEmpty()) {
-                                    OutlinedButton(
+                                    DesktopOutlinedButton(
                                         onClick = { showClearAllConfirm = true },
                                         colors = ButtonDefaults.outlinedButtonColors(
                                             contentColor = MaterialTheme.colorScheme.error,
@@ -451,7 +454,7 @@ fun ManageIgnoredDomainsDialog(
                                     }
                                 }
 
-                                IconButton(onClick = onDismiss) {
+                                DesktopIconButton(onClick = onDismiss) {
                                     Icon(Icons.Default.Close, contentDescription = "Close")
                                 }
                             }
@@ -505,7 +508,7 @@ fun ManageIgnoredDomainsDialog(
                                                 color = MaterialTheme.colorScheme.onSurface,
                                             )
 
-                                            IconButton(
+                                            DesktopIconButton(
                                                 onClick = {
                                                     viewModel.onEvent(SettingsUiEvent.RemoveIgnoredCfDomain(domain))
                                                 },
@@ -532,7 +535,7 @@ fun ManageIgnoredDomainsDialog(
                     title = { Text("Clear All Ignored Sites?") },
                     text = { Text("This will re-enable challenge verification for all previously ignored sites.") },
                     confirmButton = {
-                        Button(
+                        DesktopButton(
                             onClick = {
                                 showClearAllConfirm = false
                                 viewModel.onEvent(SettingsUiEvent.ClearAllIgnoredCfDomains)
@@ -543,7 +546,7 @@ fun ManageIgnoredDomainsDialog(
                         }
                     },
                     dismissButton = {
-                        TextButton(onClick = { showClearAllConfirm = false }) {
+                        DesktopTextButton(onClick = { showClearAllConfirm = false }) {
                             Text("Cancel")
                         }
                     },

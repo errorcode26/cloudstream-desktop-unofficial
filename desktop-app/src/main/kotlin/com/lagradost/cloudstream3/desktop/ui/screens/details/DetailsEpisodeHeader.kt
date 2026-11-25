@@ -251,36 +251,47 @@ fun DetailsEpisodeCompactHeader(
                 Spacer(Modifier.width(1.dp))
             }
 
-            Surface(
-                shape = RoundedCornerShape(8.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
-                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.1f)),
-                modifier = Modifier.height(34.dp),
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier
-                        .clickable { AppearanceConfig.setAntiSpoilerEnabled(!isAntiSpoiler) }
-                        .padding(horizontal = 8.dp),
-                ) {
-                    Text(
-                        "Anti-spoiler",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = if (isAntiSpoiler) FontWeight.Bold else FontWeight.Medium,
-                        color = if (isAntiSpoiler) Color.White else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f),
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Switch(
-                        checked = isAntiSpoiler,
-                        onCheckedChange = { AppearanceConfig.setAntiSpoilerEnabled(it) },
-                        modifier = Modifier.scale(0.7f),
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = Color.White,
-                            checkedTrackColor = Color.White.copy(alpha = 0.35f),
-                        ),
-                    )
-                }
-            }
+            AntiSpoilerToggleButton(
+                isAntiSpoiler = isAntiSpoiler,
+                isCompact = true,
+            )
+        }
+    }
+}
+
+@Composable
+private fun AntiSpoilerToggleButton(
+    isAntiSpoiler: Boolean,
+    isCompact: Boolean,
+) {
+    val toggleShape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact
+    Surface(
+        onClick = { AppearanceConfig.setAntiSpoilerEnabled(!isAntiSpoiler) },
+        shape = toggleShape,
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
+        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.1f)),
+        modifier = Modifier.height(if (isCompact) 34.dp else 40.dp),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(horizontal = if (isCompact) 8.dp else 12.dp),
+        ) {
+            Text(
+                "Anti-spoiler",
+                style = if (isCompact) MaterialTheme.typography.labelMedium else MaterialTheme.typography.titleSmall,
+                fontWeight = if (isAntiSpoiler) FontWeight.Bold else FontWeight.Medium,
+                color = if (isAntiSpoiler) Color.White else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f),
+            )
+            Spacer(modifier = Modifier.width(if (isCompact) 4.dp else 8.dp))
+            Switch(
+                checked = isAntiSpoiler,
+                onCheckedChange = { AppearanceConfig.setAntiSpoilerEnabled(it) },
+                modifier = Modifier.scale(if (isCompact) 0.7f else 0.8f),
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = Color.White,
+                    checkedTrackColor = Color.White.copy(alpha = 0.35f),
+                ),
+            )
         }
     }
 }
@@ -385,36 +396,10 @@ fun DetailsEpisodeDesktopHeader(
                 )
             }
 
-            Surface(
-                shape = RoundedCornerShape(10.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
-                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.1f)),
-                modifier = Modifier.height(40.dp),
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier
-                        .clickable { AppearanceConfig.setAntiSpoilerEnabled(!isAntiSpoiler) }
-                        .padding(horizontal = 12.dp),
-                ) {
-                    Text(
-                        "Anti-spoiler",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = if (isAntiSpoiler) FontWeight.Bold else FontWeight.Medium,
-                        color = if (isAntiSpoiler) Color.White else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f),
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Switch(
-                        checked = isAntiSpoiler,
-                        onCheckedChange = { AppearanceConfig.setAntiSpoilerEnabled(it) },
-                        modifier = Modifier.scale(0.8f),
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = Color.White,
-                            checkedTrackColor = Color.White.copy(alpha = 0.35f),
-                        ),
-                    )
-                }
-            }
+            AntiSpoilerToggleButton(
+                isAntiSpoiler = isAntiSpoiler,
+                isCompact = false,
+            )
 
             DesktopFilterChip(
                 text = if (isSortAscending) "Sort ▼" else "Sort ▲",

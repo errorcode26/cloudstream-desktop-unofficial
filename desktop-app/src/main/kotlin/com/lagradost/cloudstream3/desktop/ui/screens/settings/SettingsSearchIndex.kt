@@ -29,6 +29,7 @@ object SettingsSearchIndex {
         SettingsSearchEntry("Poster Studio", LeafTab.APPEARANCE, listOf("poster", "studio", "editor", "preview", "customize", "width", "spacing", "rounding", "workshop"), uiLabel = "Poster Studio", subScreen = SettingsSubScreen.POSTER_EDITOR),
 
         SettingsSearchEntry("Accent Color", LeafTab.APPEARANCE, listOf("accent", "theme", "color", "purple", "blue", "green", "red", "orange", "hex", "custom"), uiLabel = "Theme & Colors", subScreen = SettingsSubScreen.APPEARANCE_THEME_WALLPAPER),
+        SettingsSearchEntry("Shape & Corner Identity", LeafTab.APPEARANCE, listOf("button", "shape", "cast", "profile", "avatar", "person", "circle", "rounded", "pill", "soft", "sharp", "corners", "radius"), uiLabel = "Shape & Corner Identity", subScreen = SettingsSubScreen.APPEARANCE_THEME_WALLPAPER),
         SettingsSearchEntry("Light Theme", LeafTab.APPEARANCE, listOf("light", "white", "day", "bright", "theme", "mode"), uiLabel = "Light Theme", subScreen = SettingsSubScreen.APPEARANCE_THEME_WALLPAPER),
         SettingsSearchEntry("AMOLED Pure Black Mode", LeafTab.APPEARANCE, listOf("amoled", "oled", "pure black", "pitch black", "battery", "dark"), uiLabel = "AMOLED Pure Black Mode", subScreen = SettingsSubScreen.APPEARANCE_THEME_WALLPAPER),
         SettingsSearchEntry("App Background Palette", LeafTab.APPEARANCE, listOf("background", "navy", "midnight", "slate", "mocha", "pure black", "tint", "custom hex"), uiLabel = "App Background Palette", subScreen = SettingsSubScreen.APPEARANCE_THEME_WALLPAPER),

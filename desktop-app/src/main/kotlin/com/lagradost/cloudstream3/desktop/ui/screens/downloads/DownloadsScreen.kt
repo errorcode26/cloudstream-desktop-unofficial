@@ -138,13 +138,16 @@ fun DownloadsScreen(
                     leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(18.dp)) },
                     trailingIcon = {
                         if (uiState.searchQuery.isNotEmpty()) {
-                            IconButton(onClick = { viewModel.onEvent(DownloadsUiEvent.UpdateSearchQuery("")) }) {
+                            com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton(
+                                onClick = { viewModel.onEvent(DownloadsUiEvent.UpdateSearchQuery("")) },
+                                modifier = Modifier.size(32.dp),
+                            ) {
                                 Icon(Icons.Default.Close, contentDescription = "Clear", modifier = Modifier.size(16.dp))
                             }
                         }
                     },
                     singleLine = true,
-                    shape = RoundedCornerShape(20.dp),
+                    shape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.medium,
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = MaterialTheme.colorScheme.primary,
                         unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
@@ -152,9 +155,8 @@ fun DownloadsScreen(
                     modifier = Modifier.width(240.dp).height(48.dp),
                 )
 
-                FilledTonalButton(
+                com.lagradost.cloudstream3.desktop.ui.components.DesktopFilledTonalButton(
                     onClick = { com.lagradost.cloudstream3.desktop.ui.GlobalMediaLauncher.openLocalFileDialog() },
-                    shape = RoundedCornerShape(20.dp),
                     contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
                     modifier = Modifier.height(48.dp),
                 ) {
@@ -163,9 +165,8 @@ fun DownloadsScreen(
                     Text("Play Local File", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
                 }
 
-                FilledTonalButton(
+                com.lagradost.cloudstream3.desktop.ui.components.DesktopFilledTonalButton(
                     onClick = { com.lagradost.cloudstream3.desktop.ui.GlobalMediaLauncher.showNetworkStreamDialog = true },
-                    shape = RoundedCornerShape(20.dp),
                     contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
                     modifier = Modifier.height(48.dp),
                 ) {
@@ -174,21 +175,21 @@ fun DownloadsScreen(
                     Text("Stream URL", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
                 }
 
-                FilledTonalIconButton(
+                com.lagradost.cloudstream3.desktop.ui.components.DesktopFilledTonalIconButton(
                     onClick = { viewModel.onEvent(DownloadsUiEvent.CleanOrphanedJunk) },
                     modifier = Modifier.size(44.dp),
                 ) {
                     Icon(Icons.Default.CleaningServices, contentDescription = "Clean Orphaned Junk", modifier = Modifier.size(20.dp))
                 }
 
-                FilledTonalIconButton(
+                com.lagradost.cloudstream3.desktop.ui.components.DesktopFilledTonalIconButton(
                     onClick = { viewModel.onEvent(DownloadsUiEvent.ToggleSettingsDialog(true)) },
                     modifier = Modifier.size(44.dp),
                 ) {
                     Icon(Icons.Default.Settings, contentDescription = "Download Settings", modifier = Modifier.size(20.dp))
                 }
 
-                IconButton(
+                com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton(
                     onClick = {
                         scope.launch(Dispatchers.IO) {
                             try {
@@ -243,7 +244,7 @@ fun DownloadsScreen(
                                 }
                             }
                         },
-                        shape = RoundedCornerShape(12.dp),
+                        shape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.medium,
                     )
                 }
             }
@@ -255,10 +256,10 @@ fun DownloadsScreen(
                 ) {
                     val hasActive = uiState.activeTasks.any { it.status == DownloadStatus.DOWNLOADING || it.status == DownloadStatus.QUEUED }
                     if (hasActive) {
-                        OutlinedButton(
+                        com.lagradost.cloudstream3.desktop.ui.components.DesktopOutlinedButton(
                             onClick = { viewModel.onEvent(DownloadsUiEvent.PauseAll) },
                             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                            shape = RoundedCornerShape(8.dp),
+                            shape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact,
                         ) {
                             Icon(Icons.Default.Pause, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(6.dp))
@@ -268,10 +269,10 @@ fun DownloadsScreen(
 
                     val hasPaused = uiState.activeTasks.any { it.status == DownloadStatus.PAUSED || it.status == DownloadStatus.FAILED }
                     if (hasPaused) {
-                        Button(
+                        com.lagradost.cloudstream3.desktop.ui.components.DesktopButton(
                             onClick = { viewModel.onEvent(DownloadsUiEvent.ResumeAll) },
                             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                            shape = RoundedCornerShape(8.dp),
+                            shape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact,
                         ) {
                             Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(6.dp))
@@ -279,10 +280,10 @@ fun DownloadsScreen(
                         }
                     }
 
-                    OutlinedButton(
+                    com.lagradost.cloudstream3.desktop.ui.components.DesktopOutlinedButton(
                         onClick = { showCancelAllDialog = true },
                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                        shape = RoundedCornerShape(8.dp),
+                        shape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact,
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
                     ) {
                         Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(16.dp))
@@ -372,7 +373,7 @@ fun DownloadsScreen(
                 }
             },
             confirmButton = {
-                Button(
+                com.lagradost.cloudstream3.desktop.ui.components.DesktopButton(
                     onClick = {
                         val toDelete = target
                         taskPendingDelete = null
@@ -384,7 +385,7 @@ fun DownloadsScreen(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { taskPendingDelete = null }) {
+                com.lagradost.cloudstream3.desktop.ui.components.DesktopTextButton(onClick = { taskPendingDelete = null }) {
                     Text("Cancel")
                 }
             },
@@ -422,7 +423,7 @@ fun DownloadsScreen(
                 }
             },
             confirmButton = {
-                Button(
+                com.lagradost.cloudstream3.desktop.ui.components.DesktopButton(
                     onClick = {
                         val showToDelete = targetShow
                         showPendingDeleteShow = null
@@ -434,7 +435,7 @@ fun DownloadsScreen(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showPendingDeleteShow = null }) {
+                com.lagradost.cloudstream3.desktop.ui.components.DesktopTextButton(onClick = { showPendingDeleteShow = null }) {
                     Text("Cancel")
                 }
             },
@@ -449,7 +450,7 @@ fun DownloadsScreen(
             title = { Text("Cancel All Downloads?") },
             text = { Text("Are you sure you want to cancel all active and queued downloads? Any temporary files in progress will be cleaned up.") },
             confirmButton = {
-                Button(
+                com.lagradost.cloudstream3.desktop.ui.components.DesktopButton(
                     onClick = {
                         showCancelAllDialog = false
                         viewModel.onEvent(DownloadsUiEvent.CancelAll)
@@ -461,7 +462,7 @@ fun DownloadsScreen(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showCancelAllDialog = false }) {
+                com.lagradost.cloudstream3.desktop.ui.components.DesktopTextButton(onClick = { showCancelAllDialog = false }) {
                     Text("Keep Downloading")
                 }
             },
@@ -499,7 +500,7 @@ fun DownloadsScreen(
                 )
             },
             confirmButton = {
-                Button(onClick = { viewModel.onEvent(DownloadsUiEvent.DismissJunkMessage) }) {
+                com.lagradost.cloudstream3.desktop.ui.components.DesktopButton(onClick = { viewModel.onEvent(DownloadsUiEvent.DismissJunkMessage) }) {
                     Text("Done")
                 }
             },
@@ -617,14 +618,17 @@ private fun DownloadedItemCard(
                 }
 
                 // Play Button
-                IconButton(
+                com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton(
                     onClick = onPlay,
+                    colors = IconButtonDefaults.iconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                    ),
                     modifier = Modifier
                         .size(44.dp)
-                        .align(Alignment.Center)
-                        .background(MaterialTheme.colorScheme.primary, CircleShape),
+                        .align(Alignment.Center),
                 ) {
-                    Icon(Icons.Default.PlayArrow, contentDescription = "Play", tint = MaterialTheme.colorScheme.onPrimary)
+                    Icon(Icons.Default.PlayArrow, contentDescription = "Play")
                 }
 
                 // File Size Badge
@@ -635,7 +639,7 @@ private fun DownloadedItemCard(
                     modifier = Modifier.padding(8.dp).align(Alignment.BottomStart),
                 )
 
-                IconButton(
+                com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton(
                     onClick = onDelete,
                     modifier = Modifier.padding(4.dp).size(28.dp).align(Alignment.BottomEnd),
                 ) {

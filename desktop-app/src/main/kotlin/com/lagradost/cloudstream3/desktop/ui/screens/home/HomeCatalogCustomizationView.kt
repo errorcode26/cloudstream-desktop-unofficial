@@ -206,17 +206,17 @@ internal fun HomeCatalogCustomizationView(
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
-                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), RoundedCornerShape(50))
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact)
                             .padding(horizontal = 4.dp),
                     ) {
-                        IconButton(
+                        com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton(
                             onClick = { onMoveCatalog(index, index - 1) },
                             enabled = index > 0,
                             modifier = Modifier.size(28.dp),
                         ) {
                             Icon(Icons.Default.ArrowUpward, contentDescription = "Move Up", modifier = Modifier.size(16.dp))
                         }
-                        IconButton(
+                        com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton(
                             onClick = { onMoveCatalog(index, index + 1) },
                             enabled = index < sortedCatalogs.lastIndex,
                             modifier = Modifier.size(28.dp),

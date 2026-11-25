@@ -85,22 +85,25 @@ internal fun TorboxFileBrowserDialog(
                     )
                 }
 
-                IconButton(onClick = onDismissRequest) {
+                com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton(onClick = onDismissRequest) {
                     Icon(Icons.Default.Close, contentDescription = "Close")
                 }
             }
 
             if (videoFiles.isNotEmpty() && item.files.size > videoFiles.size) {
                 Spacer(Modifier.height(10.dp))
+                val chipShape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FilterChip(
                         selected = !showAllFiles,
                         onClick = { showAllFiles = false },
+                        shape = chipShape,
                         label = { Text("Video Streams (${videoFiles.size})") },
                     )
                     FilterChip(
                         selected = showAllFiles,
                         onClick = { showAllFiles = true },
+                        shape = chipShape,
                         label = { Text("All Files (${item.files.size})") },
                     )
                 }
@@ -296,7 +299,7 @@ internal fun TorboxFileBrowserDialog(
                                 }
                             }
 
-                            Button(
+                            com.lagradost.cloudstream3.desktop.ui.components.DesktopButton(
                                 onClick = { onPlayFile(item, file) },
                                 enabled = !isFileResolving,
                                 contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),

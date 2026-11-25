@@ -173,7 +173,7 @@ internal fun HomeSimpleProviderGrid(
                     }
                 }
 
-                IconButton(onClick = {
+                com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton(onClick = {
                     if (!isActive && provider.mainPage.isEmpty()) {
                         AppToastManager.showInfo("Select this plugin first to load its catalogs.")
                     } else {

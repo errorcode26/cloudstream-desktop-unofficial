@@ -34,6 +34,7 @@ import com.lagradost.cloudstream3.desktop.profile.ProfileManager
 import com.lagradost.cloudstream3.desktop.ui.screens.profile.ProfileEditDialog
 import com.lagradost.cloudstream3.desktop.ui.theme.AppearanceConfig
 import com.lagradost.cloudstream3.desktop.ui.theme.ClockDisplayMode
+import com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes
 import dev.chrisbanes.haze.hazeEffect
 import kotlinx.coroutines.delay
 
@@ -365,11 +366,14 @@ private fun TopBarProfilePill(
     val isHovered by interactionSource.collectIsHoveredAsState()
     val isExpanded = showProfileName || isHovered || showProfileFlyout
 
+    val buttonShapes = LocalDesktopButtonShapes.current
+    val profileButtonShape = if (isExpanded) buttonShapes.medium else buttonShapes.icon
+
     Box {
         Surface(
             modifier = Modifier
                 .height(42.dp)
-                .clip(RoundedCornerShape(10.dp))
+                .clip(profileButtonShape)
                 .clickable(
                     interactionSource = interactionSource,
                     indication = null,
@@ -378,10 +382,10 @@ private fun TopBarProfilePill(
                 .border(
                     1.dp,
                     if (isHovered) hoverBorder else buttonBorder,
-                    RoundedCornerShape(10.dp),
+                    profileButtonShape,
                 ),
             color = buttonBg,
-            shape = RoundedCornerShape(10.dp),
+            shape = profileButtonShape,
         ) {
             Row(
                 modifier = Modifier

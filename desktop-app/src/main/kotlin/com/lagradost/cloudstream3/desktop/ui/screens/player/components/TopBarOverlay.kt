@@ -9,6 +9,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton
 
 @Composable
 fun TopBarOverlay(
@@ -26,7 +27,7 @@ fun TopBarOverlay(
             .padding(24.dp),
     ) {
         // Back Button
-        IconButton(
+        DesktopIconButton(
             onClick = onBackClick,
             modifier = Modifier.align(Alignment.CenterStart),
         ) {

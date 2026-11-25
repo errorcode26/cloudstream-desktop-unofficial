@@ -164,7 +164,7 @@ fun HomeCategorySection(
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                         style = MaterialTheme.typography.bodySmall,
                     )
-                    androidx.compose.material3.TextButton(
+                    com.lagradost.cloudstream3.desktop.ui.components.DesktopTextButton(
                         onClick = onLoadCategory,
                         contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 4.dp),
                     ) {

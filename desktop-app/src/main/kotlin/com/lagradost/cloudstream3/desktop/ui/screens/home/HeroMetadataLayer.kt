@@ -20,13 +20,14 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Star
-import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import com.lagradost.cloudstream3.desktop.ui.components.HeroPrimaryCtaButton
+import com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -291,26 +292,15 @@ internal fun HeroActionButtons(
 
     Spacer(Modifier.height(if (isCompact) 14.dp else 24.dp))
 
-    Button(
+    HeroPrimaryCtaButton(
+        text = "Watch Now",
+        icon = Icons.Default.PlayArrow,
         onClick = { onSelect(item, meta?.backdropUrl) },
-        colors = ButtonDefaults.buttonColors(
-            containerColor = Color.White,
-            contentColor = Color.Black,
-        ),
-        shape = RoundedCornerShape(if (isCompact) 10.dp else 12.dp),
+        shape = LocalDesktopButtonShapes.current.primary,
         contentPadding = PaddingValues(horizontal = if (isCompact) 16.dp else 24.dp),
+        iconSize = if (isCompact) 18.dp else 22.dp,
+        fontSize = if (isCompact) 13.sp else 15.sp,
+        iconSpacing = if (isCompact) 6.dp else 8.dp,
         modifier = if (isCompact) Modifier.height(40.dp).fillMaxWidth() else Modifier.height(48.dp).widthIn(min = 160.dp),
-    ) {
-        Icon(
-            Icons.Default.PlayArrow,
-            contentDescription = null,
-            modifier = Modifier.size(if (isCompact) 18.dp else 22.dp),
-        )
-        Spacer(Modifier.width(if (isCompact) 6.dp else 8.dp))
-        Text(
-            "Watch Now",
-            fontWeight = FontWeight.ExtraBold,
-            fontSize = if (isCompact) 13.sp else 15.sp,
-        )
-    }
+    )
 }

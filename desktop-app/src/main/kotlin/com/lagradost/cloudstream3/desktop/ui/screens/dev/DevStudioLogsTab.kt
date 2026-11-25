@@ -34,6 +34,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopOutlinedButton
 import com.lagradost.common.logging.LogEntry
 import com.lagradost.common.logging.LogLevel
 import com.lagradost.common.logging.LogSubsystem
@@ -204,11 +207,11 @@ private fun DevStudioLogToolbar(
                 }
 
                 // Pause / Resume Toggle
-                Button(
+                DesktopButton(
                     onClick = { onEvent(DevStudioUiEvent.TogglePause) },
                     colors = ButtonDefaults.buttonColors(containerColor = if (state.isPaused) DevLevelWarn.copy(alpha = 0.25f) else Color(0xFF23273A)),
                     contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                    shape = RoundedCornerShape(6.dp),
+                    shape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact,
                     modifier = Modifier.height(36.dp),
                 ) {
                     Icon(
@@ -222,20 +225,20 @@ private fun DevStudioLogToolbar(
                 }
 
                 // Export Logs
-                OutlinedButton(
+                DesktopOutlinedButton(
                     onClick = { onEvent(DevStudioUiEvent.ExportLogs) },
                     contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                    shape = RoundedCornerShape(6.dp),
+                    shape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact,
                     modifier = Modifier.height(36.dp),
                 ) {
                     Text("Export", fontSize = 11.sp, color = Color.LightGray)
                 }
 
                 // Clear
-                OutlinedButton(
+                DesktopOutlinedButton(
                     onClick = { onEvent(DevStudioUiEvent.ClearLogs) },
                     contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                    shape = RoundedCornerShape(6.dp),
+                    shape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact,
                     modifier = Modifier.height(36.dp),
                 ) {
                     Text("Clear", fontSize = 11.sp, color = Color.LightGray)
@@ -253,11 +256,12 @@ private fun DevStudioLogToolbar(
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text("Level:", color = Color.Gray, fontSize = 11.sp, fontWeight = FontWeight.Bold)
 
+                    val chipShape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact
                     Surface(
                         color = if (state.exceptionsOnly) DevLevelError else DevBgDark,
-                        shape = RoundedCornerShape(12.dp),
+                        shape = chipShape,
                         border = androidx.compose.foundation.BorderStroke(1.dp, DevLevelError.copy(alpha = if (state.exceptionsOnly) 1f else 0.5f)),
-                        modifier = Modifier.clickable { onEvent(DevStudioUiEvent.ToggleExceptionsOnly) },
+                        modifier = Modifier.clip(chipShape).clickable { onEvent(DevStudioUiEvent.ToggleExceptionsOnly) },
                     ) {
                         Text(
                             "🔥 CRASHES ONLY",
@@ -288,11 +292,12 @@ private fun DevStudioLogToolbar(
                 }
 
                 // Auto-Scroll Toggle Pill
+                val autoScrollShape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact
                 Surface(
                     color = if (state.autoScrollEnabled) DevLevelDebug.copy(alpha = 0.15f) else Color(0xFF202330),
-                    shape = RoundedCornerShape(12.dp),
+                    shape = autoScrollShape,
                     border = androidx.compose.foundation.BorderStroke(1.dp, if (state.autoScrollEnabled) DevLevelDebug.copy(alpha = 0.4f) else DevBorderDark),
-                    modifier = Modifier.clickable { onEvent(DevStudioUiEvent.ToggleAutoScroll) },
+                    modifier = Modifier.clip(autoScrollShape).clickable { onEvent(DevStudioUiEvent.ToggleAutoScroll) },
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
@@ -540,7 +545,7 @@ private fun DevStudioLogRow(
         )
 
         // Inline Quick Actions
-        IconButton(onClick = onCopy, modifier = Modifier.size(20.dp)) {
+        DesktopIconButton(onClick = onCopy, modifier = Modifier.size(20.dp)) {
             Icon(Icons.Default.ContentCopy, contentDescription = "Copy Line", tint = Color.Gray, modifier = Modifier.size(12.dp))
         }
 
@@ -584,7 +589,7 @@ private fun DevStudioLogInspector(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text("Log Inspector", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-            IconButton(onClick = onClose, modifier = Modifier.size(24.dp)) {
+            DesktopIconButton(onClick = onClose, modifier = Modifier.size(24.dp)) {
                 Icon(Icons.Default.Close, contentDescription = "Close Inspector", tint = Color.Gray, modifier = Modifier.size(16.dp))
             }
         }
@@ -664,10 +669,10 @@ private fun DevStudioLogInspector(
 
         Spacer(Modifier.height(16.dp))
 
-        Button(
+        DesktopButton(
             onClick = onCopyAiSnapshot,
             colors = ButtonDefaults.buttonColors(containerColor = DevAccentCyan),
-            shape = RoundedCornerShape(6.dp),
+            shape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact,
             modifier = Modifier.fillMaxWidth().height(36.dp),
         ) {
             Icon(Icons.Default.ContentCopy, contentDescription = null, tint = DevBgDark, modifier = Modifier.size(16.dp))
@@ -689,11 +694,12 @@ private fun LevelFilterChip(
     color: Color,
     onClick: () -> Unit,
 ) {
+    val chipShape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact
     Surface(
         color = if (isSelected) color.copy(alpha = 0.25f) else DevBgDark,
-        shape = RoundedCornerShape(12.dp),
+        shape = chipShape,
         border = androidx.compose.foundation.BorderStroke(1.dp, if (isSelected) color else DevBorderDark),
-        modifier = Modifier.clickable { onClick() },
+        modifier = Modifier.clip(chipShape).clickable { onClick() },
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
@@ -732,11 +738,12 @@ private fun SubsystemPicker(
     var expanded by remember { mutableStateOf(false) }
 
     Box {
+        val pickerShape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact
         Surface(
             color = DevBgDark,
-            shape = RoundedCornerShape(6.dp),
+            shape = pickerShape,
             border = androidx.compose.foundation.BorderStroke(1.dp, DevBorderDark),
-            modifier = Modifier.clickable { expanded = true }.height(36.dp),
+            modifier = Modifier.clip(pickerShape).clickable { expanded = true }.height(36.dp),
         ) {
             Row(
                 modifier = Modifier.padding(horizontal = 10.dp),
@@ -776,11 +783,12 @@ private fun PluginPicker(
     var expanded by remember { mutableStateOf(false) }
 
     Box {
+        val pickerShape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact
         Surface(
             color = DevBgDark,
-            shape = RoundedCornerShape(6.dp),
+            shape = pickerShape,
             border = androidx.compose.foundation.BorderStroke(1.dp, if (selectedPlugin != null) DevAccentCyan else DevBorderDark),
-            modifier = Modifier.clickable { expanded = true }.height(36.dp),
+            modifier = Modifier.clip(pickerShape).clickable { expanded = true }.height(36.dp),
         ) {
             Row(
                 modifier = Modifier.padding(horizontal = 10.dp),

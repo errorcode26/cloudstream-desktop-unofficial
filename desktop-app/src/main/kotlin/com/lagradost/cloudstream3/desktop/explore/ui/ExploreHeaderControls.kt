@@ -142,33 +142,9 @@ internal fun ExploreHeaderControls(
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     if (drilledSearchCat != null) {
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)),
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .clickable { viewModel.onEvent(ExploreUiEvent.ReturnFromSearchCategory) },
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            ) {
-                                Icon(
-                                    Icons.AutoMirrored.Filled.ArrowBack,
-                                    contentDescription = "Back",
-                                    tint = MaterialTheme.colorScheme.onSurface,
-                                    modifier = Modifier.size(15.dp),
-                                )
-                                Text(
-                                    text = "Back",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                )
-                            }
-                        }
+                        ExploreHeaderBackButton(
+                            onClick = { viewModel.onEvent(ExploreUiEvent.ReturnFromSearchCategory) },
+                        )
 
                         Column {
                             Text(
@@ -185,33 +161,9 @@ internal fun ExploreHeaderControls(
                             )
                         }
                     } else if (selectedCollection != null) {
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)),
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .clickable { viewModel.onEvent(ExploreUiEvent.CloseCollection) },
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            ) {
-                                Icon(
-                                    Icons.AutoMirrored.Filled.ArrowBack,
-                                    contentDescription = "Back",
-                                    tint = MaterialTheme.colorScheme.onSurface,
-                                    modifier = Modifier.size(15.dp),
-                                )
-                                Text(
-                                    text = "Back",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                )
-                            }
-                        }
+                        ExploreHeaderBackButton(
+                            onClick = { viewModel.onEvent(ExploreUiEvent.CloseCollection) },
+                        )
 
                         Column {
                             Text(
@@ -228,33 +180,9 @@ internal fun ExploreHeaderControls(
                             )
                         }
                     } else if (drilledCat != null || drilledPlat != null) {
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)),
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .clickable { viewModel.onEvent(ExploreUiEvent.ReturnToShelves) },
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            ) {
-                                Icon(
-                                    Icons.AutoMirrored.Filled.ArrowBack,
-                                    contentDescription = "Back",
-                                    tint = MaterialTheme.colorScheme.onSurface,
-                                    modifier = Modifier.size(15.dp),
-                                )
-                                Text(
-                                    text = "Back",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                )
-                            }
-                        }
+                        ExploreHeaderBackButton(
+                            onClick = { viewModel.onEvent(ExploreUiEvent.ReturnToShelves) },
+                        )
 
                         val headerTitle = drilledPlat?.let { "${it.displayName} Hub" } ?: drilledCat?.name ?: "Explore"
                         Column {
@@ -318,16 +246,17 @@ internal fun ExploreHeaderControls(
                         )
 
                         // Explore primary category pills (My Add-ons, Streaming Hubs, Franchise Sagas, Anime, Movies, TV Shows)
+                        val switcherShapes = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current
                         Surface(
                             modifier = Modifier
-                                .clip(RoundedCornerShape(18.dp))
+                                .clip(switcherShapes.medium)
                                 .border(
                                     0.5.dp,
                                     if (isLightMode) theme.Divider.copy(alpha = 0.5f) else Color.White.copy(alpha = 0.12f),
-                                    RoundedCornerShape(18.dp),
+                                    switcherShapes.medium,
                                 ),
                             color = if (isLightMode) theme.SurfaceElevated.copy(alpha = 0.6f) else Color.White.copy(alpha = 0.05f),
-                            shape = RoundedCornerShape(18.dp),
+                            shape = switcherShapes.medium,
                         ) {
                             Row(
                                 modifier = Modifier.padding(2.5.dp),
@@ -343,7 +272,7 @@ internal fun ExploreHeaderControls(
                                     Box(
                                         modifier = Modifier
                                             .height(30.dp)
-                                            .clip(RoundedCornerShape(15.dp))
+                                            .clip(switcherShapes.compact)
                                             .background(
                                                 when {
                                                     isSelected -> MaterialTheme.colorScheme.primary
@@ -372,6 +301,38 @@ internal fun ExploreHeaderControls(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun ExploreHeaderBackButton(onClick: () -> Unit) {
+    val backShape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact
+    Surface(
+        shape = backShape,
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)),
+        modifier = Modifier
+            .clip(backShape)
+            .clickable(onClick = onClick),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Icon(
+                Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = "Back",
+                tint = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.size(15.dp),
+            )
+            Text(
+                text = "Back",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
         }
     }
 }

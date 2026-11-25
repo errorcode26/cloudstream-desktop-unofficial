@@ -14,6 +14,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopOutlinedButton
 
 // -------------------------------------------------------------------------------------------------
 // TAB 3: Live Player & Stream Diagnostics
@@ -53,10 +54,10 @@ internal fun PlayerDiagnosticsTabContent(
                 }
             }
 
-            OutlinedButton(
+            DesktopOutlinedButton(
                 onClick = { onEvent(DevStudioUiEvent.RefreshPlayerDiagnostics) },
                 contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                shape = RoundedCornerShape(6.dp),
+                shape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact,
                 modifier = Modifier.height(30.dp),
             ) {
                 Icon(Icons.Default.Refresh, contentDescription = null, tint = Color.LightGray, modifier = Modifier.size(13.dp))

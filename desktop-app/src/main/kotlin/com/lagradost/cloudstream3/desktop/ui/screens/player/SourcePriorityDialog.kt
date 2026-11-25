@@ -21,6 +21,9 @@ import com.lagradost.cloudstream3.desktop.player.LanguagePriorityHelper
 import com.lagradost.cloudstream3.desktop.player.PlayerConfig
 import com.lagradost.cloudstream3.desktop.player.QualityDataHelper
 import com.lagradost.cloudstream3.desktop.ui.components.CloudstreamCustomDialog
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopOutlinedButton
 import com.lagradost.cloudstream3.desktop.ui.screens.settings.*
 import com.lagradost.cloudstream3.desktop.ui.screens.settings.SettingsSession
 import com.lagradost.cloudstream3.desktop.ui.screens.settings.contract.SettingsUiEvent
@@ -96,7 +99,7 @@ fun SourcePriorityDialog(
                     }
                 }
 
-                IconButton(onClick = onDismissRequest) {
+                DesktopIconButton(onClick = onDismissRequest) {
                     Icon(Icons.Default.Close, contentDescription = "Close")
                 }
             }
@@ -139,30 +142,34 @@ fun SourcePriorityDialog(
 
                 // Quick Presets
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    val chipShape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact
                     when (selectedTab) {
                         0 -> {
-                            OutlinedButton(
+                            DesktopOutlinedButton(
                                 onClick = {
                                     settingsViewModel.onEvent(SettingsUiEvent.SetQualityPreset4K)
                                 },
+                                shape = chipShape,
                                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                             ) {
                                 Text("Prefer 4K", fontSize = 12.sp)
                             }
 
-                            OutlinedButton(
+                            DesktopOutlinedButton(
                                 onClick = {
                                     settingsViewModel.onEvent(SettingsUiEvent.SetQualityPreset1080p)
                                 },
+                                shape = chipShape,
                                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                             ) {
                                 Text("Prefer 1080p", fontSize = 12.sp)
                             }
 
-                            OutlinedButton(
+                            DesktopOutlinedButton(
                                 onClick = {
                                     settingsViewModel.onEvent(SettingsUiEvent.ResetQualityDefaults)
                                 },
+                                shape = chipShape,
                                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                             ) {
                                 Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(14.dp))
@@ -171,28 +178,31 @@ fun SourcePriorityDialog(
                             }
                         }
                         1 -> {
-                            OutlinedButton(
+                            DesktopOutlinedButton(
                                 onClick = {
                                     settingsViewModel.onEvent(SettingsUiEvent.SetAudioLanguagePreset(listOf("eng,en", "original")))
                                 },
+                                shape = chipShape,
                                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                             ) {
                                 Text("Prefer English", fontSize = 12.sp)
                             }
 
-                            OutlinedButton(
+                            DesktopOutlinedButton(
                                 onClick = {
                                     settingsViewModel.onEvent(SettingsUiEvent.SetAudioLanguagePreset(listOf("jpn,ja", "original", "eng,en")))
                                 },
+                                shape = chipShape,
                                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                             ) {
                                 Text("Prefer Japanese", fontSize = 12.sp)
                             }
 
-                            OutlinedButton(
+                            DesktopOutlinedButton(
                                 onClick = {
                                     settingsViewModel.onEvent(SettingsUiEvent.ResetAudioDefaults)
                                 },
+                                shape = chipShape,
                                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                             ) {
                                 Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(14.dp))
@@ -201,19 +211,21 @@ fun SourcePriorityDialog(
                             }
                         }
                         2 -> {
-                            OutlinedButton(
+                            DesktopOutlinedButton(
                                 onClick = {
                                     settingsViewModel.onEvent(SettingsUiEvent.SetSubtitleLanguagePreset(listOf("eng,en")))
                                 },
+                                shape = chipShape,
                                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                             ) {
                                 Text("Prefer English", fontSize = 12.sp)
                             }
 
-                            OutlinedButton(
+                            DesktopOutlinedButton(
                                 onClick = {
                                     settingsViewModel.onEvent(SettingsUiEvent.ResetSubtitleDefaults)
                                 },
+                                shape = chipShape,
                                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                             ) {
                                 Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(14.dp))
@@ -302,9 +314,8 @@ fun SourcePriorityDialog(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End,
             ) {
-                Button(
+                DesktopButton(
                     onClick = onDismissRequest,
-                    shape = RoundedCornerShape(10.dp),
                     contentPadding = PaddingValues(horizontal = 28.dp, vertical = 12.dp),
                 ) {
                     Text("Done", fontWeight = FontWeight.Bold)

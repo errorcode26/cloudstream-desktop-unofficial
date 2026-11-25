@@ -16,6 +16,7 @@ import androidx.compose.ui.unit.dp
 import com.lagradost.cloudstream3.MainAPI
 import com.lagradost.cloudstream3.SearchResponse
 import com.lagradost.cloudstream3.desktop.ui.components.CategoryRowWithHeader
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton
 import com.lagradost.cloudstream3.desktop.ui.components.LocalDesktopTheme
 import com.lagradost.cloudstream3.desktop.ui.components.PosterCard
 import com.lagradost.cloudstream3.desktop.ui.components.WatchHistoryCard
@@ -73,7 +74,7 @@ fun PreviewHeader(
             )
             Spacer(modifier = Modifier.width(8.dp))
         }
-        IconButton(onClick = onRefresh, modifier = Modifier.size(32.dp)) {
+        DesktopIconButton(onClick = onRefresh, modifier = Modifier.size(32.dp)) {
             Icon(
                 imageVector = Icons.Default.Refresh,
                 contentDescription = "Reload preview content",

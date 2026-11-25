@@ -158,6 +158,9 @@ fun CloudstreamApp(rootComponent: RootComponent) {
         }
     }
 
+    val buttonShapes = com.lagradost.cloudstream3.desktop.ui.theme.rememberDesktopButtonShapes()
+    val profileShapes = com.lagradost.cloudstream3.desktop.ui.theme.rememberDesktopProfileShapes()
+
     androidx.compose.runtime.CompositionLocalProvider(
         LocalVideoPlayer provides { launchData ->
             coroutineScope.launch(kotlinx.coroutines.Dispatchers.Main) {
@@ -166,6 +169,8 @@ fun CloudstreamApp(rootComponent: RootComponent) {
         },
         LocalVideoPlayerActive provides (currentVideo != null),
         com.lagradost.cloudstream3.desktop.ui.components.LocalDesktopTheme provides desktopColors,
+        com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes provides buttonShapes,
+        com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopProfileShapes provides profileShapes,
     ) {
         com.lagradost.cloudstream3.desktop.ui.GlobalMediaLauncher.GlobalNetworkStreamDialog()
 
@@ -432,7 +437,7 @@ fun CloudstreamApp(rootComponent: RootComponent) {
                                                                             color = androidx.compose.ui.graphics.Color(0xFF94A3B8),
                                                                             fontSize = 13.sp,
                                                                         )
-                                                                        androidx.compose.material3.OutlinedButton(onClick = { rootComponent.pop() }) {
+                                                                        com.lagradost.cloudstream3.desktop.ui.components.DesktopOutlinedButton(onClick = { rootComponent.pop() }) {
                                                                             Text("Go Back")
                                                                         }
                                                                     }
@@ -577,7 +582,7 @@ fun CloudstreamApp(rootComponent: RootComponent) {
                                                                             color = androidx.compose.ui.graphics.Color(0xFF94A3B8),
                                                                             fontSize = 13.sp,
                                                                         )
-                                                                        androidx.compose.material3.OutlinedButton(onClick = { rootComponent.pop() }) {
+                                                                        com.lagradost.cloudstream3.desktop.ui.components.DesktopOutlinedButton(onClick = { rootComponent.pop() }) {
                                                                             Text("Go Back")
                                                                         }
                                                                     }

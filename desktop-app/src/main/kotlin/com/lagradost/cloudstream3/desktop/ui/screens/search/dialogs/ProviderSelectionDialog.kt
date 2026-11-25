@@ -103,7 +103,7 @@ fun ProviderSelectionDialog(
                 }
 
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilledTonalButton(
+                    com.lagradost.cloudstream3.desktop.ui.components.DesktopFilledTonalButton(
                         onClick = {
                             val hasFilter = providerModalSearch.isNotBlank() || selectedCategoryFilter != null
                             localSelected = if (hasFilter) {
@@ -112,13 +112,12 @@ fun ProviderSelectionDialog(
                                 allProviderNames
                             }
                         },
-                        shape = RoundedCornerShape(10.dp),
                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                     ) {
                         Text("Select All", fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
                     }
 
-                    OutlinedButton(
+                    com.lagradost.cloudstream3.desktop.ui.components.DesktopOutlinedButton(
                         onClick = {
                             val hasFilter = providerModalSearch.isNotBlank() || selectedCategoryFilter != null
                             localSelected = if (hasFilter) {
@@ -127,7 +126,6 @@ fun ProviderSelectionDialog(
                                 emptySet()
                             }
                         },
-                        shape = RoundedCornerShape(10.dp),
                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                     ) {
                         Text("Clear All", fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
@@ -144,7 +142,7 @@ fun ProviderSelectionDialog(
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(18.dp)) },
                 trailingIcon = {
                     if (providerModalSearch.isNotEmpty()) {
-                        IconButton(onClick = { providerModalSearch = "" }) {
+                        com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton(onClick = { providerModalSearch = "" }) {
                             Icon(Icons.Default.Close, contentDescription = "Clear", modifier = Modifier.size(16.dp))
                         }
                     }
@@ -168,13 +166,14 @@ fun ProviderSelectionDialog(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                val chipShape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact
                 categoryChips.forEach { (type, label) ->
                     val isSelected = selectedCategoryFilter == type
                     FilterChip(
                         selected = isSelected,
                         onClick = { selectedCategoryFilter = if (isSelected) null else type },
                         label = { Text(label, fontSize = 12.sp) },
-                        shape = RoundedCornerShape(8.dp),
+                        shape = chipShape,
                     )
                 }
             }
@@ -332,10 +331,10 @@ fun ProviderSelectionDialog(
                 )
 
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TextButton(onClick = onDismissRequest) {
+                    com.lagradost.cloudstream3.desktop.ui.components.DesktopTextButton(onClick = onDismissRequest) {
                         Text("Cancel")
                     }
-                    Button(
+                    com.lagradost.cloudstream3.desktop.ui.components.DesktopButton(
                         onClick = {
                             val finalSelected = if (localSelected.isEmpty()) allProviderNames else localSelected
                             onApplySelectedProviders(finalSelected)

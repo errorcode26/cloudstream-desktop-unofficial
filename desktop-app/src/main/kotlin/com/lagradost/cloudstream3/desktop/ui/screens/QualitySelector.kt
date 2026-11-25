@@ -83,7 +83,7 @@ fun QualitySelector(
                     )
                 }
 
-                TextButton(
+                com.lagradost.cloudstream3.desktop.ui.components.DesktopTextButton(
                     onClick = onOpenPriorityDialog,
                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
                     modifier = Modifier.height(26.dp),
@@ -105,6 +105,7 @@ fun QualitySelector(
             }
 
             // Resolution Chips
+            val chipShape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -122,7 +123,7 @@ fun QualitySelector(
                         selectedContainerColor = DesktopUi.AccentSoft,
                         selectedLabelColor = DesktopUi.Accent,
                     ),
-                    shape = RoundedCornerShape(8.dp),
+                    shape = chipShape,
                 )
                 availableQualities.forEach { option ->
                     FilterChip(
@@ -138,7 +139,7 @@ fun QualitySelector(
                             selectedContainerColor = DesktopUi.AccentSoft,
                             selectedLabelColor = DesktopUi.Accent,
                         ),
-                        shape = RoundedCornerShape(8.dp),
+                        shape = chipShape,
                     )
                 }
             }
@@ -172,7 +173,7 @@ fun QualitySelector(
                                 selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
                                 selectedLabelColor = MaterialTheme.colorScheme.primary,
                             ),
-                            shape = RoundedCornerShape(8.dp),
+                            shape = chipShape,
                         )
                     }
                 }

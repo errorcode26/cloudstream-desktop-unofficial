@@ -17,6 +17,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lagradost.cloudstream3.desktop.ui.components.CloudstreamCustomDialog
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopOutlinedButton
 import com.lagradost.cloudstream3.desktop.ui.screens.settings.PluginSettingsUiEffect
 import com.lagradost.cloudstream3.desktop.ui.screens.settings.PluginSettingsUiEvent
 import com.lagradost.cloudstream3.desktop.ui.screens.settings.PluginSettingsViewModel
@@ -98,12 +101,12 @@ fun PluginSettingsDialog(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                IconButton(
+                DesktopIconButton(
                     onClick = { if (!isApplying) onDismiss() },
                     enabled = !isApplying,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(50))
-                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                    colors = IconButtonDefaults.iconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    ),
                 ) {
                     Icon(
                         imageVector = Icons.Default.Close,
@@ -236,16 +239,15 @@ fun PluginSettingsDialog(
                 horizontalArrangement = Arrangement.End,
             ) {
                 if (hasChanged) {
-                    OutlinedButton(
+                    DesktopOutlinedButton(
                         onClick = onDismiss,
                         enabled = !isApplying,
-                        shape = RoundedCornerShape(12.dp),
                         modifier = Modifier.padding(end = 12.dp),
                     ) {
                         Text("Cancel")
                     }
                 }
-                Button(
+                DesktopButton(
                     onClick = {
                         if (hasChanged) {
                             viewModel.onEvent(PluginSettingsUiEvent.OnApplyChanges)
@@ -254,7 +256,6 @@ fun PluginSettingsDialog(
                         }
                     },
                     enabled = !isApplying,
-                    shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                 ) {
                     Text(if (isApplying) "Applying..." else "Apply & Close", fontWeight = FontWeight.Bold)

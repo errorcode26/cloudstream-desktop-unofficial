@@ -11,6 +11,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.unit.dp
 import com.lagradost.cloudstream3.desktop.ui.components.AppToastManager
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopOutlinedButton
 import com.lagradost.cloudstream3.desktop.ui.screens.settings.contract.SettingsUiEffect
 import com.lagradost.cloudstream3.desktop.ui.screens.settings.contract.SettingsUiState
 import com.lagradost.cloudstream3.desktop.ui.screens.settings.network.DnsSettingsSection
@@ -120,16 +122,14 @@ fun SettingsNetwork(viewModel: SettingsViewModel) {
                     Spacer(modifier = Modifier.width(16.dp))
 
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(
+                        DesktopOutlinedButton(
                             onClick = { showManualSolverDialog = true },
-                            shape = RoundedCornerShape(10.dp),
                         ) {
                             Text("Solve Manually")
                         }
 
-                        Button(
+                        DesktopButton(
                             onClick = { showCookiesDialog = true },
-                            shape = RoundedCornerShape(10.dp),
                         ) {
                             Text("Manage Cookies")
                         }
@@ -160,9 +160,8 @@ fun SettingsNetwork(viewModel: SettingsViewModel) {
 
                     Spacer(modifier = Modifier.width(16.dp))
 
-                    OutlinedButton(
+                    DesktopOutlinedButton(
                         onClick = { showIgnoredDomainsDialog = true },
-                        shape = RoundedCornerShape(10.dp),
                     ) {
                         Box { Text("Manage Ignored Sites") }
                     }

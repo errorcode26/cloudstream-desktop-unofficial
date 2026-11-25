@@ -14,6 +14,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopOutlinedButton
 import com.lagradost.cloudstream3.desktop.ui.screens.settings.SettingsDropdownItem
 import com.lagradost.cloudstream3.desktop.ui.screens.settings.SettingsGroupCard
 import com.lagradost.cloudstream3.desktop.ui.theme.AppearanceConfig
@@ -62,7 +65,7 @@ fun SettingsTypographyScreen() {
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Button(
+                DesktopButton(
                     onClick = {
                         try {
                             val chosenFile = com.lagradost.cloudstream3.desktop.utils.NativeFileDialog.open(
@@ -83,16 +86,14 @@ fun SettingsTypographyScreen() {
                             fontInstallFeedback = "Error opening file picker: ${e.message}"
                         }
                     },
-                    shape = RoundedCornerShape(10.dp),
                 ) {
                     Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(6.dp))
                     Text("Install Font (.ttf / .otf)")
                 }
 
-                OutlinedButton(
+                DesktopOutlinedButton(
                     onClick = { CustomFontManager.openFontsDirectory() },
-                    shape = RoundedCornerShape(10.dp),
                 ) {
                     Icon(Icons.Default.FolderOpen, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(6.dp))
@@ -147,7 +148,7 @@ fun SettingsTypographyScreen() {
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
                                 }
-                                IconButton(
+                                DesktopIconButton(
                                     onClick = {
                                         coroutineScope.launch(Dispatchers.IO) {
                                             if (selectedFont == fontName) {

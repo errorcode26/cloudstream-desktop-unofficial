@@ -29,6 +29,10 @@ import com.lagradost.cloudstream3.desktop.stremio.StremioAddonManager
 import com.lagradost.cloudstream3.desktop.stremio.StremioAddonType
 import com.lagradost.cloudstream3.desktop.stremio.matchesType
 import com.lagradost.cloudstream3.desktop.ui.components.CloudstreamAlertDialog
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopOutlinedButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopTextButton
 import com.lagradost.cloudstream3.desktop.ui.navigation.Config
 import com.lagradost.cloudstream3.desktop.ui.screens.extensions.ExtensionsViewModel
 import com.lagradost.cloudstream3.desktop.ui.screens.extensions.contract.ExtensionsUiEvent
@@ -65,7 +69,7 @@ fun SettingsAddons(
                 Text("Are you sure you want to remove '${addon.name}'? You can re-install this manifest anytime.")
             },
             confirmButton = {
-                TextButton(
+                DesktopTextButton(
                     onClick = {
                         viewModel.onEvent(ExtensionsUiEvent.OnRemoveStremioAddon(addon.manifestUrl))
                         addonToDelete = null
@@ -75,7 +79,7 @@ fun SettingsAddons(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { addonToDelete = null }) {
+                DesktopTextButton(onClick = { addonToDelete = null }) {
                     Text("Cancel")
                 }
             },
@@ -169,7 +173,7 @@ fun SettingsAddons(
                             }
                         }
 
-                        OutlinedButton(
+                        DesktopOutlinedButton(
                             onClick = {
                                 SettingsSession.selectedLeaf = LeafTab.INTEGRATIONS
                                 SettingsSession.activeSubScreen = SettingsSubScreen.EXPLORE_CATALOGS
@@ -177,7 +181,7 @@ fun SettingsAddons(
                                     onNavigate?.invoke(Config.Settings)
                                 }
                             },
-                            shape = RoundedCornerShape(8.dp),
+                            shape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact,
                             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
                             modifier = Modifier.height(if (isCompactHeight) 30.dp else 34.dp),
                         ) {
@@ -245,7 +249,7 @@ fun SettingsAddons(
                                     )
                                 }
                                 if (inputUrl.isNotEmpty()) {
-                                    IconButton(
+                                    DesktopIconButton(
                                         onClick = { inputUrl = ""; viewModel.onEvent(ExtensionsUiEvent.OnClearStremioAddonStatus) },
                                         modifier = Modifier.size(20.dp),
                                     ) {
@@ -260,14 +264,13 @@ fun SettingsAddons(
                             }
                         }
 
-                        Button(
+                        DesktopButton(
                             onClick = {
                                 if (inputUrl.isNotBlank()) {
                                     viewModel.onEvent(ExtensionsUiEvent.OnAddStremioAddon(inputUrl))
                                 }
                             },
                             enabled = inputUrl.isNotBlank() && !uiState.isInstallingStremioAddon,
-                            shape = RoundedCornerShape(10.dp),
                             contentPadding = PaddingValues(horizontal = 14.dp, vertical = 0.dp),
                             modifier = Modifier.height(42.dp),
                         ) {
@@ -500,7 +503,7 @@ private fun AddonItemCard(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier.padding(end = 8.dp),
             ) {
-                IconButton(
+                DesktopIconButton(
                     onClick = onMoveUp,
                     enabled = !isFirst,
                     modifier = Modifier.size(22.dp),
@@ -511,7 +514,7 @@ private fun AddonItemCard(
                         tint = if (!isFirst) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f),
                     )
                 }
-                IconButton(
+                DesktopIconButton(
                     onClick = onMoveDown,
                     enabled = !isLast,
                     modifier = Modifier.size(22.dp),
@@ -656,7 +659,7 @@ private fun AddonItemCard(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                IconButton(onClick = onInspect, modifier = Modifier.size(32.dp)) {
+                DesktopIconButton(onClick = onInspect, modifier = Modifier.size(32.dp)) {
                     Icon(
                         imageVector = Icons.Default.Info,
                         contentDescription = "Inspect Addon Details",
@@ -665,7 +668,7 @@ private fun AddonItemCard(
                     )
                 }
 
-                IconButton(onClick = onRefresh, modifier = Modifier.size(32.dp)) {
+                DesktopIconButton(onClick = onRefresh, modifier = Modifier.size(32.dp)) {
                     Icon(
                         imageVector = Icons.Default.Refresh,
                         contentDescription = "Refresh Manifest",
@@ -674,7 +677,7 @@ private fun AddonItemCard(
                     )
                 }
 
-                IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
+                DesktopIconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
                     Icon(
                         imageVector = Icons.Default.Delete,
                         contentDescription = "Delete Addon",

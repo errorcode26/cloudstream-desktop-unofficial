@@ -86,9 +86,9 @@ internal fun DesktopShellOfflineBanner(
                     )
                 }
                 Spacer(modifier = Modifier.width(6.dp))
-                FilledTonalButton(
+                com.lagradost.cloudstream3.desktop.ui.components.DesktopFilledTonalButton(
                     onClick = { GlobalMediaLauncher.openLocalFileDialog() },
-                    shape = RoundedCornerShape(8.dp),
+                    shape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact,
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
                     modifier = Modifier.height(32.dp),
                     colors = ButtonDefaults.filledTonalButtonColors(
@@ -100,11 +100,11 @@ internal fun DesktopShellOfflineBanner(
                     Spacer(Modifier.width(4.dp))
                     Text("Play Local File", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                 }
-                FilledTonalButton(
+                com.lagradost.cloudstream3.desktop.ui.components.DesktopFilledTonalButton(
                     onClick = {
                         coroutineScope.launch { NetworkMonitor.checkConnectivity() }
                     },
-                    shape = RoundedCornerShape(8.dp),
+                    shape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact,
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
                     modifier = Modifier.height(32.dp),
                     colors = ButtonDefaults.filledTonalButtonColors(

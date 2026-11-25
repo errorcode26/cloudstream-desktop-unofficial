@@ -10,6 +10,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes
 
 /**
  * Horizontally scrollable multi-select FilterChip row.
@@ -21,6 +22,7 @@ fun CategoryFilterChips(
     onToggle: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val chipShape = LocalDesktopButtonShapes.current.compact
     LazyRow(
         modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -31,6 +33,7 @@ fun CategoryFilterChips(
             FilterChip(
                 selected = category in selected,
                 onClick = { onToggle(category) },
+                shape = chipShape,
                 label = { Text(category) },
             )
         }

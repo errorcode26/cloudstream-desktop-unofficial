@@ -15,6 +15,8 @@ import com.lagradost.cloudstream3.desktop.ui.LocalFullscreenController
 import com.lagradost.cloudstream3.desktop.ui.LocalWindowState
 import com.lagradost.cloudstream3.desktop.ui.VideoLaunchData
 import com.lagradost.cloudstream3.desktop.ui.components.CloudstreamAlertDialog
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopTextButton
 import com.lagradost.cloudstream3.desktop.ui.screens.player.contract.PlayerUiEvent
 import com.lagradost.cloudstream3.fixUrlNull
 
@@ -391,7 +393,7 @@ fun EmbeddedVideoPlayer(
                         }
                     },
                     confirmButton = {
-                        Button(
+                        DesktopButton(
                             onClick = onClose,
                             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                         ) {
@@ -399,7 +401,7 @@ fun EmbeddedVideoPlayer(
                         }
                     },
                     dismissButton = {
-                        TextButton(
+                        DesktopTextButton(
                             onClick = {
                                 viewModel.onEvent(PlayerUiEvent.OnInit(actualLaunchData))
                             },

@@ -28,6 +28,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lagradost.cloudstream3.desktop.ui.components.CloudstreamCustomDialog
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopTextButton
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import org.jetbrains.skia.Bitmap
@@ -225,7 +228,7 @@ fun AvatarCropperDialog(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                IconButton(
+                DesktopIconButton(
                     onClick = { zoomScale = (zoomScale - 0.2f).coerceAtLeast(1.0f) },
                     enabled = zoomScale > 1.0f && !uiState.isCropping,
                 ) {
@@ -240,14 +243,14 @@ fun AvatarCropperDialog(
                     modifier = Modifier.weight(1f),
                 )
 
-                IconButton(
+                DesktopIconButton(
                     onClick = { zoomScale = (zoomScale + 0.2f).coerceAtMost(3.0f) },
                     enabled = zoomScale < 3.0f && !uiState.isCropping,
                 ) {
                     Icon(Icons.Default.ZoomIn, contentDescription = "Zoom In")
                 }
 
-                IconButton(
+                DesktopIconButton(
                     onClick = {
                         zoomScale = 1.0f
                         panOffset = Offset.Zero
@@ -266,14 +269,14 @@ fun AvatarCropperDialog(
                 horizontalArrangement = Arrangement.End,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                TextButton(
+                DesktopTextButton(
                     onClick = onDismiss,
                     enabled = !uiState.isCropping,
                 ) {
                     Text("Cancel")
                 }
                 Spacer(Modifier.width(8.dp))
-                Button(
+                DesktopButton(
                     onClick = {
                         viewModel.onEvent(AvatarCropperUiEvent.ApplyCrop(zoomScale, panOffset))
                     },

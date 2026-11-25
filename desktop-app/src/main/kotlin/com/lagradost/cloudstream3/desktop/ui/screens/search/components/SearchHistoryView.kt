@@ -41,7 +41,7 @@ fun SearchHistoryView(
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
-                TextButton(onClick = onClearAll) {
+                com.lagradost.cloudstream3.desktop.ui.components.DesktopTextButton(onClick = onClearAll) {
                     Text("Clear All", color = Color.White.copy(alpha = 0.65f), fontSize = 13.sp)
                 }
             }
@@ -81,7 +81,7 @@ fun SearchHistoryView(
                             color = MaterialTheme.colorScheme.onSurface,
                         )
                     }
-                    IconButton(
+                    com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton(
                         onClick = { onRemoveHistoryItem(item) },
                         modifier = Modifier.size(24.dp),
                     ) {

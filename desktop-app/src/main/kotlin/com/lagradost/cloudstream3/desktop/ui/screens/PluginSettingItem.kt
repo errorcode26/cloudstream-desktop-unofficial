@@ -23,6 +23,9 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lagradost.cloudstream3.desktop.ui.components.CloudstreamCustomDialog
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopOutlinedButton
 import com.lagradost.common.storage.PluginSettingSchema
 import java.io.File
 
@@ -136,7 +139,7 @@ fun PluginSettingItem(
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onSurface,
                                 )
-                                IconButton(onClick = { showSelectDialog = false }) {
+                                DesktopIconButton(onClick = { showSelectDialog = false }) {
                                     Icon(
                                         imageVector = Icons.Default.Close,
                                         contentDescription = "Close",
@@ -444,7 +447,7 @@ fun PluginSettingItem(
                                                         color = MaterialTheme.colorScheme.primary,
                                                     )
                                                 }
-                                                IconButton(onClick = { showProviderDialog = false }) {
+                                                DesktopIconButton(onClick = { showProviderDialog = false }) {
                                                     Icon(
                                                         imageVector = Icons.Default.Close,
                                                         contentDescription = "Close",
@@ -497,7 +500,7 @@ fun PluginSettingItem(
                                                     modifier = Modifier.fillMaxWidth(),
                                                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                                                 ) {
-                                                    OutlinedButton(
+                                                    DesktopOutlinedButton(
                                                         onClick = {
                                                             if (isDisablingKey) {
                                                                 onValueChanged(emptySet<String>())
@@ -507,7 +510,7 @@ fun PluginSettingItem(
                                                         },
                                                         modifier = Modifier.weight(1f),
                                                     ) { Text("Enable All") }
-                                                    OutlinedButton(
+                                                    DesktopOutlinedButton(
                                                         onClick = {
                                                             if (isDisablingKey) {
                                                                 onValueChanged(optionsList.toSet())
@@ -572,9 +575,8 @@ fun PluginSettingItem(
                                                     .padding(horizontal = 20.dp, vertical = 12.dp),
                                                 horizontalArrangement = Arrangement.End,
                                             ) {
-                                                Button(
+                                                DesktopButton(
                                                     onClick = { showProviderDialog = false },
-                                                    shape = RoundedCornerShape(10.dp),
                                                 ) {
                                                     Text("Done", fontWeight = FontWeight.Bold)
                                                 }
@@ -611,7 +613,7 @@ fun PluginSettingItem(
                                 visualTransformation = if (isSensitive && !showPassword) PasswordVisualTransformation() else VisualTransformation.None,
                                 trailingIcon = if (isSensitive) {
                                     {
-                                        IconButton(onClick = { showPassword = !showPassword }) {
+                                        DesktopIconButton(onClick = { showPassword = !showPassword }) {
                                             Icon(
                                                 imageVector = if (showPassword) Icons.Default.VisibilityOff else Icons.Default.Visibility,
                                                 contentDescription = if (showPassword) "Hide" else "Show",

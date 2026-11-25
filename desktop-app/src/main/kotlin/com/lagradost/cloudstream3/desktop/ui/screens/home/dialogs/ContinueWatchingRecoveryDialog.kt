@@ -214,7 +214,7 @@ fun ContinueWatchingRecoveryDialog(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                OutlinedButton(
+                com.lagradost.cloudstream3.desktop.ui.components.DesktopOutlinedButton(
                     onClick = onRemove,
                     colors = ButtonDefaults.outlinedButtonColors(
                         contentColor = MaterialTheme.colorScheme.error,
@@ -225,7 +225,7 @@ fun ContinueWatchingRecoveryDialog(
                     Text("Remove from Continue Watching")
                 }
 
-                OutlinedButton(onClick = onDismiss) {
+                com.lagradost.cloudstream3.desktop.ui.components.DesktopOutlinedButton(onClick = onDismiss) {
                     Text("Close")
                 }
             }

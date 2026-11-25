@@ -13,6 +13,9 @@ import com.lagradost.cloudstream3.desktop.download.TaskStatus
 import com.lagradost.cloudstream3.desktop.torrent.DesktopTorrentEngine
 import com.lagradost.cloudstream3.desktop.ui.components.AppToastManager
 import com.lagradost.cloudstream3.desktop.ui.components.CloudstreamAlertDialog
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopOutlinedButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopTextButton
 import com.lagradost.cloudstream3.desktop.ui.components.P2pTorrentDisclaimerDialog
 import com.lagradost.cloudstream3.desktop.ui.screens.settings.MviSettingsToggle
 import com.lagradost.cloudstream3.desktop.ui.screens.settings.SettingsGroupCard
@@ -142,7 +145,7 @@ fun TorrentEngineSection(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.End,
                     ) {
-                        TextButton(
+                        DesktopTextButton(
                             onClick = { AppDownloadManager.cancelDownload("torrserver") },
                             colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
                         ) {
@@ -156,7 +159,7 @@ fun TorrentEngineSection(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         if (!engineState.isInstalled) {
-                            Button(
+                            DesktopButton(
                                 onClick = {
                                     DesktopTorrentEngine.binary.downloadWithManager()
                                 },
@@ -164,7 +167,7 @@ fun TorrentEngineSection(
                                 Text("Download Engine Now (~28 MB)")
                             }
                         } else {
-                            OutlinedButton(
+                            DesktopOutlinedButton(
                                 onClick = {
                                     onEvent(SettingsUiEvent.CheckTorrServerUpdates)
                                 },
@@ -173,7 +176,7 @@ fun TorrentEngineSection(
                                 Text(if (engineState.isCheckingUpdates) "Checking..." else "Check for Updates")
                             }
 
-                            TextButton(
+                            DesktopTextButton(
                                 onClick = {
                                     DesktopTorrentEngine.binary.downloadWithManager()
                                 },
@@ -181,7 +184,7 @@ fun TorrentEngineSection(
                                 Text("Re-download")
                             }
 
-                            TextButton(
+                            DesktopTextButton(
                                 onClick = { showDeleteConfirmDialog = true },
                                 colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
                             ) {
@@ -189,7 +192,7 @@ fun TorrentEngineSection(
                             }
                         }
 
-                        TextButton(
+                        DesktopTextButton(
                             onClick = {
                                 scope.launch(Dispatchers.IO) {
                                     val parent = DesktopTorrentEngine.binary.getBinaryFile().parentFile
@@ -216,7 +219,7 @@ fun TorrentEngineSection(
                     title = { Text("Uninstall Torrent Engine?") },
                     text = { Text("This will delete the 28 MB TorrServer executable from your computer to free up space. You can re-download it at any time.") },
                     confirmButton = {
-                        Button(
+                        DesktopButton(
                             onClick = {
                                 showDeleteConfirmDialog = false
                                 onEvent(SettingsUiEvent.DeleteTorrServerBinary)
@@ -227,7 +230,7 @@ fun TorrentEngineSection(
                         }
                     },
                     dismissButton = {
-                        TextButton(onClick = { showDeleteConfirmDialog = false }) {
+                        DesktopTextButton(onClick = { showDeleteConfirmDialog = false }) {
                             Text("Cancel")
                         }
                     },

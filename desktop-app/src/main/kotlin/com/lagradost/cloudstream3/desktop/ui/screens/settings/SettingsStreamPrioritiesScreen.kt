@@ -36,6 +36,9 @@ import androidx.compose.ui.zIndex
 import com.lagradost.cloudstream3.desktop.player.LanguagePriorityHelper
 import com.lagradost.cloudstream3.desktop.player.PlayerConfig
 import com.lagradost.cloudstream3.desktop.player.QualityDataHelper
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopFilledTonalButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopOutlinedButton
 import com.lagradost.cloudstream3.desktop.ui.screens.settings.contract.SettingsUiEvent
 import com.lagradost.cloudstream3.utils.Qualities
 
@@ -149,30 +152,34 @@ fun SettingsStreamPrioritiesScreen(
 
             // Quick Preset Buttons
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                val chipShape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact
                 when (selectedTab) {
                     0 -> {
-                        OutlinedButton(
+                        DesktopOutlinedButton(
                             onClick = {
                                 viewModel.onEvent(SettingsUiEvent.SetQualityPreset4K)
                             },
+                            shape = chipShape,
                             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                         ) {
                             Text("Prefer 4K", fontSize = 12.sp)
                         }
 
-                        OutlinedButton(
+                        DesktopOutlinedButton(
                             onClick = {
                                 viewModel.onEvent(SettingsUiEvent.SetQualityPreset1080p)
                             },
+                            shape = chipShape,
                             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                         ) {
                             Text("Prefer 1080p", fontSize = 12.sp)
                         }
 
-                        OutlinedButton(
+                        DesktopOutlinedButton(
                             onClick = {
                                 viewModel.onEvent(SettingsUiEvent.ResetQualityDefaults)
                             },
+                            shape = chipShape,
                             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                         ) {
                             Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(14.dp))
@@ -181,28 +188,31 @@ fun SettingsStreamPrioritiesScreen(
                         }
                     }
                     1 -> {
-                        OutlinedButton(
+                        DesktopOutlinedButton(
                             onClick = {
                                 viewModel.onEvent(SettingsUiEvent.SetAudioLanguagePreset(listOf("eng,en", "original")))
                             },
+                            shape = chipShape,
                             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                         ) {
                             Text("Prefer English", fontSize = 12.sp)
                         }
 
-                        OutlinedButton(
+                        DesktopOutlinedButton(
                             onClick = {
                                 viewModel.onEvent(SettingsUiEvent.SetAudioLanguagePreset(listOf("jpn,ja", "original", "eng,en")))
                             },
+                            shape = chipShape,
                             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                         ) {
                             Text("Prefer Japanese", fontSize = 12.sp)
                         }
 
-                        OutlinedButton(
+                        DesktopOutlinedButton(
                             onClick = {
                                 viewModel.onEvent(SettingsUiEvent.ResetAudioDefaults)
                             },
+                            shape = chipShape,
                             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                         ) {
                             Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(14.dp))
@@ -211,19 +221,21 @@ fun SettingsStreamPrioritiesScreen(
                         }
                     }
                     2 -> {
-                        OutlinedButton(
+                        DesktopOutlinedButton(
                             onClick = {
                                 viewModel.onEvent(SettingsUiEvent.SetSubtitleLanguagePreset(listOf("eng,en")))
                             },
+                            shape = chipShape,
                             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                         ) {
                             Text("Prefer English", fontSize = 12.sp)
                         }
 
-                        OutlinedButton(
+                        DesktopOutlinedButton(
                             onClick = {
                                 viewModel.onEvent(SettingsUiEvent.ResetSubtitleDefaults)
                             },
+                            shape = chipShape,
                             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                         ) {
                             Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(14.dp))
@@ -314,11 +326,12 @@ internal fun StreamPriorityTabButton(
     selected: Boolean,
     onClick: () -> Unit,
 ) {
+    val tabShape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact
     Surface(
-        shape = RoundedCornerShape(8.dp),
+        shape = tabShape,
         color = if (selected) MaterialTheme.colorScheme.primary else Color.Transparent,
         contentColor = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.clickable(onClick = onClick),
+        modifier = Modifier.clip(tabShape).clickable(onClick = onClick),
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
@@ -370,7 +383,7 @@ internal fun StreamPriorityRow(
             }
 
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                IconButton(
+                DesktopIconButton(
                     onClick = { if (priority > minPriority) onPriorityChange(priority - 1) },
                     enabled = priority > minPriority,
                     modifier = Modifier.size(32.dp),
@@ -402,7 +415,7 @@ internal fun StreamPriorityRow(
                     }
                 }
 
-                IconButton(
+                DesktopIconButton(
                     onClick = { if (priority < maxPriority) onPriorityChange(priority + 1) },
                     enabled = priority < maxPriority,
                     modifier = Modifier.size(32.dp),
@@ -631,7 +644,7 @@ internal fun PriorityStackManager(
                                 }
                             }
 
-                            IconButton(
+                            DesktopIconButton(
                                 onClick = { onRemove(code) },
                                 modifier = Modifier.size(32.dp),
                             ) {
@@ -746,9 +759,9 @@ internal fun AvailableLanguageItemCard(
                 )
             }
 
-            FilledTonalButton(
+            DesktopFilledTonalButton(
                 onClick = onAdd,
-                shape = RoundedCornerShape(8.dp),
+                shape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact,
                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
                 modifier = Modifier.height(32.dp),
             ) {

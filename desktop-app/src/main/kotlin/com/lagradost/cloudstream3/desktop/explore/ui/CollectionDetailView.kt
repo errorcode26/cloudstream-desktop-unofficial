@@ -205,24 +205,13 @@ internal fun CollectionDetailView(
         }
 
         // Floating Top Back Button (pinned, matching DetailsScreen & PersonScreen)
-        IconButton(
+        com.lagradost.cloudstream3.desktop.ui.components.DesktopBackButton(
             onClick = onBack,
             modifier = Modifier
                 .align(Alignment.TopStart)
                 .padding(start = paddingStart, top = 52.dp)
-                .size(42.dp)
-                .clip(CircleShape)
-                .background(Color(0xFF0F0F12).copy(alpha = 0.55f))
-                .border(1.dp, Color.White.copy(alpha = 0.15f), CircleShape)
                 .zIndex(10f),
-        ) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = "Back",
-                tint = Color.White,
-                modifier = Modifier.size(22.dp),
-            )
-        }
+        )
     }
 }
 

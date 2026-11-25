@@ -21,6 +21,8 @@ object AppearanceConfig {
     private const val PREF_HERO_BANNER_STYLE = "pref_hero_banner_style"
     private const val PREF_TOP_BAR_PROVIDER_STYLE = "pref_top_bar_provider_style"
     private const val PREF_PROVIDER_BADGE_DISPLAY_MODE = "pref_provider_badge_display_mode"
+    private const val PREF_BUTTON_SHAPE_STYLE = "pref_button_shape_style"
+    private const val PREF_CAST_PROFILE_SHAPE_STYLE = "pref_cast_profile_shape_style"
     private const val PREF_THEME_ACCENT = "pref_theme_accent"
     private const val PREF_AMOLED_MODE = "pref_amoled_mode"
     private const val PREF_LIGHT_MODE = "pref_light_mode"
@@ -170,6 +172,12 @@ object AppearanceConfig {
 
     private val _topBarProviderStyle = MutableStateFlow(TopBarProviderStyle.fromString(DesktopDataStore.getKey<String>(PREF_TOP_BAR_PROVIDER_STYLE)))
     val topBarProviderStyle: StateFlow<TopBarProviderStyle> = _topBarProviderStyle.asStateFlow()
+
+    private val _buttonShapeStyle = MutableStateFlow(ButtonShapeStyle.fromString(DesktopDataStore.getKey<String>(PREF_BUTTON_SHAPE_STYLE)))
+    val buttonShapeStyle: StateFlow<ButtonShapeStyle> = _buttonShapeStyle.asStateFlow()
+
+    private val _castProfileShapeStyle = MutableStateFlow(CastProfileShapeStyle.fromString(DesktopDataStore.getKey<String>(PREF_CAST_PROFILE_SHAPE_STYLE)))
+    val castProfileShapeStyle: StateFlow<CastProfileShapeStyle> = _castProfileShapeStyle.asStateFlow()
 
     private val _cleanModeEnabled = MutableStateFlow(DesktopDataStore.getKey<Boolean>(PREF_CLEAN_MODE_ENABLED) ?: false)
     val cleanModeEnabled: StateFlow<Boolean> = _cleanModeEnabled.asStateFlow()
@@ -531,6 +539,16 @@ object AppearanceConfig {
         persist(PREF_TOP_BAR_PROVIDER_STYLE, style.name)
     }
 
+    fun setButtonShapeStyle(style: ButtonShapeStyle) {
+        _buttonShapeStyle.value = style
+        persist(PREF_BUTTON_SHAPE_STYLE, style.name)
+    }
+
+    fun setCastProfileShapeStyle(style: CastProfileShapeStyle) {
+        _castProfileShapeStyle.value = style
+        persist(PREF_CAST_PROFILE_SHAPE_STYLE, style.name)
+    }
+
     fun setCleanModeEnabled(enabled: Boolean) {
         _cleanModeEnabled.value = enabled
         _hideProviderNames.value = enabled
@@ -795,6 +813,8 @@ object AppearanceConfig {
         _heroBannerStyle.value = HeroBannerStyle.fromString(DesktopDataStore.getKey<String>(PREF_HERO_BANNER_STYLE))
         _continueWatchingStyle.value = ContinueWatchingStyle.fromString(DesktopDataStore.getKey<String>(PREF_CONTINUE_WATCHING_STYLE))
         _topBarProviderStyle.value = TopBarProviderStyle.fromString(DesktopDataStore.getKey<String>(PREF_TOP_BAR_PROVIDER_STYLE))
+        _buttonShapeStyle.value = ButtonShapeStyle.fromString(DesktopDataStore.getKey<String>(PREF_BUTTON_SHAPE_STYLE))
+        _castProfileShapeStyle.value = CastProfileShapeStyle.fromString(DesktopDataStore.getKey<String>(PREF_CAST_PROFILE_SHAPE_STYLE))
         _cleanModeEnabled.value = DesktopDataStore.getKey<Boolean>(PREF_CLEAN_MODE_ENABLED) ?: false
         _hideProviderNames.value = DesktopDataStore.getKey<Boolean>(PREF_HIDE_PROVIDER_NAMES) ?: true
         _hideDetailsSource.value = DesktopDataStore.getKey<Boolean>(PREF_HIDE_DETAILS_SOURCE) ?: false

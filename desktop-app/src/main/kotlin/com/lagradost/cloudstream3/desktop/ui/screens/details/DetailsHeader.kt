@@ -574,22 +574,12 @@ fun DetailsMetadata(
                             animationSpec = spring(dampingRatio = 0.75f, stiffness = Spring.StiffnessMediumLow),
                             label = "actionsToggleRotation",
                         )
-                        val moreInteractionSource = remember { MutableInteractionSource() }
-                        val isMoreHovered by moreInteractionSource.collectIsHoveredAsState()
 
                         val moreActionsToggle: @Composable (Boolean) -> Unit = { isNarrowBtn ->
-                            Surface(
+                            com.lagradost.cloudstream3.desktop.ui.components.HeroSecondaryButton(
                                 onClick = { isActionsExpanded = !isActionsExpanded },
-                                modifier = Modifier
-                                    .size(if (isNarrowBtn) 44.dp else 52.dp)
-                                    .pointerHoverIcon(PointerIcon.Hand),
-                                shape = RoundedCornerShape(if (isNarrowBtn) 10.dp else 12.dp),
-                                color = if (isMoreHovered || isActionsExpanded) Color.White.copy(alpha = 0.20f) else Color.White.copy(alpha = 0.12f),
-                                border = BorderStroke(
-                                    1.2.dp,
-                                    if (isMoreHovered || isActionsExpanded) Color.White.copy(alpha = 0.50f) else Color.White.copy(alpha = 0.28f),
-                                ),
-                                interactionSource = moreInteractionSource,
+                                modifier = Modifier.size(if (isNarrowBtn) 44.dp else 52.dp),
+                                isActive = isActionsExpanded,
                             ) {
                                 Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
                                     Icon(

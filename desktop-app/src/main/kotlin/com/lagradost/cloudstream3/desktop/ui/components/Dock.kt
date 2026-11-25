@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lagradost.cloudstream3.desktop.ui.PremiumIcons
 import com.lagradost.cloudstream3.desktop.ui.theme.AppearanceConfig
+import com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes
 
 @Composable
 fun DockItemsList(
@@ -204,6 +205,7 @@ fun DockItem(
     )
 
     val hoverBgColor = if (isHorizontal) theme.SurfaceElevated else Color.White.copy(alpha = 0.08f)
+    val dockItemShape = LocalDesktopButtonShapes.current.medium
 
     Box(
         modifier = Modifier
@@ -214,7 +216,7 @@ fun DockItem(
                     Modifier.fillMaxWidth().height(44.dp)
                 },
             )
-            .clip(RoundedCornerShape(12.dp))
+            .clip(dockItemShape)
             .hoverable(itemInteraction)
             .clickable(
                 interactionSource = itemInteraction,
@@ -228,7 +230,7 @@ fun DockItem(
                 modifier = Modifier
                     .matchParentSize()
                     .graphicsLayer { alpha = bgAlpha }
-                    .clip(RoundedCornerShape(14.dp))
+                    .clip(dockItemShape)
                     .background(hoverBgColor),
             )
         }
@@ -524,12 +526,14 @@ fun DockProfileAvatar(
         )
     }
 
+    val dockItemShape = LocalDesktopButtonShapes.current.medium
+
     Box(modifier = modifier) {
         Surface(
             modifier = if (isHorizontal) {
                 Modifier
                     .size(42.dp)
-                    .clip(RoundedCornerShape(12.dp))
+                    .clip(dockItemShape)
                     .hoverable(interactionSource)
                     .clickable(
                         interactionSource = interactionSource,
@@ -540,7 +544,7 @@ fun DockProfileAvatar(
                 Modifier
                     .height(48.dp)
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
+                    .clip(dockItemShape)
                     .hoverable(interactionSource)
                     .clickable(
                         interactionSource = interactionSource,
@@ -549,7 +553,7 @@ fun DockProfileAvatar(
                     )
             },
             color = if (isHovered) Color.White.copy(alpha = 0.08f) else Color.Transparent,
-            shape = RoundedCornerShape(12.dp),
+            shape = dockItemShape,
         ) {
             if (isHorizontal) {
                 Box(
@@ -797,17 +801,18 @@ fun DockProfileAvatar(
             Spacer(Modifier.height(8.dp))
 
             // Add Profile & Manage
+            val compactButtonShape = LocalDesktopButtonShapes.current.compact
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                OutlinedButton(
+                DesktopOutlinedButton(
                     onClick = {
                         showProfileFlyout = false
                         showCreateProfileDialog = true
                     },
                     modifier = Modifier.weight(1f).height(36.dp),
-                    shape = RoundedCornerShape(10.dp),
+                    shape = compactButtonShape,
                     contentPadding = PaddingValues(horizontal = 8.dp),
                 ) {
                     Icon(androidx.compose.material.icons.Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
@@ -815,13 +820,13 @@ fun DockProfileAvatar(
                     Text("Add", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                 }
 
-                FilledTonalButton(
+                DesktopFilledTonalButton(
                     onClick = {
                         showProfileFlyout = false
                         onOpenProfileManager?.invoke()
                     },
                     modifier = Modifier.weight(1f).height(36.dp),
-                    shape = RoundedCornerShape(10.dp),
+                    shape = compactButtonShape,
                     contentPadding = PaddingValues(horizontal = 8.dp),
                 ) {
                     Icon(androidx.compose.material.icons.Icons.Default.Settings, contentDescription = null, modifier = Modifier.size(15.dp))

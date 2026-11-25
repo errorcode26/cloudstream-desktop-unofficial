@@ -186,6 +186,8 @@ fun main(args: Array<String> = emptyArray()) {
         val isDevDetached by DevStudioState.isDetachedWindow.collectAsState()
 
         val isPipMode by com.lagradost.cloudstream3.desktop.ui.PipState.isPipMode.collectAsState()
+        val buttonShapes = com.lagradost.cloudstream3.desktop.ui.theme.rememberDesktopButtonShapes()
+        val profileShapes = com.lagradost.cloudstream3.desktop.ui.theme.rememberDesktopProfileShapes()
 
         Window(
             onCloseRequest = {
@@ -209,6 +211,8 @@ fun main(args: Array<String> = emptyArray()) {
                 com.lagradost.cloudstream3.desktop.ui.LocalWindowState provides state,
                 LocalFullscreenController provides fullscreenHelper.controller,
                 com.lagradost.cloudstream3.desktop.ui.LocalComposeWindow provides window,
+                com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes provides buttonShapes,
+                com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopProfileShapes provides profileShapes,
             ) {
                 var isAppReady by remember { mutableStateOf(false) }
 
@@ -402,10 +406,15 @@ fun main(args: Array<String> = emptyArray()) {
                 state = devWindowState,
                 icon = painterResource("app_icon_small.png"),
             ) {
-                DevStudioView(
-                    isDetached = true,
-                    onClose = { DevStudioState.close() },
-                )
+                CompositionLocalProvider(
+                    com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes provides buttonShapes,
+                    com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopProfileShapes provides profileShapes,
+                ) {
+                    DevStudioView(
+                        isDetached = true,
+                        onClose = { DevStudioState.close() },
+                    )
+                }
             }
         }
     }

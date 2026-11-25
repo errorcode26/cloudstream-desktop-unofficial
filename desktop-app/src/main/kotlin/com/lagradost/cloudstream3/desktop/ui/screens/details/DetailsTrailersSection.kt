@@ -160,17 +160,17 @@ fun DetailsTrailersSection(
             // Scroll arrows
             if (trailersExpanded && displayTrailers.size > 2) {
                 Surface(
-                    shape = RoundedCornerShape(8.dp),
+                    shape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact,
                     color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
                 ) {
                     Row {
-                        IconButton(
+                        com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton(
                             onClick = { coroutineScope.launch { scrollState.animateScrollBy(-500f) } },
                             modifier = Modifier.size(32.dp),
                         ) {
                             Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "Scroll Left", modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurface)
                         }
-                        IconButton(
+                        com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton(
                             onClick = { coroutineScope.launch { scrollState.animateScrollBy(500f) } },
                             modifier = Modifier.size(32.dp),
                         ) {
@@ -238,13 +238,12 @@ private fun CategoryFilterChip(
     isSelected: Boolean,
     onClick: () -> Unit,
 ) {
+    val chipShape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact
     Surface(
-        shape = RoundedCornerShape(8.dp),
+        onClick = onClick,
+        shape = chipShape,
         color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
         contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier
-            .clip(RoundedCornerShape(8.dp))
-            .clickable { onClick() },
     ) {
         Text(
             text = label,

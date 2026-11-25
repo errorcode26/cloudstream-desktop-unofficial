@@ -65,10 +65,9 @@ fun LibraryActionBar(
                     val selIcon = remember(uiState.selectedProvider) {
                         DesktopRepositoryManager.getPluginIcon(uiState.selectedProvider)
                     }
-                    OutlinedButton(
+                    com.lagradost.cloudstream3.desktop.ui.components.DesktopOutlinedButton(
                         onClick = { providerExpanded = true },
                         modifier = Modifier.fillMaxWidth().height(42.dp),
-                        shape = RoundedCornerShape(10.dp),
                         contentPadding = PaddingValues(horizontal = 8.dp),
                     ) {
                         if (selIcon != null) {
@@ -131,10 +130,9 @@ fun LibraryActionBar(
                 }
 
                 Box(modifier = Modifier.weight(1f)) {
-                    OutlinedButton(
+                    com.lagradost.cloudstream3.desktop.ui.components.DesktopOutlinedButton(
                         onClick = { sortExpanded = true },
                         modifier = Modifier.fillMaxWidth().height(42.dp),
-                        shape = RoundedCornerShape(10.dp),
                         contentPadding = PaddingValues(horizontal = 8.dp),
                     ) {
                         Icon(Icons.AutoMirrored.Filled.Sort, contentDescription = null, modifier = Modifier.size(14.dp))
@@ -179,10 +177,10 @@ fun LibraryActionBar(
             )
 
             Box {
-                OutlinedButton(
+                com.lagradost.cloudstream3.desktop.ui.components.DesktopOutlinedButton(
                     onClick = { providerExpanded = true },
                     modifier = Modifier.height(52.dp),
-                    shape = RoundedCornerShape(12.dp),
+                    shape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.primary,
                 ) {
                     Icon(Icons.Default.FilterList, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(6.dp))
@@ -210,10 +208,10 @@ fun LibraryActionBar(
             }
 
             Box {
-                OutlinedButton(
+                com.lagradost.cloudstream3.desktop.ui.components.DesktopOutlinedButton(
                     onClick = { sortExpanded = true },
                     modifier = Modifier.height(52.dp),
-                    shape = RoundedCornerShape(12.dp),
+                    shape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.primary,
                 ) {
                     Icon(Icons.AutoMirrored.Filled.Sort, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(6.dp))

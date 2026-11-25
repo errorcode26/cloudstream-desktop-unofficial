@@ -16,6 +16,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lagradost.cloudstream3.desktop.network.DiagnosticResult
 import com.lagradost.cloudstream3.desktop.network.DiagnosticsRunner
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopOutlinedButton
 import com.lagradost.cloudstream3.desktop.ui.screens.settings.contract.SettingsUiEvent
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -78,7 +80,7 @@ fun SettingsDiagnostics(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Button(
+                DesktopButton(
                     onClick = {
                         copiedNet = false
                         viewModel.onEvent(SettingsUiEvent.RunNetworkDiagnostics)
@@ -96,7 +98,7 @@ fun SettingsDiagnostics(
                 }
 
                 if (results.isNotEmpty()) {
-                    OutlinedButton(
+                    DesktopOutlinedButton(
                         onClick = {
                             scope.launch(Dispatchers.IO) {
                                 val report = DiagnosticsRunner.formatReport(results)

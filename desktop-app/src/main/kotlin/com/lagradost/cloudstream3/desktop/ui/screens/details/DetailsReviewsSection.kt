@@ -62,11 +62,11 @@ fun DetailsReviewsSection(
 
             if (reviews.size > 2) {
                 Surface(
-                    shape = RoundedCornerShape(8.dp),
+                    shape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact,
                     color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
                 ) {
                     Row {
-                        IconButton(
+                        com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton(
                             onClick = { coroutineScope.launch { scrollState.animateScrollBy(-500f) } },
                             modifier = Modifier.size(32.dp),
                         ) {
@@ -77,7 +77,7 @@ fun DetailsReviewsSection(
                                 tint = MaterialTheme.colorScheme.onSurface,
                             )
                         }
-                        IconButton(
+                        com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton(
                             onClick = { coroutineScope.launch { scrollState.animateScrollBy(500f) } },
                             modifier = Modifier.size(32.dp),
                         ) {

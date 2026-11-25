@@ -98,7 +98,7 @@ fun TorboxCloudLibraryView(
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                 )
                 Spacer(Modifier.height(20.dp))
-                Button(
+                com.lagradost.cloudstream3.desktop.ui.components.DesktopButton(
                     onClick = { onNavigate(Config.Settings) },
                 ) {
                     Icon(Icons.Default.Settings, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -123,6 +123,7 @@ fun TorboxCloudLibraryView(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            val chipShape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact
             TorboxStorageType.entries.forEach { type ->
                 FilterChip(
                     selected = selectedStorageType == type,
@@ -131,6 +132,7 @@ fun TorboxCloudLibraryView(
                             viewModel.onEvent(TorboxLibraryUiEvent.OnSelectStorageType(type))
                         }
                     },
+                    shape = chipShape,
                     label = {
                         Text(
                             type.label,
@@ -174,7 +176,7 @@ fun TorboxCloudLibraryView(
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(18.dp)) },
                 trailingIcon = {
                     if (searchQuery.isNotBlank()) {
-                        IconButton(onClick = { viewModel.onEvent(TorboxLibraryUiEvent.OnSearchQueryChange("")) }) {
+                        com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton(onClick = { viewModel.onEvent(TorboxLibraryUiEvent.OnSearchQueryChange("")) }) {
                             Icon(Icons.Default.Close, contentDescription = "Clear", modifier = Modifier.size(16.dp))
                         }
                     }
@@ -190,16 +192,18 @@ fun TorboxCloudLibraryView(
             )
 
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                val filterChipShape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact
                 TorrentFilter.entries.forEach { filter ->
                     FilterChip(
                         selected = selectedFilter == filter,
                         onClick = { viewModel.onEvent(TorboxLibraryUiEvent.OnFilterChange(filter)) },
+                        shape = filterChipShape,
                         label = { Text(filter.label) },
                     )
                 }
             }
 
-            Button(
+            com.lagradost.cloudstream3.desktop.ui.components.DesktopButton(
                 onClick = {
                     newLinkInput = ""
                     viewModel.onEvent(TorboxLibraryUiEvent.OnDismissAddItemError)
@@ -213,7 +217,7 @@ fun TorboxCloudLibraryView(
                 Text(addLabel)
             }
 
-            IconButton(
+            com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton(
                 onClick = { refreshItems(force = true) },
                 enabled = !isLoading,
                 modifier = Modifier.size(48.dp),
@@ -235,7 +239,7 @@ fun TorboxCloudLibraryView(
                         style = MaterialTheme.typography.bodyMedium,
                     )
                     Spacer(Modifier.height(12.dp))
-                    Button(onClick = { refreshItems(force = true) }) {
+                    com.lagradost.cloudstream3.desktop.ui.components.DesktopButton(onClick = { refreshItems(force = true) }) {
                         Text("Retry")
                     }
                 }
@@ -373,7 +377,7 @@ fun TorboxCloudLibraryView(
             }
         },
         confirmButton = {
-            Button(
+            com.lagradost.cloudstream3.desktop.ui.components.DesktopButton(
                 onClick = {
                     viewModel.onEvent(TorboxLibraryUiEvent.OnAddItem(newLinkInput) {
                         showAddDialog = false
@@ -392,7 +396,7 @@ fun TorboxCloudLibraryView(
             }
         },
         dismissButton = {
-            TextButton(
+            com.lagradost.cloudstream3.desktop.ui.components.DesktopTextButton(
                 onClick = { showAddDialog = false },
                 enabled = !isAddingItem,
             ) {
@@ -416,7 +420,7 @@ fun TorboxCloudLibraryView(
                 )
             },
             confirmButton = {
-                Button(
+                com.lagradost.cloudstream3.desktop.ui.components.DesktopButton(
                     onClick = {
                         viewModel.onEvent(TorboxLibraryUiEvent.OnDeleteItem(target) {
                             itemToDelete = null
@@ -435,7 +439,7 @@ fun TorboxCloudLibraryView(
                 }
             },
             dismissButton = {
-                TextButton(
+                com.lagradost.cloudstream3.desktop.ui.components.DesktopTextButton(
                     onClick = { itemToDelete = null },
                     enabled = !isDeleting,
                 ) {

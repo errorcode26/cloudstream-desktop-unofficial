@@ -28,6 +28,11 @@ import com.lagradost.cloudstream3.desktop.profile.Profile
 import com.lagradost.cloudstream3.desktop.profile.ProfileAvatar
 import com.lagradost.cloudstream3.desktop.profile.ProfilePalette
 import com.lagradost.cloudstream3.desktop.ui.components.CloudstreamCustomDialog
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopFilledTonalButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopOutlinedButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopTextButton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -76,7 +81,7 @@ fun ProfileEditDialog(
             title = { Text("Delete Profile?") },
             text = { Text("Are you sure you want to delete profile '${profile?.name}'? Its watch history and bookmarks will be permanently removed.") },
             confirmButton = {
-                Button(
+                DesktopButton(
                     onClick = {
                         showDeleteConfirm = false
                         onDelete()
@@ -88,7 +93,7 @@ fun ProfileEditDialog(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showDeleteConfirm = false }) {
+                DesktopTextButton(onClick = { showDeleteConfirm = false }) {
                     Text("Cancel")
                 }
             },
@@ -220,7 +225,7 @@ fun ProfileEditDialog(
                         singleLine = true,
                         trailingIcon = {
                             if (customAvatarPath.isNotEmpty()) {
-                                IconButton(onClick = { customAvatarPath = "" }) {
+                                DesktopIconButton(onClick = { customAvatarPath = "" }) {
                                     Icon(Icons.Default.Clear, contentDescription = "Clear")
                                 }
                             }
@@ -232,7 +237,7 @@ fun ProfileEditDialog(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        OutlinedButton(
+                        DesktopOutlinedButton(
                             onClick = {
                                 val pickedFile = com.lagradost.cloudstream3.desktop.utils.NativeFileDialog.open(
                                     title = "Choose Avatar Image / GIF",
@@ -253,7 +258,7 @@ fun ProfileEditDialog(
                         }
 
                         if (customAvatarPath.isNotEmpty()) {
-                            OutlinedButton(
+                            DesktopOutlinedButton(
                                 onClick = {
                                     customAvatarPath = ""
                                     avatarMode = 0
@@ -264,9 +269,8 @@ fun ProfileEditDialog(
                                 Text("Reset")
                             }
 
-                            Button(
+                            DesktopFilledTonalButton(
                                 onClick = { showCropperForPath = customAvatarPath },
-                                colors = ButtonDefaults.filledTonalButtonColors(),
                             ) {
                                 Icon(Icons.Default.Crop, contentDescription = null, modifier = Modifier.size(16.dp))
                                 Spacer(Modifier.width(6.dp))
@@ -391,7 +395,7 @@ fun ProfileEditDialog(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 if (profile != null && canDelete) {
-                    TextButton(
+                    DesktopTextButton(
                         onClick = { showDeleteConfirm = true },
                         colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
                     ) {
@@ -402,10 +406,10 @@ fun ProfileEditDialog(
                 }
 
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TextButton(onClick = onDismiss) {
+                    DesktopTextButton(onClick = onDismiss) {
                         Text("Cancel")
                     }
-                    Button(
+                    DesktopButton(
                         onClick = {
                             if (name.isNotBlank()) {
                                 val trimmedCustom = if (avatarMode == 1 && customAvatarPath.isNotBlank()) customAvatarPath.trim() else null

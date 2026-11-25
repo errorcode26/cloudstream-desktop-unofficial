@@ -24,6 +24,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lagradost.cloudstream3.desktop.ui.PremiumIcons
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopFilledTonalButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopOutlinedButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopTextButton
 import com.lagradost.cloudstream3.desktop.ui.navigation.Config
 import com.lagradost.cloudstream3.desktop.ui.screens.extensions.contract.ExtensionsUiEffect
 import com.lagradost.cloudstream3.desktop.ui.screens.extensions.contract.ExtensionsUiEvent
@@ -115,7 +120,7 @@ fun ComposeExtensionScreen(
 
                         Surface(
                             onClick = { selectedTab = index },
-                            shape = RoundedCornerShape(12.dp),
+                            shape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.medium,
                             color = when {
                                 isSelected && isStremioTab -> Color(0xFF00B4D8).copy(alpha = 0.20f)
                                 isSelected -> MaterialTheme.colorScheme.primaryContainer
@@ -160,13 +165,12 @@ fun ComposeExtensionScreen(
 
                 // Sync All Action Button (Visible on CS3 tabs)
                 if (selectedTab != 3) {
-                    FilledTonalButton(
+                    DesktopFilledTonalButton(
                         onClick = {
                             if (!uiState.isSyncing) {
                                 viewModel.onEvent(ExtensionsUiEvent.OnSyncAllRepos)
                             }
                         },
-                        shape = RoundedCornerShape(12.dp),
                         contentPadding = if (isCompactHeight) PaddingValues(horizontal = 10.dp, vertical = 6.dp) else ButtonDefaults.ContentPadding,
                         colors = ButtonDefaults.filledTonalButtonColors(
                             containerColor = MaterialTheme.colorScheme.primaryContainer,
@@ -219,7 +223,7 @@ fun ComposeExtensionScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f),
                             modifier = Modifier.weight(1f),
                         )
-                        IconButton(
+                        DesktopIconButton(
                             onClick = { isRecommendationDismissed = true },
                             modifier = Modifier.size(20.dp),
                         ) {
@@ -321,7 +325,7 @@ fun ComposeExtensionScreen(
                 },
                 confirmButton = {
                     if (!isDialogInstalling) {
-                        Button(
+                        DesktopButton(
                             onClick = {
                                 viewModel.onEvent(
                                     ExtensionsUiEvent.OnBypassSecurityAndInstall(bypassRepo, bypassPlugin),
@@ -335,7 +339,7 @@ fun ComposeExtensionScreen(
                 },
                 dismissButton = {
                     if (!isDialogInstalling) {
-                        OutlinedButton(onClick = { viewModel.onEvent(ExtensionsUiEvent.OnClearBypass) }) {
+                        DesktopOutlinedButton(onClick = { viewModel.onEvent(ExtensionsUiEvent.OnClearBypass) }) {
                             Text("Cancel")
                         }
                     }
@@ -362,7 +366,7 @@ fun ComposeExtensionScreen(
                 },
                 confirmButton = {
                     if (!isDialogInstalling) {
-                        TextButton(
+                        DesktopTextButton(
                             onClick = {
                                 viewModel.onEvent(
                                     ExtensionsUiEvent.OnGrantPermissionAndInstall(reqRepo, reqPlugin, reqPermission),
@@ -375,7 +379,7 @@ fun ComposeExtensionScreen(
                 },
                 dismissButton = {
                     if (!isDialogInstalling) {
-                        TextButton(onClick = { viewModel.onEvent(ExtensionsUiEvent.OnClearPermissionRequest) }) {
+                        DesktopTextButton(onClick = { viewModel.onEvent(ExtensionsUiEvent.OnClearPermissionRequest) }) {
                             Text("Cancel")
                         }
                     }

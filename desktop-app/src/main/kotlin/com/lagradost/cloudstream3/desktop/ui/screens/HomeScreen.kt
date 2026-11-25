@@ -320,15 +320,13 @@ fun ComposeHomeScreen(
                     )
                     Spacer(modifier = Modifier.height(24.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Button(
+                        com.lagradost.cloudstream3.desktop.ui.components.DesktopButton(
                             onClick = { onNavigate(Config.Extensions(initialTab = 0)) },
-                            shape = androidx.compose.foundation.shape.RoundedCornerShape(10.dp),
                         ) {
                             Text("Browse Plugins")
                         }
-                        OutlinedButton(
+                        com.lagradost.cloudstream3.desktop.ui.components.DesktopOutlinedButton(
                             onClick = { onNavigate(Config.Extensions(initialTab = 3)) },
-                            shape = androidx.compose.foundation.shape.RoundedCornerShape(10.dp),
                         ) {
                             Text("Install Add-ons")
                         }

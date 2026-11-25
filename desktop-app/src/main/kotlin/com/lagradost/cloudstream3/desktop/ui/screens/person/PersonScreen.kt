@@ -100,7 +100,7 @@ fun PersonScreen(
                         color = theme.TextMuted,
                     )
                     Spacer(modifier = Modifier.height(16.dp))
-                    Button(
+                    com.lagradost.cloudstream3.desktop.ui.components.DesktopButton(
                         onClick = { viewModel.onEvent(PersonUiEvent.Retry) },
                         colors = ButtonDefaults.buttonColors(containerColor = theme.Accent),
                     ) {
@@ -277,13 +277,14 @@ private fun PersonHeroSidebar(
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             // High-res Portrait (Centered with Soft Border & subtle elevation)
+            val profileShapes = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopProfileShapes.current
             Surface(
-                shape = RoundedCornerShape(18.dp),
+                shape = profileShapes.hero,
                 color = Color(0xFF141416),
                 border = BorderStroke(1.dp, Color.White.copy(alpha = 0.12f)),
                 modifier = Modifier
                     .width(240.dp)
-                    .aspectRatio(2f / 3f),
+                    .aspectRatio(profileShapes.portraitAspectRatio),
             ) {
                 val photoUrl = detail.profileUrl ?: fallbackImage
                 if (!photoUrl.isNullOrBlank()) {
@@ -291,6 +292,7 @@ private fun PersonHeroSidebar(
                         model = photoUrl,
                         contentDescription = detail.name,
                         contentScale = ContentScale.Crop,
+                        alignment = profileShapes.portraitAlignment,
                         modifier = Modifier.fillMaxSize(),
                     )
                 } else {
@@ -601,11 +603,12 @@ private fun CategoryTabPill(
         label = "textColor",
     )
 
+    val pillShape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact
     Surface(
-        shape = RoundedCornerShape(10.dp),
+        onClick = onClick,
+        shape = pillShape,
         color = pillBg,
         border = BorderStroke(1.dp, pillBorder),
-        modifier = Modifier.clickable { onClick() },
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp),

@@ -16,6 +16,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.lagradost.cloudstream3.desktop.ui.components.LocalDesktopTheme
+import com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes
 import kotlin.math.roundToInt
 
 @Composable
@@ -184,7 +185,7 @@ fun <T> StudioChoiceControl(
                             style = MaterialTheme.typography.labelSmall,
                         )
                     },
-                    shape = RoundedCornerShape(8.dp),
+                    shape = LocalDesktopButtonShapes.current.compact,
                     colors = FilterChipDefaults.filterChipColors(
                         selectedContainerColor = MaterialTheme.colorScheme.primary,
                         selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
@@ -250,7 +251,7 @@ fun StudioPresetChip(
                 style = MaterialTheme.typography.labelSmall,
             )
         },
-        shape = RoundedCornerShape(8.dp),
+        shape = LocalDesktopButtonShapes.current.compact,
         colors = FilterChipDefaults.filterChipColors(
             selectedContainerColor = MaterialTheme.colorScheme.primary,
             selectedLabelColor = MaterialTheme.colorScheme.onPrimary,

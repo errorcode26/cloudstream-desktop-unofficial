@@ -78,9 +78,8 @@ fun SafeModeRecoveryBanner(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                OutlinedButton(
+                DesktopOutlinedButton(
                     onClick = { DevStudioState.open(detached = true) },
-                    shape = RoundedCornerShape(8.dp),
                     contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
                 ) {
                     Icon(Icons.Default.Terminal, contentDescription = null, modifier = Modifier.size(14.dp))
@@ -88,13 +87,12 @@ fun SafeModeRecoveryBanner(
                     Text("View Live Logs", fontSize = 12.sp, fontWeight = FontWeight.Medium)
                 }
 
-                Button(
+                DesktopButton(
                     onClick = onOpenExtensions,
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.error,
                         contentColor = MaterialTheme.colorScheme.onError,
                     ),
-                    shape = RoundedCornerShape(8.dp),
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                 ) {
                     Icon(Icons.Default.Extension, contentDescription = null, modifier = Modifier.size(16.dp))
@@ -102,7 +100,7 @@ fun SafeModeRecoveryBanner(
                     Text("Manage Extensions", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                 }
 
-                IconButton(
+                DesktopIconButton(
                     onClick = onDismiss,
                     modifier = Modifier.size(28.dp),
                 ) {

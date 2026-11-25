@@ -111,7 +111,7 @@ fun WebView2SetupDialog() {
                 )
             },
             confirmButton = {
-                Button(
+                DesktopButton(
                     onClick = {
                         showConfirmation = false
                         WebView2SetupState.isDismissedForSession = true
@@ -122,7 +122,7 @@ fun WebView2SetupDialog() {
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showConfirmation = false }) {
+                DesktopTextButton(onClick = { showConfirmation = false }) {
                     Text("Go Back")
                 }
             },
@@ -180,7 +180,7 @@ fun WebView2SetupDialog() {
                             )
                         }
 
-                        IconButton(
+                        DesktopIconButton(
                             onClick = { verifyRuntime() },
                             enabled = !isChecking && !isInstalling,
                             modifier = Modifier.size(28.dp),
@@ -208,7 +208,7 @@ fun WebView2SetupDialog() {
             }
         },
         confirmButton = {
-            Button(
+            DesktopButton(
                 onClick = { startInstaller() },
                 enabled = !isInstalling,
             ) {
@@ -227,7 +227,7 @@ fun WebView2SetupDialog() {
         },
         dismissButton = {
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                TextButton(
+                DesktopTextButton(
                     onClick = {
                         try {
                             Desktop.getDesktop().browse(URI("https://go.microsoft.com/fwlink/p/?LinkId=2124703"))
@@ -239,7 +239,7 @@ fun WebView2SetupDialog() {
                     Text("Manual Download")
                 }
 
-                TextButton(onClick = { showConfirmation = true }) {
+                DesktopTextButton(onClick = { showConfirmation = true }) {
                     Text("Continue Anyway")
                 }
             }

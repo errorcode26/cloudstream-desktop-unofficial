@@ -217,10 +217,9 @@ internal fun ExploreShelvesView(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     if (selectedType.equals("addons", ignoreCase = true)) {
-                        Button(
+                        com.lagradost.cloudstream3.desktop.ui.components.DesktopButton(
                             onClick = { onNavigate(Config.Extensions(initialTab = 3)) },
                             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                            shape = RoundedCornerShape(8.dp),
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Add,
@@ -232,16 +231,14 @@ internal fun ExploreShelvesView(
                             Text("Install Add-ons", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 12.5.sp)
                         }
                     } else {
-                        Button(
+                        com.lagradost.cloudstream3.desktop.ui.components.DesktopButton(
                             onClick = { onNavigate(Config.Extensions(initialTab = 0)) },
                             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                            shape = RoundedCornerShape(8.dp),
                         ) {
                             Text("Browse Plugins", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 12.5.sp)
                         }
-                        OutlinedButton(
+                        com.lagradost.cloudstream3.desktop.ui.components.DesktopOutlinedButton(
                             onClick = { onNavigate(Config.Extensions(initialTab = 3)) },
-                            shape = RoundedCornerShape(8.dp),
                         ) {
                             Text("Install Add-ons", fontSize = 12.5.sp)
                         }

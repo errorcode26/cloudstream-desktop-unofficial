@@ -322,7 +322,7 @@ fun CategoryRowViewAllButton(
     Surface(
         onClick = onClick,
         interactionSource = interactionSource,
-        shape = RoundedCornerShape(17.dp),
+        shape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact,
         color = Color.White.copy(alpha = if (isHovered) 0.10f else 0.05f),
         border = BorderStroke(1.dp, Color.White.copy(alpha = if (isHovered) 0.22f else 0.10f)),
         shadowElevation = 0.dp,
@@ -500,7 +500,7 @@ fun ScrollChevron(
                 scaleX = scale
                 scaleY = scale
             },
-        shape = CircleShape,
+        shape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.icon,
         color = bgColor,
         border = BorderStroke(1.dp, borderColor),
         shadowElevation = 0.dp,

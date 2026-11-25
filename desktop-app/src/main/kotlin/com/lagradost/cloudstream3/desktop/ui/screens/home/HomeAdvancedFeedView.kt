@@ -286,7 +286,7 @@ internal fun HomeAdvancedFeedView(
                                     }
                                 }
                             }
-                            FilledTonalIconButton(onClick = {
+                            com.lagradost.cloudstream3.desktop.ui.components.DesktopFilledTonalIconButton(onClick = {
                                 onAddProvider(provider, pKey)
                             }) {
                                 Icon(Icons.Default.Add, contentDescription = "Add")

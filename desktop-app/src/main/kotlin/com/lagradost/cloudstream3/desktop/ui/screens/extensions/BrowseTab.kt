@@ -33,6 +33,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lagradost.cloudstream3.desktop.ui.components.AppDropdownMenu
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopFilledTonalButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopTextButton
 import com.lagradost.cloudstream3.desktop.ui.components.ExtensionCard
 import com.lagradost.cloudstream3.desktop.ui.components.FlagImage
 import com.lagradost.cloudstream3.desktop.ui.components.LocalDesktopTheme
@@ -176,10 +179,9 @@ fun BrowseTab(
 
             // Language Filter — multi-select
             Box {
-                FilledTonalButton(
+                DesktopFilledTonalButton(
                     onClick = { showLangDropdown = true },
                     modifier = Modifier.height(44.dp),
-                    shape = RoundedCornerShape(12.dp),
                     contentPadding = PaddingValues(horizontal = 12.dp),
                 ) {
                     when {
@@ -222,10 +224,9 @@ fun BrowseTab(
 
             // Repository Filter — multi-select
             Box {
-                FilledTonalButton(
+                DesktopFilledTonalButton(
                     onClick = { showRepoDropdown = true },
                     modifier = Modifier.height(44.dp),
-                    shape = RoundedCornerShape(12.dp),
                     contentPadding = PaddingValues(horizontal = 12.dp),
                 ) {
                     val repoLabel = when {
@@ -264,10 +265,9 @@ fun BrowseTab(
             }
 
             // Fetch Repos Action
-            FilledTonalButton(
+            DesktopFilledTonalButton(
                 onClick = { viewModel.onEvent(ExtensionsUiEvent.OnFetchPlugins) },
                 enabled = !isFetching,
-                shape = RoundedCornerShape(12.dp),
                 modifier = Modifier.height(44.dp),
                 contentPadding = PaddingValues(horizontal = 14.dp),
             ) {
@@ -405,9 +405,8 @@ fun BrowseTab(
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
                                 }
-                                Button(
+                                DesktopButton(
                                     onClick = onNavigateToRepos,
-                                    shape = RoundedCornerShape(10.dp),
                                     contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
                                 ) {
                                     Text("Go to Repositories", fontSize = 12.sp)
@@ -491,7 +490,7 @@ fun BrowseTab(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontWeight = FontWeight.Medium,
                         )
-                        TextButton(onClick = {
+                        DesktopTextButton(onClick = {
                             selectedLanguages = emptySet()
                             selectedCategories = emptySet()
                             selectedRepos = emptySet()

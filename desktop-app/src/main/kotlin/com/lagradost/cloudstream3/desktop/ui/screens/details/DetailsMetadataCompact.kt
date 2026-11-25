@@ -541,7 +541,7 @@ internal fun DetailsMetadataCompact(
             },
             confirmButton = {},
             dismissButton = {
-                TextButton(onClick = { isEditingStatus = false }) {
+                com.lagradost.cloudstream3.desktop.ui.components.DesktopTextButton(onClick = { isEditingStatus = false }) {
                     Text("Cancel")
                 }
             },

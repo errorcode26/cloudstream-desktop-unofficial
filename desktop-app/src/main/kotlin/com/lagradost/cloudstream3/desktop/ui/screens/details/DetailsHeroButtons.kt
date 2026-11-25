@@ -152,7 +152,7 @@ fun DetailsLibraryStatusDialog(
         },
         confirmButton = {
             if (currentBookmark != null) {
-                TextButton(
+                com.lagradost.cloudstream3.desktop.ui.components.DesktopTextButton(
                     onClick = onRemoveBookmark,
                     colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
                 ) {
@@ -163,7 +163,7 @@ fun DetailsLibraryStatusDialog(
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismissRequest) {
+            com.lagradost.cloudstream3.desktop.ui.components.DesktopTextButton(onClick = onDismissRequest) {
                 Text("Cancel", fontSize = 13.sp)
             }
         },
@@ -214,19 +214,14 @@ fun DetailsHeroLibraryButton(
         delayMillis = 400,
         tooltipPlacement = TooltipPlacement.CursorPoint(offset = DpOffset(0.dp, 16.dp)),
     ) {
-        Surface(
+        com.lagradost.cloudstream3.desktop.ui.components.HeroSecondaryButton(
             onClick = onEditStatus,
             modifier = if (isInLibrary) {
                 modifier.height(if (isButtonsNarrow) 44.dp else 52.dp).animateContentSize()
             } else {
                 modifier.size(if (isButtonsNarrow) 44.dp else 52.dp)
             },
-            shape = RoundedCornerShape(if (isButtonsNarrow) 10.dp else 12.dp),
-            color = Color.White.copy(alpha = 0.12f),
-            border = BorderStroke(
-                1.2.dp,
-                Color.White.copy(alpha = 0.28f),
-            ),
+            isActive = isInLibrary,
         ) {
             if (isInLibrary) {
                 Row(
@@ -291,8 +286,6 @@ fun DetailsHeroWebButton(
         }
     } ?: return
 
-    val interactionSource = remember { MutableInteractionSource() }
-    val isHovered by interactionSource.collectIsHoveredAsState()
     val theme = LocalDesktopTheme.current
 
     TooltipArea(
@@ -315,18 +308,9 @@ fun DetailsHeroWebButton(
         delayMillis = 400,
         tooltipPlacement = TooltipPlacement.CursorPoint(offset = DpOffset(0.dp, 16.dp)),
     ) {
-        Surface(
+        com.lagradost.cloudstream3.desktop.ui.components.HeroSecondaryButton(
             onClick = { ExternalLinkHandler.launchSystemBrowser(fullWebUrl) },
-            modifier = modifier
-                .size(if (isButtonsNarrow) 44.dp else 52.dp)
-                .pointerHoverIcon(PointerIcon.Hand),
-            shape = RoundedCornerShape(if (isButtonsNarrow) 10.dp else 12.dp),
-            color = if (isHovered) Color.White.copy(alpha = 0.22f) else Color.White.copy(alpha = 0.12f),
-            border = BorderStroke(
-                1.2.dp,
-                if (isHovered) Color.White.copy(alpha = 0.50f) else Color.White.copy(alpha = 0.28f),
-            ),
-            interactionSource = interactionSource,
+            modifier = modifier.size(if (isButtonsNarrow) 44.dp else 52.dp),
         ) {
             Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
                 Icon(
@@ -346,19 +330,9 @@ fun DetailsHeroTrailerButton(
     isButtonsNarrow: Boolean,
     onClick: () -> Unit,
 ) {
-    val interactionSource = remember { MutableInteractionSource() }
-    val isHovered by interactionSource.collectIsHoveredAsState()
-
-    Surface(
+    com.lagradost.cloudstream3.desktop.ui.components.HeroSecondaryButton(
         onClick = onClick,
         modifier = modifier.height(if (isButtonsNarrow) 44.dp else 52.dp),
-        shape = RoundedCornerShape(if (isButtonsNarrow) 10.dp else 12.dp),
-        color = if (isHovered) Color.White.copy(alpha = 0.22f) else Color.White.copy(alpha = 0.12f),
-        border = BorderStroke(
-            1.2.dp,
-            if (isHovered) Color.White.copy(alpha = 0.50f) else Color.White.copy(alpha = 0.28f),
-        ),
-        interactionSource = interactionSource,
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,

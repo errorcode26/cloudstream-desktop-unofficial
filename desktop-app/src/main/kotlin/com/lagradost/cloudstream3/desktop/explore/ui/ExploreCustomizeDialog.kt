@@ -119,7 +119,7 @@ fun ExploreCustomizeDialog(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    TextButton(
+                    com.lagradost.cloudstream3.desktop.ui.components.DesktopTextButton(
                         onClick = { showResetConfirm = true },
                         colors = ButtonDefaults.textButtonColors(
                             contentColor = MaterialTheme.colorScheme.error.copy(alpha = 0.85f),
@@ -134,7 +134,7 @@ fun ExploreCustomizeDialog(
                         Text(text = "Reset to Defaults", fontSize = 12.5.sp)
                     }
 
-                    IconButton(
+                    com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton(
                         onClick = onDismissRequest,
                         modifier = Modifier.size(32.dp),
                     ) {
@@ -278,7 +278,7 @@ fun ExploreCustomizeDialog(
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.spacedBy(2.dp),
                                     ) {
-                                        IconButton(
+                                        com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton(
                                             onClick = {
                                                 val orderedKeys = orderedCatalogs.map { it.key }
                                                 coroutineScope.launch(Dispatchers.IO) {
@@ -296,7 +296,7 @@ fun ExploreCustomizeDialog(
                                             )
                                         }
 
-                                        IconButton(
+                                        com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton(
                                             onClick = {
                                                 val orderedKeys = orderedCatalogs.map { it.key }
                                                 coroutineScope.launch(Dispatchers.IO) {
@@ -372,7 +372,7 @@ fun ExploreCustomizeDialog(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                                 ) {
-                                    IconButton(
+                                    com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton(
                                         onClick = {
                                             editingDescriptor = descriptor
                                             renameInputText = displayTitle
@@ -443,7 +443,7 @@ fun ExploreCustomizeDialog(
                 }
             },
             confirmButton = {
-                Button(
+                com.lagradost.cloudstream3.desktop.ui.components.DesktopButton(
                     onClick = {
                         val newTitle = renameInputText.trim()
                         coroutineScope.launch(Dispatchers.IO) {
@@ -456,7 +456,7 @@ fun ExploreCustomizeDialog(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { editingDescriptor = null }) {
+                com.lagradost.cloudstream3.desktop.ui.components.DesktopTextButton(onClick = { editingDescriptor = null }) {
                     Text("Cancel")
                 }
             },
@@ -482,7 +482,7 @@ fun ExploreCustomizeDialog(
                 )
             },
             confirmButton = {
-                Button(
+                com.lagradost.cloudstream3.desktop.ui.components.DesktopButton(
                     onClick = {
                         coroutineScope.launch(Dispatchers.IO) {
                             ExploreCatalogSettingsManager.resetToDefaults(currentTypeCatalogs)
@@ -498,7 +498,7 @@ fun ExploreCustomizeDialog(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showResetConfirm = false }) {
+                com.lagradost.cloudstream3.desktop.ui.components.DesktopTextButton(onClick = { showResetConfirm = false }) {
                     Text("Cancel")
                 }
             },

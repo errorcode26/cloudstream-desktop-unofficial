@@ -25,6 +25,10 @@ import com.lagradost.cloudstream3.desktop.debrid.torbox.TorboxApiClient
 import com.lagradost.cloudstream3.desktop.debrid.torbox.TorboxDeviceAuthData
 import com.lagradost.cloudstream3.desktop.debrid.torbox.TorboxUserData
 import com.lagradost.cloudstream3.desktop.ui.components.CloudstreamCustomDialog
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopOutlinedButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopTextButton
 import com.lagradost.cloudstream3.desktop.ui.dialogs.TorboxAuthDialog
 import com.lagradost.cloudstream3.desktop.ui.screens.settings.contract.SettingsUiEvent
 import com.lagradost.cloudstream3.syncproviders.AccountManager
@@ -187,19 +191,20 @@ fun SettingsAccounts(viewModel: SettingsViewModel) {
 
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 if (profile.id != activeProfile.id) {
-                                    OutlinedButton(
+                                    DesktopOutlinedButton(
                                         onClick = {
                                             scope.launch(Dispatchers.IO) {
                                                 com.lagradost.cloudstream3.desktop.profile.ProfileManager.switchProfile(profile.id)
                                             }
                                         },
+                                        shape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact,
                                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
                                         modifier = Modifier.height(32.dp),
                                     ) {
                                         Text("Switch", style = MaterialTheme.typography.labelMedium)
                                     }
                                 }
-                                IconButton(
+                                DesktopIconButton(
                                     onClick = { editingProfile = profile },
                                     modifier = Modifier.size(32.dp),
                                 ) {
@@ -217,7 +222,7 @@ fun SettingsAccounts(viewModel: SettingsViewModel) {
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
-                        Button(onClick = { isCreatingNew = true }) {
+                        DesktopButton(onClick = { isCreatingNew = true }) {
                             Text("+ Create New Profile")
                         }
 
@@ -271,7 +276,7 @@ fun SettingsAccounts(viewModel: SettingsViewModel) {
                             if (provider.hasInApp) {
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     if (isLoggedIn) {
-                                        OutlinedButton(
+                                        DesktopOutlinedButton(
                                             onClick = {
                                                 scope.launch(Dispatchers.IO) {
                                                     AccountManager.updateAccounts(provider.idPrefix, emptyArray())
@@ -288,13 +293,13 @@ fun SettingsAccounts(viewModel: SettingsViewModel) {
                                         ) {
                                             Text("Remove")
                                         }
-                                        Button(
+                                        DesktopButton(
                                             onClick = { selectedApiForLogin = provider },
                                         ) {
                                             Text("Edit Key")
                                         }
                                     } else {
-                                        Button(
+                                        DesktopButton(
                                             onClick = { selectedApiForLogin = provider },
                                         ) {
                                             Text("Add API Key")
@@ -448,7 +453,7 @@ fun SettingsAccounts(viewModel: SettingsViewModel) {
 
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             if (torboxApiKey.isNotBlank()) {
-                                OutlinedButton(
+                                DesktopOutlinedButton(
                                     onClick = {
                                         scope.launch(Dispatchers.IO) {
                                             viewModel.onEvent(SettingsUiEvent.DisconnectTorbox)
@@ -468,10 +473,10 @@ fun SettingsAccounts(viewModel: SettingsViewModel) {
                                 }
                             }
 
-                            Button(
+                            DesktopButton(
                                 onClick = {
                                     viewModel.onEvent(SettingsUiEvent.StartTorboxAuth)
-                                    return@Button
+                                    return@DesktopButton
                                     scope.launch(Dispatchers.IO) {
                                         val auth = TorboxApiClient.startDeviceAuthorization()
                                         // isStartingTorboxAuth = false
@@ -520,7 +525,7 @@ fun SettingsAccounts(viewModel: SettingsViewModel) {
                                 singleLine = true,
                                 visualTransformation = if (showTorboxPassword) VisualTransformation.None else PasswordVisualTransformation(),
                                 trailingIcon = {
-                                    IconButton(onClick = { showTorboxPassword = !showTorboxPassword }) {
+                                    DesktopIconButton(onClick = { showTorboxPassword = !showTorboxPassword }) {
                                         Icon(
                                             imageVector = if (showTorboxPassword) Icons.Default.VisibilityOff else Icons.Default.Visibility,
                                             contentDescription = "Toggle Visibility",
@@ -529,16 +534,16 @@ fun SettingsAccounts(viewModel: SettingsViewModel) {
                                 },
                             )
 
-                            Button(
+                            DesktopButton(
                                 onClick = {
-                                    viewModel.onEvent(SettingsUiEvent.ValidateTorboxKey(torboxKeyInput)); return@Button; val clean = torboxKeyInput.trim()
+                                    viewModel.onEvent(SettingsUiEvent.ValidateTorboxKey(torboxKeyInput)); return@DesktopButton; val clean = torboxKeyInput.trim()
                                     if (clean.isBlank()) {
                                         // torboxFeedbackMessage = "API Key cannot be blank"
                                         // error */
-                                        return@Button
+                                        return@DesktopButton
                                     }
                                     // isValidatingTorboxKey = true
-                                    return@Button
+                                    return@DesktopButton
                                     scope.launch(Dispatchers.IO) {
                                         val user = TorboxApiClient.getUser(clean)
                                         // isValidatingTorboxKey = false
@@ -749,12 +754,12 @@ fun InAppLoginDialog(api: AuthAPI, onDismiss: () -> Unit, onSuccess: (AuthData) 
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 if (isApiKeyOnly) {
-                    OutlinedButton(
+                    DesktopOutlinedButton(
                         onClick = {
-                            onTestApi(apiKeyStr); if (true) return@OutlinedButton; val cleanKey = apiKeyStr.trim()
+                            onTestApi(apiKeyStr); if (true) return@DesktopOutlinedButton; val cleanKey = apiKeyStr.trim()
                             if (cleanKey.isBlank()) {
                                 val _dTestStatus = false to "API Key cannot be empty"
-                                return@OutlinedButton
+                                return@DesktopOutlinedButton
                             }
                             val _dTesting = true
                             val _dTestStatusNull: Pair<Boolean, String>? = null
@@ -790,12 +795,12 @@ fun InAppLoginDialog(api: AuthAPI, onDismiss: () -> Unit, onSuccess: (AuthData) 
                 }
 
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    TextButton(onClick = onDismiss) { Text("Cancel") }
-                    Button(onClick = {
+                    DesktopTextButton(onClick = onDismiss) { Text("Cancel") }
+                    DesktopButton(onClick = {
                         val cleanKey = apiKeyStr.trim()
                         if (isApiKeyOnly && cleanKey.isBlank()) {
                             errorMsg = "API Key cannot be empty"
-                            return@Button
+                            return@DesktopButton
                         }
                         val authData = AuthData(
                             user = com.lagradost.cloudstream3.syncproviders.AuthUser(name = if (username.isNotBlank()) username.trim() else "User", id = 0, profilePicture = ""),

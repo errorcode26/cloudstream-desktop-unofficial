@@ -21,6 +21,9 @@ import com.lagradost.cloudstream3.desktop.core.preference.PreferenceKeys
 import com.lagradost.cloudstream3.desktop.models.CustomSite
 import com.lagradost.cloudstream3.desktop.ui.components.AppToastManager
 import com.lagradost.cloudstream3.desktop.ui.components.CloudstreamCustomDialog
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopTextButton
 import com.lagradost.cloudstream3.desktop.ui.screens.settings.SettingsGroupCard
 import com.lagradost.cloudstream3.desktop.ui.screens.settings.SettingsViewModel
 import com.lagradost.cloudstream3.desktop.ui.screens.settings.contract.SettingsUiEvent
@@ -61,7 +64,7 @@ fun SettingsAdvancedClonedSites(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                IconButton(onClick = {
+                DesktopIconButton(onClick = {
                     viewModel.onEvent(SettingsUiEvent.RemoveClonedSite(site))
                 }) {
                     Icon(Icons.Default.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error)
@@ -70,7 +73,7 @@ fun SettingsAdvancedClonedSites(
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
         }
 
-        Button(onClick = { showAddCloneDialog = true }) {
+        DesktopButton(onClick = { showAddCloneDialog = true }) {
             Text("Add Cloned Site")
         }
     }
@@ -195,17 +198,17 @@ fun SettingsAdvancedClonedSites(
 
                             Spacer(Modifier.weight(1f))
                             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                                TextButton(onClick = { showAddCloneDialog = false }) {
+                                DesktopTextButton(onClick = { showAddCloneDialog = false }) {
                                     Text("Cancel")
                                 }
                                 Spacer(Modifier.width(8.dp))
-                                Button(onClick = {
+                                DesktopButton(onClick = {
                                     val provider = selectedProvider
                                     if (provider != null && nameInput.isNotBlank() && urlInput.isNotBlank()) {
                                         val cleanUrl = urlInput.trim().trimEnd('/')
                                         if (cleanUrl.equals(provider.mainUrl.trimEnd('/'), ignoreCase = true)) {
                                             AppToastManager.showWarning("Clone URL must be an alternate mirror, not identical to base URL")
-                                            return@Button
+                                            return@DesktopButton
                                         }
 
                                         val parentId = if (provider is com.lagradost.cloudstream3.desktop.sandbox.proxy.SandboxedMainApiProxy &&

@@ -63,10 +63,12 @@ fun ComposeLibraryScreen(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                val chipShape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact
                 LibrarySection.entries.forEach { section ->
                     FilterChip(
                         selected = currentSection == section,
                         onClick = { viewModel.onEvent(LibraryUiEvent.OnSelectSection(section)) },
+                        shape = chipShape,
                         label = {
                             Text(
                                 section.label,
@@ -101,7 +103,7 @@ fun ComposeLibraryScreen(
                                 color = MaterialTheme.colorScheme.onSurface,
                                 modifier = Modifier.padding(bottom = 16.dp),
                             )
-                            Button(onClick = { onNavigate(Config.Home) }) {
+                            com.lagradost.cloudstream3.desktop.ui.components.DesktopButton(onClick = { onNavigate(Config.Home) }) {
                                 Text("Browse Shows")
                             }
                         }
@@ -114,10 +116,12 @@ fun ComposeLibraryScreen(
                                     .horizontalScroll(rememberScrollState()),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                             ) {
+                                val tabChipShape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact
                                 DesktopWatchType.entries.forEach { tab ->
                                     FilterChip(
                                         selected = selectedTab == tab,
                                         onClick = { viewModel.onEvent(LibraryUiEvent.OnSelectTab(tab)) },
+                                        shape = tabChipShape,
                                         label = {
                                             Text(
                                                 tab.stringRes,

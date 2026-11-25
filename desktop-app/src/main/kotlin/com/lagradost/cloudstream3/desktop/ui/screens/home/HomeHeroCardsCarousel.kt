@@ -1,6 +1,6 @@
 package com.lagradost.cloudstream3.desktop.ui.screens.home
 
-import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
@@ -26,9 +26,12 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -40,13 +43,18 @@ import androidx.compose.ui.zIndex
 import coil3.compose.AsyncImage
 import coil3.request.crossfade
 import com.lagradost.cloudstream3.MainAPI
+import com.lagradost.cloudstream3.desktop.ui.components.HeroPrimaryCtaButton
+import com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes
 import com.lagradost.cloudstream3.SearchResponse
+import com.lagradost.cloudstream3.desktop.ui.LocalSafeArea
 import com.lagradost.cloudstream3.desktop.ui.theme.AppearanceConfig
 import com.lagradost.cloudstream3.fixUrlNull
 import com.lagradost.common.storage.DesktopBookmark
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+
+private val HeroParallaxEasing = CubicBezierEasing(0.22f, 1.0f, 0.36f, 1.0f)
 
 @Composable
 fun HomeHeroCardsCarousel(
@@ -84,8 +92,8 @@ fun HomeHeroCardsCarousel(
                 pagerState.animateScrollToPage(
                     page = targetPage,
                     animationSpec = tween(
-                        durationMillis = 450,
-                        easing = FastOutSlowInEasing,
+                        durationMillis = 540,
+                        easing = HeroParallaxEasing,
                     ),
                 )
             } finally {
@@ -94,22 +102,20 @@ fun HomeHeroCardsCarousel(
         }
     }
 
-    // Eagerly prefetch first 2 slides on load
-    LaunchedEffect(items) {
-        items.take(2).forEachIndexed { index, item ->
-            if (index > 0) delay(400L)
-            onPrefetchHeroItem(provider, item)
-        }
-    }
-
-    // Lazily prefetch upcoming slide as carousel advances
-    LaunchedEffect(pagerState.currentPage, items) {
-        if (items.isNotEmpty()) {
-            val nextActualIndex = ((pagerState.currentPage + 1) % items.size)
-            items.getOrNull(nextActualIndex)?.let { nextItem ->
-                if (!heroMetaMap.containsKey(nextItem.url)) {
-                    onPrefetchHeroItem(provider, nextItem)
-                }
+    // Prefetch active card and ±2 flanking cinema peeks so side cards load landscape backdrops
+    LaunchedEffect(pagerState.currentPage, displayItems, items) {
+        if (displayItems.isEmpty()) return@LaunchedEffect
+        val seenUrls = HashSet<String>(5)
+        val relativeOffsets = intArrayOf(0, 1, -1, 2, -2)
+        var fetchedCount = 0
+        for (rel in relativeOffsets) {
+            val actualIndex = HomeHeroCardsLayoutMath.safeWrapIndex(pagerState.currentPage + rel, displayItems.size)
+            val targetItem = displayItems.getOrNull(actualIndex) ?: continue
+            if (!seenUrls.add(targetItem.url)) continue
+            if (!heroMetaMap.containsKey(targetItem.url)) {
+                if (fetchedCount > 0) delay(100L)
+                fetchedCount++
+                onPrefetchHeroItem(provider, targetItem)
             }
         }
     }
@@ -138,9 +144,23 @@ fun HomeHeroCardsCarousel(
     val windowInfo = androidx.compose.ui.platform.LocalWindowInfo.current
     val density = androidx.compose.ui.platform.LocalDensity.current
     val rawHeight = with(density) { windowInfo.containerSize.height.toDp() }
+    val rawWidth = with(density) { windowInfo.containerSize.width.toDp() }
+    val isWindowCompact = rawWidth < 680.dp
 
-    // Balanced 16:9 widescreen cinematic desktop scale
-    val dynamicHeight = (rawHeight * 0.52f).coerceIn(440.dp, 520.dp)
+    // Respect top header / top dock clearance with a guarded buffer for floating card heroes
+    val safeTop = LocalSafeArea.current.calculateTopPadding()
+    val topBuffer = if (isWindowCompact) {
+        safeTop.coerceAtLeast(58.dp)
+    } else {
+        safeTop.coerceAtLeast(72.dp)
+    }
+    val bottomBuffer = 38.dp
+    val cardHeight = if (isWindowCompact) {
+        360.dp
+    } else {
+        ((rawHeight - topBuffer) * 0.46f).coerceIn(340.dp, 444.dp)
+    }
+    val totalHeroHeight = topBuffer + cardHeight + bottomBuffer
 
     val carouselInteractionSource = remember { MutableInteractionSource() }
     val isCarouselHovered by carouselInteractionSource.collectIsHoveredAsState()
@@ -148,7 +168,7 @@ fun HomeHeroCardsCarousel(
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxWidth()
-            .height(dynamicHeight)
+            .height(totalHeroHeight)
             .hoverable(carouselInteractionSource),
     ) {
         val rootWidth = maxWidth
@@ -157,28 +177,82 @@ fun HomeHeroCardsCarousel(
         val cardWidth = if (isCompact) {
             (rootWidth - 32.dp).coerceAtLeast(300.dp)
         } else {
-            (rootWidth * 0.58f).coerceIn(620.dp, 840.dp)
+            (rootWidth * 0.50f).coerceIn(580.dp, 820.dp)
         }
-        val cardHeight = (dynamicHeight - 44.dp).coerceIn(380.dp, 460.dp)
+        val cardGap = if (isCompact) 12.dp else 20.dp
         val horizontalPeekPadding = ((rootWidth - cardWidth) / 2f).coerceAtLeast(0.dp)
-        val stackStep = if (isCompact) 0.dp else (cardWidth * 0.28f).coerceIn(180.dp, 240.dp)
+        val sideClearance = when {
+            rootWidth >= 1440.dp -> 84.dp
+            rootWidth >= 1100.dp -> 56.dp
+            else -> 16.dp
+        }
 
+        val rootWidthPx = with(density) { rootWidth.toPx() }
         val cardWidthPx = with(density) { cardWidth.toPx() }
-        val stackStepPx = with(density) { stackStep.toPx() }
+        val gapPx = with(density) { cardGap.toPx() }
+        val sideClearancePx = with(density) { sideClearance.toPx() }
 
-        // Horizontal Pager rendering 5-card stacked deck with seamless infinite looping
-        HorizontalPager(
-            state = pagerState,
-            key = { page -> page },
-            beyondViewportPageCount = 3,
-            contentPadding = PaddingValues(horizontal = horizontalPeekPadding),
-            pageSpacing = 0.dp,
-            userScrollEnabled = false,
+        val edgeFadeBrush = remember(rootWidthPx, cardWidthPx, gapPx, sideClearancePx, isCompact) {
+            if (isCompact) {
+                null
+            } else {
+                val stops = HomeHeroCardsLayoutMath.calculateEdgeFadeStops(
+                    canvasWidthPx = rootWidthPx,
+                    cardWidthPx = cardWidthPx,
+                    gapPx = gapPx,
+                    sideClearancePx = sideClearancePx,
+                )
+                Brush.horizontalGradient(
+                    0.00f to Color.Transparent,
+                    stops.leftFadeEnd to Color.Transparent,
+                    stops.leftMidLow to Color.Black.copy(alpha = 0.28f),
+                    stops.leftMidHigh to Color.Black.copy(alpha = 0.76f),
+                    stops.leftFadeStart to Color.Black,
+                    stops.rightFadeStart to Color.Black,
+                    stops.rightMidHigh to Color.Black.copy(alpha = 0.76f),
+                    stops.rightMidLow to Color.Black.copy(alpha = 0.28f),
+                    stops.rightFadeEnd to Color.Transparent,
+                    1.00f to Color.Transparent,
+                )
+            }
+        }
+
+        // Offscreen DstIn edge mask melts outer wings of flanking cinema peeks smoothly into backdrop
+        Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .height(cardHeight)
-                .align(Alignment.Center)
-                .pointerInput(pagerState, displayItems.size) {
+                .fillMaxSize()
+                .then(
+                    if (edgeFadeBrush != null) {
+                        Modifier
+                            .graphicsLayer {
+                                compositingStrategy = CompositingStrategy.Offscreen
+                            }
+                            .drawWithContent {
+                                drawContent()
+                                drawRect(
+                                    brush = edgeFadeBrush,
+                                    blendMode = BlendMode.DstIn,
+                                )
+                            }
+                    } else {
+                        Modifier
+                    },
+                ),
+            contentAlignment = Alignment.TopCenter,
+        ) {
+            // Spaced Cinema Pager: active center card flanked by clean gapped left/right peeks
+            HorizontalPager(
+                state = pagerState,
+                key = { page -> page },
+                beyondViewportPageCount = 2,
+                contentPadding = PaddingValues(horizontal = horizontalPeekPadding),
+                pageSpacing = cardGap,
+                userScrollEnabled = false,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = topBuffer)
+                    .height(cardHeight)
+                    .pointerInput(pagerState, displayItems.size) {
                     detectHorizontalDragGestures(
                         onDragStart = {
                             isDragging = true
@@ -214,17 +288,21 @@ fun HomeHeroCardsCarousel(
             val backdropUrl = meta?.backdropUrl ?: posterUrl
             val enhancedBackdrop = remember(backdropUrl) { com.lagradost.cloudstream3.desktop.utils.ImageUtils.enhanceBackdropUrl(backdropUrl) }
 
-            val cardShape = RoundedCornerShape(18.dp)
+            val cardShape = RoundedCornerShape(20.dp)
 
             val pageOffset = ((page - pagerState.currentPage) - pagerState.currentPageOffsetFraction)
             val absOffset = kotlin.math.abs(pageOffset)
 
             val scale = HomeHeroCardsLayoutMath.calculateScale(absOffset)
             val alphaVal = HomeHeroCardsLayoutMath.calculateAlpha(absOffset)
+            val dimAlpha = HomeHeroCardsLayoutMath.calculateDimAlpha(absOffset)
             val zIndexVal = HomeHeroCardsLayoutMath.calculateZIndex(absOffset)
-            val translationX = HomeHeroCardsLayoutMath.calculateTranslationX(pageOffset, stackStepPx, cardWidthPx, isCompact)
             val detailsAlpha = HomeHeroCardsLayoutMath.calculateDetailsAlpha(absOffset)
+            val backdropParallaxPx = HomeHeroCardsLayoutMath.calculateBackdropParallaxPx(pageOffset, cardWidthPx)
+            val foregroundBaseParallaxPx = HomeHeroCardsLayoutMath.calculateForegroundParallaxPx(pageOffset, cardWidthPx)
             val isCenter = absOffset <= 0.5f
+
+            val shadowElevation = (24f - (absOffset * 6f)).coerceIn(8f, 24f).dp
 
             Box(
                 modifier = Modifier
@@ -232,27 +310,22 @@ fun HomeHeroCardsCarousel(
                     .width(cardWidth)
                     .height(cardHeight)
                     .graphicsLayer {
-                        this.translationX = translationX
                         this.scaleX = scale
                         this.scaleY = scale
                         this.alpha = alphaVal
                     }
                     .shadow(
-                        elevation = if (isCenter) 22.dp else if (absOffset <= 1.5f) 12.dp else 4.dp,
+                        elevation = shadowElevation,
                         shape = cardShape,
-                        spotColor = Color.Black.copy(alpha = 0.70f),
+                        spotColor = Color.Black.copy(alpha = 0.72f),
                         ambientColor = Color.Transparent,
                     )
                     .clip(cardShape)
-                    .border(
-                        BorderStroke(
-                            width = 1.dp,
-                            color = if (isCenter) Color.White.copy(alpha = 0.20f) else Color.White.copy(alpha = 0.08f),
-                        ),
-                        shape = cardShape,
-                    )
                     .background(Color(0xFF0F0F14))
-                    .clickable {
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                    ) {
                         if (!isDragging && kotlin.math.abs(dragAccumulator) < 15f) {
                             if (!isCenter) {
                                 navigateToPage(page)
@@ -262,7 +335,7 @@ fun HomeHeroCardsCarousel(
                         }
                     },
             ) {
-                // Card Backdrop Image
+                // Card Backdrop Image (overscaled 1.08x inside card clip for edge-safe depth parallax)
                 if (enhancedBackdrop != null) {
                     AsyncImage(
                         model = coil3.request.ImageRequest.Builder(coil3.compose.LocalPlatformContext.current)
@@ -271,102 +344,131 @@ fun HomeHeroCardsCarousel(
                             .build(),
                         contentDescription = item.name,
                         contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize(),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer {
+                                this.scaleX = HomeHeroCardsLayoutMath.BACKDROP_PARALLAX_SCALE
+                                this.scaleY = HomeHeroCardsLayoutMath.BACKDROP_PARALLAX_SCALE
+                                this.translationX = backdropParallaxPx
+                            },
                     )
                 }
 
-                // Dual directional scrims: Left-to-right for typography & bottom-to-top for grounding
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(
-                            Brush.horizontalGradient(
-                                0.00f to Color.Black.copy(alpha = 0.90f),
-                                0.45f to Color.Black.copy(alpha = 0.65f),
-                                0.80f to Color.Black.copy(alpha = 0.20f),
-                                1.00f to Color.Transparent,
-                            ),
-                        ),
-                )
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(
-                            Brush.verticalGradient(
-                                0.00f to Color.Transparent,
-                                0.40f to Color.Transparent,
-                                1.00f to Color.Black.copy(alpha = 0.85f),
-                            ),
-                        ),
-                )
+                // Symmetrical depth-dimming veil keeps cards solid while separating fanned layers
+                if (dimAlpha > 0.005f) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color.Black.copy(alpha = dimAlpha)),
+                    )
+                }
 
-                // Unified Content: Anchored at the bottom-left on ALL cards
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(
-                            start = if (isCompact) 18.dp else 28.dp,
-                            end = if (isCompact) 18.dp else 28.dp,
-                            top = 16.dp,
-                            bottom = 22.dp,
-                        ),
-                    verticalArrangement = Arrangement.Bottom,
-                    horizontalAlignment = Alignment.Start,
-                ) {
-                    // Title Logo or Bold Title (Always present, never jumps or teleports!)
-                    val logoUrl = meta?.logoUrl
-                    val displayTitle = meta?.title ?: com.lagradost.cloudstream3.desktop.repo.HeroRepository.cleanHeroTitle(item.name)
-
-                    if (!logoUrl.isNullOrBlank()) {
-                        var logoFailed by remember(logoUrl) { mutableStateOf(false) }
-                        if (!logoFailed) {
-                            AsyncImage(
-                                model = coil3.request.ImageRequest.Builder(coil3.compose.LocalPlatformContext.current)
-                                    .data(logoUrl)
-                                    .crossfade(true)
-                                    .build(),
-                                contentDescription = displayTitle,
-                                contentScale = ContentScale.Fit,
-                                alignment = Alignment.CenterStart,
-                                modifier = Modifier
-                                    .heightIn(max = if (isCompact) 42.dp else 56.dp)
-                                    .fillMaxWidth(if (isCompact) 0.85f else 0.70f),
-                                onError = { logoFailed = true },
-                            )
-                        } else {
-                            Text(
-                                text = displayTitle,
-                                style = MaterialTheme.typography.headlineMedium.copy(
-                                    fontWeight = FontWeight.ExtraBold,
-                                    fontSize = if (isCompact) 20.sp else 24.sp,
+                // Center-only typography scrims so left/right peek cards stay vibrant and symmetrical
+                if (detailsAlpha > 0.01f) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer { alpha = detailsAlpha },
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(
+                                    Brush.horizontalGradient(
+                                        0.00f to Color.Black.copy(alpha = 0.72f),
+                                        0.38f to Color.Black.copy(alpha = 0.34f),
+                                        0.72f to Color.Transparent,
+                                    ),
                                 ),
-                                color = Color.White,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                    } else {
-                        Text(
-                            text = displayTitle,
-                            style = MaterialTheme.typography.headlineMedium.copy(
-                                fontWeight = FontWeight.ExtraBold,
-                                fontSize = if (isCompact) 20.sp else 24.sp,
-                            ),
-                            color = Color.White,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(
+                                    Brush.verticalGradient(
+                                        0.00f to Color.Transparent,
+                                        0.38f to Color.Transparent,
+                                        0.72f to Color.Black.copy(alpha = 0.45f),
+                                        1.00f to Color.Black.copy(alpha = 0.88f),
+                                    ),
+                                ),
                         )
                     }
+                }
 
-                    // Extra Details: Smoothly and continuously fades in when card is centered
-                    if (detailsAlpha > 0.01f) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .graphicsLayer { alpha = detailsAlpha },
+                // Active-card foreground overlay; hidden on peeking cards to prevent edge text collisions
+                if (detailsAlpha > 0.01f) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer { alpha = detailsAlpha }
+                            .padding(
+                                start = if (isCompact) 18.dp else 28.dp,
+                                end = if (isCompact) 18.dp else 28.dp,
+                                top = 16.dp,
+                                bottom = 24.dp,
+                            ),
+                        verticalArrangement = Arrangement.Bottom,
+                        horizontalAlignment = Alignment.Start,
+                    ) {
+                        val logoUrl = meta?.logoUrl
+                        val displayTitle = meta?.title ?: com.lagradost.cloudstream3.desktop.repo.HeroRepository.cleanHeroTitle(item.name)
+
+                        Box(
+                            modifier = Modifier.graphicsLayer {
+                                this.translationX = foregroundBaseParallaxPx * 0.75f
+                            },
                         ) {
-                            Spacer(Modifier.height(8.dp))
+                            if (!logoUrl.isNullOrBlank()) {
+                                var logoFailed by remember(logoUrl) { mutableStateOf(false) }
+                                if (!logoFailed) {
+                                    AsyncImage(
+                                        model = coil3.request.ImageRequest.Builder(coil3.compose.LocalPlatformContext.current)
+                                            .data(logoUrl)
+                                            .crossfade(true)
+                                            .build(),
+                                        contentDescription = displayTitle,
+                                        contentScale = ContentScale.Fit,
+                                        alignment = Alignment.CenterStart,
+                                        modifier = Modifier
+                                            .heightIn(max = if (isCompact) 42.dp else 56.dp)
+                                            .fillMaxWidth(if (isCompact) 0.85f else 0.65f),
+                                        onError = { logoFailed = true },
+                                    )
+                                } else {
+                                    Text(
+                                        text = displayTitle,
+                                        style = MaterialTheme.typography.headlineMedium.copy(
+                                            fontWeight = FontWeight.ExtraBold,
+                                            fontSize = if (isCompact) 20.sp else 26.sp,
+                                        ),
+                                        color = Color.White,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                }
+                            } else {
+                                Text(
+                                    text = displayTitle,
+                                    style = MaterialTheme.typography.headlineMedium.copy(
+                                        fontWeight = FontWeight.ExtraBold,
+                                        fontSize = if (isCompact) 20.sp else 26.sp,
+                                    ),
+                                    color = Color.White,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                        }
 
+                        Spacer(Modifier.height(8.dp))
+
+                        // Metadata + Plot layer floats slightly ahead of title during scroll transitions
+                        Column(
+                            modifier = Modifier.graphicsLayer {
+                                this.translationX = foregroundBaseParallaxPx
+                            },
+                        ) {
                             // Metadata Badges Row
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
@@ -425,35 +527,57 @@ fun HomeHeroCardsCarousel(
                                 Spacer(Modifier.height(6.dp))
                                 Text(
                                     text = displayPlot,
-                                    color = Color.White.copy(alpha = 0.80f),
+                                    color = Color.White.copy(alpha = 0.82f),
                                     fontSize = 13.sp,
                                     maxLines = 2,
                                     overflow = TextOverflow.Ellipsis,
                                     lineHeight = 17.sp,
-                                    modifier = Modifier.fillMaxWidth(if (isCompact) 0.95f else 0.80f),
+                                    modifier = Modifier.fillMaxWidth(if (isCompact) 0.95f else 0.74f),
                                 )
                             }
-
-                            Spacer(Modifier.height(14.dp))
-
-                            // Single Clean "Watch Now" Action Button directly opening details
-                            Button(
-                                onClick = { onItemClick(item, meta?.backdropUrl, false) },
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = Color.White,
-                                    contentColor = Color.Black,
-                                ),
-                                shape = RoundedCornerShape(10.dp),
-                                contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp),
-                                modifier = Modifier.height(38.dp),
-                            ) {
-                                Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Spacer(Modifier.width(5.dp))
-                                Text("Watch Now", fontWeight = FontWeight.ExtraBold, fontSize = 13.5.sp)
-                            }
                         }
+
+                        Spacer(Modifier.height(14.dp))
+
+                        HeroPrimaryCtaButton(
+                            text = "Watch Now",
+                            icon = Icons.Default.PlayArrow,
+                            onClick = { onItemClick(item, meta?.backdropUrl, false) },
+                            shape = LocalDesktopButtonShapes.current.primary,
+                            contentPadding = PaddingValues(horizontal = 20.dp),
+                            iconSize = 18.dp,
+                            fontSize = 13.5.sp,
+                            iconSpacing = 5.dp,
+                            modifier = Modifier
+                                .height(38.dp)
+                                .graphicsLayer {
+                                    this.translationX = foregroundBaseParallaxPx * 1.25f
+                                },
+                        )
                     }
                 }
+
+                // Rendered last inside card bounds so rim highlights stay crisp over artwork and scrims
+                val centerGlow = (1f - absOffset).coerceIn(0f, 1f)
+                val rimTopAlpha = 0.22f + 0.06f * centerGlow
+                val rimMidAlpha = 0.13f + 0.03f * centerGlow
+                val rimBottomAlpha = 0.08f + 0.02f * centerGlow
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .border(
+                            BorderStroke(
+                                width = 1.dp,
+                                brush = Brush.verticalGradient(
+                                    0.00f to Color.White.copy(alpha = rimTopAlpha),
+                                    0.40f to Color.White.copy(alpha = rimMidAlpha),
+                                    1.00f to Color.White.copy(alpha = rimBottomAlpha),
+                                ),
+                            ),
+                            shape = cardShape,
+                        ),
+                )
+            }
             }
         }
 
@@ -474,91 +598,40 @@ fun HomeHeroCardsCarousel(
             val rightInteractionSource = remember { MutableInteractionSource() }
             val isRightHovered by rightInteractionSource.collectIsHoveredAsState()
 
-            // Left Chevron (hugging the center active card's left edge)
-            Box(
-                modifier = Modifier
-                    .align(Alignment.CenterStart)
-                    .padding(start = chevronCardOffset)
-                    .size(chevronButtonSize)
-                    .graphicsLayer {
-                        this.alpha = chevronAlpha
-                        this.clip = true
-                        this.shape = CircleShape
-                    }
-                    .shadow(
-                        elevation = 8.dp,
-                        shape = CircleShape,
-                        spotColor = Color.Black.copy(alpha = 0.50f),
-                        ambientColor = Color.Transparent,
-                    )
-                    .clip(CircleShape)
-                    .background(
-                        if (isLeftHovered) Color(0xFF22222E).copy(alpha = 0.92f * chevronAlpha)
-                        else Color(0xFF14141A).copy(alpha = 0.78f * chevronAlpha),
-                    )
-                    .border(
-                        1.dp,
-                        if (isLeftHovered) Color.White.copy(alpha = 0.45f * chevronAlpha)
-                        else Color.White.copy(alpha = 0.20f * chevronAlpha),
-                        CircleShape,
-                    )
-                    .clickable(
-                        interactionSource = leftInteractionSource,
-                        indication = null,
-                    ) {
-                        navigateToPage(pagerState.currentPage - 1)
-                    },
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    Icons.Default.ChevronLeft,
-                    contentDescription = "Previous Slide",
-                    tint = Color.White,
-                    modifier = Modifier.size(20.dp),
-                )
-            }
+            val chevronShape = LocalDesktopButtonShapes.current.icon
 
-            // Right Chevron (hugging the center active card's right edge)
             Box(
                 modifier = Modifier
-                    .align(Alignment.CenterEnd)
-                    .padding(end = chevronCardOffset)
-                    .size(chevronButtonSize)
-                    .graphicsLayer {
-                        this.alpha = chevronAlpha
-                        this.clip = true
-                        this.shape = CircleShape
-                    }
-                    .shadow(
-                        elevation = 8.dp,
-                        shape = CircleShape,
-                        spotColor = Color.Black.copy(alpha = 0.50f),
-                        ambientColor = Color.Transparent,
-                    )
-                    .clip(CircleShape)
-                    .background(
-                        if (isRightHovered) Color(0xFF22222E).copy(alpha = 0.92f * chevronAlpha)
-                        else Color(0xFF14141A).copy(alpha = 0.78f * chevronAlpha),
-                    )
-                    .border(
-                        1.dp,
-                        if (isRightHovered) Color.White.copy(alpha = 0.45f * chevronAlpha)
-                        else Color.White.copy(alpha = 0.20f * chevronAlpha),
-                        CircleShape,
-                    )
-                    .clickable(
-                        interactionSource = rightInteractionSource,
-                        indication = null,
-                    ) {
-                        navigateToPage(pagerState.currentPage + 1)
-                    },
-                contentAlignment = Alignment.Center,
+                    .fillMaxWidth()
+                    .padding(top = topBuffer)
+                    .height(cardHeight),
             ) {
-                Icon(
-                    Icons.Default.ChevronRight,
+                HeroCarouselChevronButton(
+                    icon = Icons.Default.ChevronLeft,
+                    contentDescription = "Previous Slide",
+                    isHovered = isLeftHovered,
+                    interactionSource = leftInteractionSource,
+                    chevronAlpha = chevronAlpha,
+                    buttonSize = chevronButtonSize,
+                    shape = chevronShape,
+                    modifier = Modifier
+                        .align(Alignment.CenterStart)
+                        .padding(start = chevronCardOffset),
+                    onClick = { navigateToPage(pagerState.currentPage - 1) },
+                )
+
+                HeroCarouselChevronButton(
+                    icon = Icons.Default.ChevronRight,
                     contentDescription = "Next Slide",
-                    tint = Color.White,
-                    modifier = Modifier.size(20.dp),
+                    isHovered = isRightHovered,
+                    interactionSource = rightInteractionSource,
+                    chevronAlpha = chevronAlpha,
+                    buttonSize = chevronButtonSize,
+                    shape = chevronShape,
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .padding(end = chevronCardOffset),
+                    onClick = { navigateToPage(pagerState.currentPage + 1) },
                 )
             }
         }
@@ -569,7 +642,7 @@ fun HomeHeroCardsCarousel(
             Row(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(bottom = 6.dp),
+                    .padding(bottom = 10.dp),
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -591,5 +664,58 @@ fun HomeHeroCardsCarousel(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun HeroCarouselChevronButton(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    contentDescription: String,
+    isHovered: Boolean,
+    interactionSource: MutableInteractionSource,
+    chevronAlpha: Float,
+    buttonSize: androidx.compose.ui.unit.Dp,
+    shape: androidx.compose.ui.graphics.Shape,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    Box(
+        modifier = modifier
+            .size(buttonSize)
+            .graphicsLayer {
+                alpha = chevronAlpha
+                clip = true
+                this.shape = shape
+            }
+            .shadow(
+                elevation = 8.dp,
+                shape = shape,
+                spotColor = Color.Black.copy(alpha = 0.50f),
+                ambientColor = Color.Transparent,
+            )
+            .clip(shape)
+            .background(
+                if (isHovered) Color(0xFF22222E).copy(alpha = 0.92f * chevronAlpha)
+                else Color(0xFF14141A).copy(alpha = 0.78f * chevronAlpha),
+            )
+            .border(
+                1.dp,
+                if (isHovered) Color.White.copy(alpha = 0.45f * chevronAlpha)
+                else Color.White.copy(alpha = 0.20f * chevronAlpha),
+                shape,
+            )
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick,
+            ),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = contentDescription,
+            tint = Color.White,
+            modifier = Modifier.size(20.dp),
+        )
     }
 }

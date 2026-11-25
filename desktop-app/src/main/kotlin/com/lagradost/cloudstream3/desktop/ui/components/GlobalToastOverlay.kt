@@ -243,7 +243,7 @@ private fun ToastCard(
                     )
                 }
 
-                IconButton(
+                DesktopIconButton(
                     onClick = onDismiss,
                     modifier = Modifier.size(22.dp),
                 ) {

@@ -50,7 +50,7 @@ fun SettingsAppearanceScreen(onNavigateToSubScreen: (SettingsSubScreen) -> Unit 
         SettingsHubCard(
             icon = Icons.Default.Palette,
             title = "Theme & Colors",
-            subtitle = "Light/Dark/AMOLED mode, accent color, canvas background tone, and curated one-click presets.",
+            subtitle = "Light/Dark/AMOLED mode, button & profile shapes, accent color, canvas background, and curated presets.",
             badge = themeBadge,
             onClick = { onNavigateToSubScreen(SettingsSubScreen.APPEARANCE_THEME_WALLPAPER) },
         )

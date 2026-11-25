@@ -146,16 +146,17 @@ internal fun ActiveProviderItem(
                 }
 
                 if (isAdvancedMode) {
+                    val orderContainerShape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
-                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), RoundedCornerShape(50))
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), orderContainerShape)
                             .padding(horizontal = 4.dp),
                     ) {
-                        IconButton(onClick = onMoveUp, enabled = index > 0, modifier = Modifier.size(28.dp)) {
+                        com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton(onClick = onMoveUp, enabled = index > 0, modifier = Modifier.size(28.dp)) {
                             Icon(Icons.Default.ArrowUpward, contentDescription = "Move Up", modifier = Modifier.size(16.dp))
                         }
-                        IconButton(onClick = onMoveDown, enabled = index < totalActive - 1, modifier = Modifier.size(28.dp)) {
+                        com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton(onClick = onMoveDown, enabled = index < totalActive - 1, modifier = Modifier.size(28.dp)) {
                             Icon(Icons.Default.ArrowDownward, contentDescription = "Move Down", modifier = Modifier.size(16.dp))
                         }
                     }
@@ -170,8 +171,14 @@ internal fun ActiveProviderItem(
                     )
                 }
 
-                IconButton(onClick = onRemove, modifier = Modifier.background(MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f), RoundedCornerShape(50))) {
-                    Icon(Icons.Default.Close, contentDescription = "Remove", tint = MaterialTheme.colorScheme.onErrorContainer)
+                com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton(
+                    onClick = onRemove,
+                    colors = IconButtonDefaults.iconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f),
+                        contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                    ),
+                ) {
+                    Icon(Icons.Default.Close, contentDescription = "Remove")
                 }
             }
 
@@ -216,17 +223,17 @@ internal fun ActiveProviderItem(
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
                                     modifier = Modifier
-                                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), RoundedCornerShape(50))
+                                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact)
                                         .padding(horizontal = 4.dp),
                                 ) {
-                                    IconButton(
+                                    com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton(
                                         onClick = { onMoveCatalog(catIdx, catIdx - 1) },
                                         enabled = catIdx > 0,
                                         modifier = Modifier.size(24.dp),
                                     ) {
                                         Icon(Icons.Default.ArrowUpward, contentDescription = "Move Up", modifier = Modifier.size(14.dp))
                                     }
-                                    IconButton(
+                                    com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton(
                                         onClick = { onMoveCatalog(catIdx, catIdx + 1) },
                                         enabled = catIdx < sortedCatalogs.lastIndex,
                                         modifier = Modifier.size(24.dp),

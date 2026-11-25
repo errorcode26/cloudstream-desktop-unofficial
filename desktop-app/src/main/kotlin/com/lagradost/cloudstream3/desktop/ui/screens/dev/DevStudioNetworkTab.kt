@@ -25,6 +25,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopOutlinedButton
 import com.lagradost.common.net.NetworkRequestEntry
 
 // -------------------------------------------------------------------------------------------------
@@ -88,11 +91,11 @@ internal fun NetworkInspectorTabContent(
                     }
 
                     // Pause Network recording
-                    Button(
+                    DesktopButton(
                         onClick = { onEvent(DevStudioUiEvent.ToggleNetworkPause) },
                         colors = ButtonDefaults.buttonColors(containerColor = if (state.isNetworkPaused) DevLevelWarn.copy(alpha = 0.25f) else Color(0xFF23273A)),
                         contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                        shape = RoundedCornerShape(6.dp),
+                        shape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact,
                         modifier = Modifier.height(36.dp),
                     ) {
                         Icon(
@@ -106,20 +109,20 @@ internal fun NetworkInspectorTabContent(
                     }
 
                     // Export
-                    OutlinedButton(
+                    DesktopOutlinedButton(
                         onClick = { onEvent(DevStudioUiEvent.ExportNetworkLogs) },
                         contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                        shape = RoundedCornerShape(6.dp),
+                        shape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact,
                         modifier = Modifier.height(36.dp),
                     ) {
                         Text("Export", fontSize = 11.sp, color = Color.LightGray)
                     }
 
                     // Clear
-                    OutlinedButton(
+                    DesktopOutlinedButton(
                         onClick = { onEvent(DevStudioUiEvent.ClearNetworkLogs) },
                         contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                        shape = RoundedCornerShape(6.dp),
+                        shape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact,
                         modifier = Modifier.height(36.dp),
                     ) {
                         Text("Clear", fontSize = 11.sp, color = Color.LightGray)
@@ -136,13 +139,14 @@ internal fun NetworkInspectorTabContent(
                 ) {
                     Text("Method:", color = Color.Gray, fontSize = 11.sp, fontWeight = FontWeight.Bold)
 
+                    val chipShape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact
                     val methods = listOf(null, "GET", "POST", "HEAD", "PUT", "DELETE")
                     methods.forEach { m ->
                         val isSelected = state.networkMethodFilter == m
                         val label = m ?: "ALL"
                         Surface(
                             color = if (isSelected) DevAccentCyan.copy(alpha = 0.25f) else DevBgDark,
-                            shape = RoundedCornerShape(12.dp),
+                            shape = chipShape,
                             border = androidx.compose.foundation.BorderStroke(1.dp, if (isSelected) DevAccentCyan else DevBorderDark),
                             modifier = Modifier.clickable { onEvent(DevStudioUiEvent.SelectNetworkMethodFilter(m)) },
                         ) {
@@ -160,7 +164,7 @@ internal fun NetworkInspectorTabContent(
 
                     Surface(
                         color = if (state.networkErrorsOnly) DevLevelError else DevBgDark,
-                        shape = RoundedCornerShape(12.dp),
+                        shape = chipShape,
                         border = androidx.compose.foundation.BorderStroke(1.dp, DevLevelError.copy(alpha = if (state.networkErrorsOnly) 1f else 0.5f)),
                         modifier = Modifier.clickable { onEvent(DevStudioUiEvent.ToggleNetworkErrorsOnly) },
                     ) {
@@ -357,7 +361,7 @@ private fun NetworkRequestRow(
         )
 
         // Copy cURL button
-        IconButton(onClick = onCopyCurl, modifier = Modifier.size(22.dp)) {
+        DesktopIconButton(onClick = onCopyCurl, modifier = Modifier.size(22.dp)) {
             Icon(Icons.Default.Terminal, contentDescription = "Copy cURL", tint = Color.Gray, modifier = Modifier.size(13.dp))
         }
     }
@@ -385,7 +389,7 @@ private fun NetworkRequestInspector(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text("Request Details", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-            IconButton(onClick = onClose, modifier = Modifier.size(24.dp)) {
+            DesktopIconButton(onClick = onClose, modifier = Modifier.size(24.dp)) {
                 Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.Gray, modifier = Modifier.size(16.dp))
             }
         }
@@ -414,10 +418,10 @@ private fun NetworkRequestInspector(
         Spacer(Modifier.height(10.dp))
 
         // cURL Button
-        Button(
+        DesktopButton(
             onClick = onCopyCurl,
             colors = ButtonDefaults.buttonColors(containerColor = DevAccentCyan.copy(alpha = 0.2f)),
-            shape = RoundedCornerShape(6.dp),
+            shape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact,
             modifier = Modifier.fillMaxWidth().height(32.dp),
             contentPadding = PaddingValues(0.dp),
         ) {
@@ -483,7 +487,7 @@ private fun NetworkRequestInspector(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text("Payload:", color = Color.LightGray, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                        IconButton(onClick = { onCopyPayload(body, "Request Body") }, modifier = Modifier.size(20.dp)) {
+                        DesktopIconButton(onClick = { onCopyPayload(body, "Request Body") }, modifier = Modifier.size(20.dp)) {
                             Icon(Icons.Default.ContentCopy, contentDescription = "Copy", tint = Color.Gray, modifier = Modifier.size(13.dp))
                         }
                     }
@@ -518,7 +522,7 @@ private fun NetworkRequestInspector(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text("Response Data:", color = Color.LightGray, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                        IconButton(onClick = { onCopyPayload(resp, "Response Body") }, modifier = Modifier.size(20.dp)) {
+                        DesktopIconButton(onClick = { onCopyPayload(resp, "Response Body") }, modifier = Modifier.size(20.dp)) {
                             Icon(Icons.Default.ContentCopy, contentDescription = "Copy", tint = Color.Gray, modifier = Modifier.size(13.dp))
                         }
                     }

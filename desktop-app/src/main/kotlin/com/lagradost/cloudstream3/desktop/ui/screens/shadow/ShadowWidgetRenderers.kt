@@ -28,6 +28,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lagradost.cloudstream3.desktop.shadowui.ShadowUi
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton
 import com.lagradost.common.logging.AppLogger
 import java.awt.Toolkit
 import java.awt.datatransfer.DataFlavor
@@ -106,9 +108,8 @@ internal fun ButtonNode(view: android.widget.Button) {
     val resolvedText = resolveText(view.text).let { if (view.allCaps) it.uppercase() else it }
     val actionIcon = getActionIcon(resolvedText)
 
-    Button(
+    DesktopButton(
         onClick = { ShadowUi.dispatch("button-click") { view.performClick() } },
-        shape = RoundedCornerShape(12.dp),
         colors = ButtonDefaults.buttonColors(
             containerColor = MaterialTheme.colorScheme.primary,
             contentColor = MaterialTheme.colorScheme.onPrimary,
@@ -189,7 +190,7 @@ internal fun EditTextNode(view: android.widget.EditText, labelText: String? = nu
             trailingIcon = {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (textValue.isNotEmpty()) {
-                        IconButton(
+                        DesktopIconButton(
                             onClick = {
                                 textValue = ""
                                 view.setTextFromUi("")
@@ -204,7 +205,7 @@ internal fun EditTextNode(view: android.widget.EditText, labelText: String? = nu
                             )
                         }
                     }
-                    IconButton(
+                    DesktopIconButton(
                         onClick = {
                             try {
                                 val clipboard = Toolkit.getDefaultToolkit().systemClipboard
@@ -331,7 +332,7 @@ internal fun RadioButtonNode(view: android.widget.RadioButton) {
 
 @Composable
 internal fun IconButtonNode(view: android.widget.ImageButton) {
-    IconButton(
+    DesktopIconButton(
         onClick = { ShadowUi.dispatch("icon-button") { view.performClick() } },
         modifier = Modifier.padding(4.dp),
     ) {

@@ -5,18 +5,14 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -67,7 +63,7 @@ fun CrashRecoveryDialog() {
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                OutlinedButton(
+                DesktopOutlinedButton(
                     onClick = {
                         if (openLogsFolder()) {
                             AppToastManager.showInfo("Opened logs folder in Explorer")
@@ -75,7 +71,6 @@ fun CrashRecoveryDialog() {
                             AppToastManager.showError("Could not open logs folder")
                         }
                     },
-                    shape = RoundedCornerShape(8.dp),
                 ) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.OpenInNew,
@@ -86,7 +81,7 @@ fun CrashRecoveryDialog() {
                     Text("Open Folder")
                 }
 
-                Button(
+                DesktopButton(
                     onClick = {
                         if (copyDiagnosticLogsToClipboard()) {
                             AppToastManager.showSuccess("Full diagnostic logs copied to clipboard")
@@ -99,7 +94,6 @@ fun CrashRecoveryDialog() {
                         containerColor = MaterialTheme.colorScheme.error,
                         contentColor = MaterialTheme.colorScheme.onError,
                     ),
-                    shape = RoundedCornerShape(8.dp),
                 ) {
                     Icon(
                         imageVector = Icons.Default.ContentCopy,
@@ -112,9 +106,8 @@ fun CrashRecoveryDialog() {
             }
         },
         dismissButton = {
-            TextButton(
+            DesktopTextButton(
                 onClick = { CrashRecoveryManager.dismiss() },
-                shape = RoundedCornerShape(8.dp),
             ) {
                 Text("Dismiss")
             }

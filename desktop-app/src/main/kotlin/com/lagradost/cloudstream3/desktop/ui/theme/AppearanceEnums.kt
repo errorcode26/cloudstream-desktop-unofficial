@@ -167,3 +167,35 @@ enum class ProviderBadgeDisplayMode(val label: String) {
         }
     }
 }
+
+enum class ButtonShapeStyle(val label: String, val description: String) {
+    ROUNDED("Rounded", "Balanced desktop corners (12dp primary / 10dp compact)"),
+    SOFT("Soft", "Tighter structured corners (8dp primary / 6dp compact)"),
+    PILL("Pill", "Full capsule & circular shapes across every button"),
+    SHARP("Sharp", "Crisp minimal corners (4dp primary / 3dp compact)"),
+    ;
+
+    companion object {
+        fun fromString(value: String?): ButtonShapeStyle {
+            return entries.find {
+                it.name.equals(value, ignoreCase = true) || it.label.equals(value, ignoreCase = true)
+            } ?: ROUNDED
+        }
+    }
+}
+
+enum class CastProfileShapeStyle(val label: String, val description: String) {
+    ROUNDED("Rounded", "Classic 2:3 portrait frames (14dp corners)"),
+    SOFT("Soft", "Tighter structured 2:3 frames (8dp corners)"),
+    CIRCLE("Circle", "1:1 circular avatars across cast and person screens"),
+    SHARP("Sharp", "Crisp editorial 2:3 frames (4dp corners)"),
+    ;
+
+    companion object {
+        fun fromString(value: String?): CastProfileShapeStyle {
+            return entries.find {
+                it.name.equals(value, ignoreCase = true) || it.label.equals(value, ignoreCase = true)
+            } ?: ROUNDED
+        }
+    }
+}

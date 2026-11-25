@@ -36,6 +36,7 @@ import com.lagradost.cloudstream3.desktop.ui.PremiumIcons
 import com.lagradost.cloudstream3.desktop.ui.screens.home.contract.HomeUiEvent
 import com.lagradost.cloudstream3.desktop.ui.screens.home.contract.HomeUiState
 import com.lagradost.cloudstream3.desktop.ui.theme.AppearanceConfig
+import com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes
 import com.lagradost.cloudstream3.desktop.ui.theme.TopBarProviderStyle
 
 /**
@@ -79,7 +80,7 @@ fun FullscreenToggleButton(
         label = "fullscreenButtonRotation",
     )
 
-    val buttonShape = RoundedCornerShape(10.dp)
+    val buttonShape = LocalDesktopButtonShapes.current.icon
     val isLightMode = theme.isLightMode
     val isAmoled = theme.isAmoled
 
@@ -266,8 +267,11 @@ fun TopBarProviderPill(
         if (isLightMode) Color.White.copy(alpha = 0.85f) else if (isAmoled) Color.Black.copy(alpha = 0.85f) else Color(0xFF1E1E24).copy(alpha = 0.65f)
     }
 
+    val buttonShapes = LocalDesktopButtonShapes.current
+    val pillShape = if (isIconOnly) buttonShapes.icon else buttonShapes.medium
+
     Surface(
-        shape = RoundedCornerShape(10.dp),
+        shape = pillShape,
         color = activeBgColor,
         border = BorderStroke(1.dp, activeBorderColor),
         shadowElevation = 0.dp,
@@ -277,7 +281,7 @@ fun TopBarProviderPill(
             Box(
                 modifier = Modifier
                     .size(42.dp)
-                    .clip(RoundedCornerShape(10.dp))
+                    .clip(pillShape)
                     .clickable(
                         interactionSource = interactionSource,
                         indication = null,
@@ -320,7 +324,7 @@ fun TopBarProviderPill(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .height(42.dp)
-                    .clip(RoundedCornerShape(10.dp))
+                    .clip(pillShape)
                     .clickable(
                         interactionSource = interactionSource,
                         indication = null,

@@ -41,6 +41,8 @@ import com.lagradost.cloudstream3.desktop.ui.components.desktopDragScroll
 import com.lagradost.cloudstream3.desktop.ui.components.posterHoverEffect
 import com.lagradost.cloudstream3.desktop.ui.navigation.Config
 import com.lagradost.cloudstream3.desktop.ui.screens.details.contract.DetailsUiState
+import com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes
+import com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopProfileShapes
 import com.lagradost.cloudstream3.fixUrlNull
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -129,9 +131,7 @@ fun DetailsCastSection(
         val hPad = if (isCompact) 12.dp else horizontalPadding
         val cardWidth = if (isCompact) 110.dp else 140.dp
         val invertedMap = remember { androidx.compose.runtime.mutableStateMapOf<ActorData, Boolean>() }
-        val previewLimit = if (isCompact) 5 else 7
-        val topCast = remember(cast, previewLimit) { cast.take(previewLimit) }
-        val keyCrew = remember(directors, writers) { (directors + writers).distinctBy { it.actor.name }.take(3) }
+        val keyCrew = remember(directors, writers) { (directors + writers).distinctBy { it.actor.name } }
 
         if (cast.isNotEmpty() || directors.isNotEmpty() || writers.isNotEmpty()) {
             Column(
@@ -166,12 +166,13 @@ fun DetailsCastSection(
 
                         if (availableSeasons.size > 1 && onSeasonChange != null) {
                             var seasonMenuExpanded by remember { mutableStateOf(false) }
+                            val seasonChipShape = LocalDesktopButtonShapes.current.compact
                             Box {
                                 Surface(
-                                    shape = RoundedCornerShape(8.dp),
+                                    onClick = { seasonMenuExpanded = true },
+                                    shape = seasonChipShape,
                                     color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
                                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
-                                    modifier = Modifier.clickable { seasonMenuExpanded = true },
                                 ) {
                                     Row(
                                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
@@ -215,8 +216,8 @@ fun DetailsCastSection(
                             }
                         }
                     }
-                    if (actors.size > 8) {
-                        androidx.compose.material3.TextButton(
+                    if (actors.size > 8 || producers.isNotEmpty()) {
+                        com.lagradost.cloudstream3.desktop.ui.components.DesktopTextButton(
                             onClick = openFullCast,
                             contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
                         ) {
@@ -239,7 +240,7 @@ fun DetailsCastSection(
                 Spacer(modifier = Modifier.height(if (isCompact) 10.dp else 16.dp))
 
                 // Virtualized Horizontal Cast Row
-                if (topCast.isNotEmpty()) {
+                if (cast.isNotEmpty()) {
                     val castScrollState = rememberLazyListState()
                     LazyRow(
                         state = castScrollState,
@@ -247,7 +248,7 @@ fun DetailsCastSection(
                         contentPadding = PaddingValues(start = hPad, end = hPad, top = 8.dp, bottom = 12.dp),
                         modifier = Modifier.fillMaxWidth().desktopDragScroll(castScrollState),
                     ) {
-                        items(topCast, key = { it.actor.name + (it.roleString ?: "") }) { actor ->
+                        items(cast, key = { it.actor.name + (it.roleString ?: "") }) { actor ->
                             ActorCard(
                                 actor = actor,
                                 provider = provider,
@@ -256,16 +257,6 @@ fun DetailsCastSection(
                                 onClick = { onActorClick(actor) },
                                 modifier = Modifier.width(cardWidth),
                             )
-                        }
-
-                        if (cast.size > topCast.size || keyCrew.isNotEmpty() || producers.isNotEmpty()) {
-                            item(key = "view_all_card") {
-                                ViewAllCastCard(
-                                    totalCount = actors.size,
-                                    onClick = openFullCast,
-                                    modifier = Modifier.width(cardWidth),
-                                )
-                            }
                         }
                     }
                 }
@@ -316,78 +307,6 @@ fun DetailsCastSection(
 }
 
 @Composable
-private fun ViewAllCastCard(
-    totalCount: Int,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val interactionSource = remember { MutableInteractionSource() }
-    val isHovered by interactionSource.collectIsHoveredAsState()
-
-    Column(
-        modifier = modifier
-            .hoverable(interactionSource)
-            .clickable(interactionSource = interactionSource, indication = null) { onClick() },
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .aspectRatio(2f / 3f)
-                .clip(RoundedCornerShape(14.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (isHovered) 0.65f else 0.35f))
-                .border(
-                    width = if (isHovered) 2.dp else 1.dp,
-                    color = if (isHovered) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
-                    shape = RoundedCornerShape(14.dp),
-                ),
-            contentAlignment = Alignment.Center,
-        ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
-                modifier = Modifier.padding(12.dp),
-            ) {
-                Surface(
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.primary.copy(alpha = if (isHovered) 0.25f else 0.15f),
-                    modifier = Modifier.size(44.dp),
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowForward,
-                            contentDescription = "View All",
-                            tint = Color.White,
-                            modifier = Modifier.size(20.dp),
-                        )
-                    }
-                }
-                Spacer(Modifier.height(10.dp))
-                Text(
-                    text = "View All",
-                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
-                    color = Color.White,
-                )
-                Text(
-                    text = "Cast & Crew",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-        Spacer(Modifier.height(6.dp))
-        Text(
-            text = "Full Roster",
-            style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.5.sp),
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
-            maxLines = 1,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth(),
-        )
-    }
-}
-
-@Composable
 private fun CompactActorCard(
     actor: ActorData,
     provider: MainAPI,
@@ -412,6 +331,8 @@ private fun CompactActorCard(
         else -> actor.roleString ?: actor.role?.name
     }
 
+    val profileShapes = LocalDesktopProfileShapes.current
+
     Column(
         modifier = Modifier
             .width(76.dp)
@@ -421,9 +342,9 @@ private fun CompactActorCard(
         Box(
             modifier = Modifier
                 .size(56.dp)
-                .clip(CircleShape)
+                .clip(profileShapes.compact)
                 .background(MaterialTheme.colorScheme.surfaceVariant)
-                .border(1.dp, Color.White.copy(alpha = 0.15f), CircleShape),
+                .border(1.dp, Color.White.copy(alpha = 0.15f), profileShapes.compact),
             contentAlignment = Alignment.Center,
         ) {
             if (actorImg != null) {
@@ -435,6 +356,7 @@ private fun CompactActorCard(
                         .build(),
                     contentDescription = actorName,
                     contentScale = ContentScale.Crop,
+                    alignment = profileShapes.portraitAlignment,
                     filterQuality = androidx.compose.ui.graphics.FilterQuality.Medium,
                     modifier = Modifier.fillMaxSize(),
                 )
@@ -539,7 +461,7 @@ private fun ActorCard(
 
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
-    val cardShape = RoundedCornerShape(14.dp)
+    val profileShapes = LocalDesktopProfileShapes.current
 
     Column(
         modifier = modifier
@@ -549,75 +471,87 @@ private fun ActorCard(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .aspectRatio(2f / 3f)
-                .posterHoverEffect(cardShape)
-                .clip(cardShape)
-                .background(MaterialTheme.colorScheme.surfaceVariant),
+                .aspectRatio(profileShapes.portraitAspectRatio),
         ) {
-            val actorImg = provider.fixUrlNull(mainImgRaw)
-            if (actorImg != null) {
-                AsyncImage(
-                    model = coil3.request.ImageRequest.Builder(coil3.compose.LocalPlatformContext.current)
-                        .data(actorImg)
-                        .size(400, 600)
-                        .crossfade(true)
-                        .build(),
-                    contentDescription = mainName,
-                    contentScale = ContentScale.Crop,
-                    filterQuality = androidx.compose.ui.graphics.FilterQuality.Medium,
-                    modifier = Modifier.fillMaxSize(),
-                )
-            } else {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        Icons.Default.Person,
-                        contentDescription = mainName,
-                        modifier = Modifier.size(54.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                    )
-                }
-            }
-
-            // Bottom gradient scrim
             Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .height(60.dp)
-                    .align(Alignment.BottomCenter)
-                    .background(
-                        Brush.verticalGradient(
-                            listOf(Color.Transparent, Color.Black.copy(alpha = 0.65f)),
-                        ),
-                    ),
-            )
+                    .fillMaxSize()
+                    .posterHoverEffect(profileShapes.card)
+                    .clip(profileShapes.card)
+                    .background(MaterialTheme.colorScheme.surfaceVariant),
+            ) {
+                val actorImg = provider.fixUrlNull(mainImgRaw)
+                if (actorImg != null) {
+                    AsyncImage(
+                        model = coil3.request.ImageRequest.Builder(coil3.compose.LocalPlatformContext.current)
+                            .data(actorImg)
+                            .size(if (profileShapes.isCircular) 480 else 400, if (profileShapes.isCircular) 480 else 600)
+                            .crossfade(true)
+                            .build(),
+                        contentDescription = mainName,
+                        contentScale = ContentScale.Crop,
+                        alignment = profileShapes.portraitAlignment,
+                        filterQuality = androidx.compose.ui.graphics.FilterQuality.Medium,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            Icons.Default.Person,
+                            contentDescription = mainName,
+                            modifier = Modifier.size(54.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                        )
+                    }
+                }
 
-            // Top-left Role Badge
-            if (!roleStr.isNullOrBlank()) {
+                // Bottom gradient scrim
                 Box(
                     modifier = Modifier
-                        .padding(8.dp)
-                        .align(Alignment.TopStart)
-                        .background(Color.Black.copy(alpha = 0.68f), RoundedCornerShape(6.dp))
-                        .border(0.5.dp, Color.White.copy(alpha = 0.18f), RoundedCornerShape(6.dp))
-                        .padding(horizontal = 7.dp, vertical = 3.dp),
-                ) {
-                    Text(
-                        text = roleStr,
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 0.5.sp,
+                        .fillMaxWidth()
+                        .height(60.dp)
+                        .align(Alignment.BottomCenter)
+                        .background(
+                            Brush.verticalGradient(
+                                listOf(Color.Transparent, Color.Black.copy(alpha = 0.65f)),
+                            ),
                         ),
-                        color = when (roleStr) {
-                            "MAIN" -> MaterialTheme.colorScheme.primary
-                            "SUPPORTING" -> Color(0xFF4DD0E1)
-                            "DIRECTOR", "CREATOR" -> Color(0xFFFFB74D)
-                            else -> MaterialTheme.colorScheme.primary
-                        },
-                    )
+                )
+
+                // Role badge moves to bottom-center inside circular crops so arc clipping never slices corners.
+                if (!roleStr.isNullOrBlank()) {
+                    val roleBadgeShape = if (profileShapes.isCircular) CircleShape else RoundedCornerShape(6.dp)
+                    Box(
+                        modifier = Modifier
+                            .then(
+                                if (profileShapes.isCircular) {
+                                    Modifier.padding(bottom = 8.dp).align(Alignment.BottomCenter)
+                                } else {
+                                    Modifier.padding(8.dp).align(Alignment.TopStart)
+                                },
+                            )
+                            .background(Color.Black.copy(alpha = 0.68f), roleBadgeShape)
+                            .border(0.5.dp, Color.White.copy(alpha = 0.18f), roleBadgeShape)
+                            .padding(horizontal = 7.dp, vertical = 3.dp),
+                    ) {
+                        Text(
+                            text = roleStr,
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 0.5.sp,
+                            ),
+                            color = when (roleStr) {
+                                "MAIN" -> MaterialTheme.colorScheme.primary
+                                "SUPPORTING" -> Color(0xFF4DD0E1)
+                                "DIRECTOR", "CREATOR" -> Color(0xFFFFB74D)
+                                else -> MaterialTheme.colorScheme.primary
+                            },
+                        )
+                    }
                 }
             }
 
@@ -626,13 +560,16 @@ private fun ActorCard(
             if (voiceActorImg != null) {
                 Box(
                     modifier = Modifier
-                        .size(44.dp)
+                        .size(if (profileShapes.isCircular) 40.dp else 44.dp)
                         .align(Alignment.BottomEnd)
-                        .offset(x = (-6).dp, y = (-6).dp)
-                        .shadow(8.dp, CircleShape)
-                        .background(MaterialTheme.colorScheme.surface, CircleShape)
+                        .offset(
+                            x = if (profileShapes.isCircular) 0.dp else (-6).dp,
+                            y = if (profileShapes.isCircular) 0.dp else (-6).dp,
+                        )
+                        .shadow(8.dp, profileShapes.badge)
+                        .background(MaterialTheme.colorScheme.surface, profileShapes.badge)
                         .padding(2.5.dp)
-                        .clip(CircleShape)
+                        .clip(profileShapes.badge)
                         .background(MaterialTheme.colorScheme.surfaceVariant)
                         .clickable { onInvertToggle() },
                 ) {
@@ -644,14 +581,17 @@ private fun ActorCard(
                             .build(),
                         contentDescription = subName,
                         contentScale = ContentScale.Crop,
+                        alignment = profileShapes.portraitAlignment,
                         filterQuality = androidx.compose.ui.graphics.FilterQuality.Medium,
-                        modifier = Modifier.fillMaxSize().clip(CircleShape),
+                        modifier = Modifier.fillMaxSize().clip(profileShapes.badge),
                     )
                 }
             }
         }
 
         Spacer(modifier = Modifier.height(10.dp))
+
+        val labelAlignment = if (profileShapes.isCircular) TextAlign.Center else TextAlign.Start
 
         // Main Title (Character Name or Live Action Actor Name)
         Text(
@@ -662,6 +602,7 @@ private fun ActorCard(
             ),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
+            textAlign = labelAlignment,
             color = if (isHovered) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.fillMaxWidth(),
         )
@@ -677,6 +618,7 @@ private fun ActorCard(
                 ),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
+                textAlign = labelAlignment,
                 modifier = Modifier.fillMaxWidth(),
             )
         }

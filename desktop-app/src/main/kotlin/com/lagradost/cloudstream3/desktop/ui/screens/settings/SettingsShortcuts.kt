@@ -16,6 +16,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton
 
 data class ShortcutEntry(
     val keys: List<String>,
@@ -172,7 +173,7 @@ fun SettingsShortcutsScreen() {
             },
             trailingIcon = {
                 if (searchQuery.isNotBlank()) {
-                    IconButton(onClick = { searchQuery = "" }) {
+                    DesktopIconButton(onClick = { searchQuery = "" }) {
                         Icon(Icons.Default.Clear, contentDescription = "Clear search", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }

@@ -105,7 +105,7 @@ fun ReleaseHistoryDialog(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    IconButton(
+                    DesktopIconButton(
                         onClick = {
                             scope.launch {
                                 UnifiedUpdateManager.fetchReleaseHistory(force = true)
@@ -119,7 +119,7 @@ fun ReleaseHistoryDialog(
                         )
                     }
 
-                    IconButton(onClick = onDismissRequest) {
+                    DesktopIconButton(onClick = onDismissRequest) {
                         Icon(
                             imageVector = Icons.Default.Close,
                             contentDescription = "Close",
@@ -164,7 +164,7 @@ fun ReleaseHistoryDialog(
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
-                        FilledTonalButton(
+                        DesktopFilledTonalButton(
                             onClick = {
                                 scope.launch {
                                     UnifiedUpdateManager.fetchReleaseHistory(force = true)
@@ -288,7 +288,7 @@ fun ReleaseHistoryDialog(
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                                     ) {
-                                        IconButton(
+                                        DesktopIconButton(
                                             onClick = {
                                                 try {
                                                     Desktop.getDesktop().browse(URI(release.html_url))
@@ -307,7 +307,7 @@ fun ReleaseHistoryDialog(
 
                                         when {
                                             isCurrent -> {
-                                                FilledTonalButton(
+                                                DesktopFilledTonalButton(
                                                     onClick = {},
                                                     enabled = false,
                                                     contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
@@ -318,7 +318,7 @@ fun ReleaseHistoryDialog(
                                                 }
                                             }
                                             isNewer -> {
-                                                Button(
+                                                DesktopButton(
                                                     onClick = {
                                                         UnifiedUpdateManager.installRelease(release)
                                                         onDismissRequest()
@@ -331,7 +331,7 @@ fun ReleaseHistoryDialog(
                                                 }
                                             }
                                             isOlder -> {
-                                                OutlinedButton(
+                                                DesktopOutlinedButton(
                                                     onClick = {
                                                         pendingRollbackRelease = release
                                                     },
@@ -420,7 +420,7 @@ fun ReleaseHistoryDialog(
                 )
             },
             confirmButton = {
-                Button(
+                DesktopButton(
                     onClick = {
                         UnifiedUpdateManager.installRelease(targetRelease)
                         pendingRollbackRelease = null
@@ -432,7 +432,7 @@ fun ReleaseHistoryDialog(
                 }
             },
             dismissButton = {
-                OutlinedButton(onClick = { pendingRollbackRelease = null }) {
+                DesktopOutlinedButton(onClick = { pendingRollbackRelease = null }) {
                     Text("Cancel")
                 }
             },

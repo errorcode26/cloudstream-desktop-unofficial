@@ -25,6 +25,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lagradost.cloudstream3.desktop.init.PluginWarmupState
+import com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes
 import com.lagradost.cloudstream3.desktop.updates.PendingUpdate
 import com.lagradost.cloudstream3.desktop.updates.UnifiedUpdateManager
 import kotlinx.coroutines.Dispatchers
@@ -82,11 +83,13 @@ fun TopBarNotificationCenter() {
         },
     )
 
+    val buttonShape = LocalDesktopButtonShapes.current.icon
+
     Box {
         Surface(
             modifier = Modifier
                 .size(42.dp)
-                .clip(RoundedCornerShape(10.dp))
+                .clip(buttonShape)
                 .clickable(
                     interactionSource = interactionSource,
                     indication = null,
@@ -95,10 +98,10 @@ fun TopBarNotificationCenter() {
                 .border(
                     1.dp,
                     if (isHovered) hoverBorder else buttonBorder,
-                    RoundedCornerShape(10.dp),
+                    buttonShape,
                 ),
             color = buttonBg,
-            shape = RoundedCornerShape(10.dp),
+            shape = buttonShape,
         ) {
             Box(
                 modifier = Modifier.fillMaxSize(),
@@ -454,9 +457,9 @@ private fun UpdateNoticeCard(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                FilledTonalButton(
+                DesktopFilledTonalButton(
                     onClick = onUpdateClick,
-                    shape = RoundedCornerShape(6.dp),
+                    shape = LocalDesktopButtonShapes.current.compact,
                     contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
                     modifier = Modifier.height(28.dp),
                     colors = ButtonDefaults.filledTonalButtonColors(
@@ -467,7 +470,7 @@ private fun UpdateNoticeCard(
                     Text("Update", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 }
 
-                IconButton(
+                DesktopIconButton(
                     onClick = onSkipClick,
                     modifier = Modifier.size(26.dp),
                 ) {
@@ -538,7 +541,7 @@ private fun HistoryNotificationCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
                 )
             }
-            IconButton(
+            DesktopIconButton(
                 onClick = onDismiss,
                 modifier = Modifier.size(20.dp),
             ) {

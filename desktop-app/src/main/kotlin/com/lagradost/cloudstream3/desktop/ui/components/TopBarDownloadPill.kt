@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lagradost.cloudstream3.desktop.download.AppDownloadManager
 import com.lagradost.cloudstream3.desktop.download.TaskStatus
+import com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes
 @Composable
 fun TopBarDownloadPill() {
     val tasks by AppDownloadManager.tasks.collectAsState()
@@ -50,6 +51,8 @@ fun TopBarDownloadPill() {
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
 
+    val pillShape = LocalDesktopButtonShapes.current.medium
+
     AnimatedVisibility(
         visible = true,
         enter = fadeIn() + slideInVertically { -it },
@@ -58,7 +61,7 @@ fun TopBarDownloadPill() {
         Surface(
             modifier = Modifier
                 .height(42.dp)
-                .clip(RoundedCornerShape(10.dp))
+                .clip(pillShape)
                 .clickable(
                     interactionSource = interactionSource,
                     indication = null,
@@ -67,10 +70,10 @@ fun TopBarDownloadPill() {
                 .border(
                     1.dp,
                     if (isHovered) buttonBorder.copy(alpha = 0.8f) else buttonBorder,
-                    RoundedCornerShape(10.dp),
+                    pillShape,
                 ),
             color = buttonBg,
-            shape = RoundedCornerShape(10.dp),
+            shape = pillShape,
         ) {
             Row(
                 modifier = Modifier
@@ -247,7 +250,7 @@ fun TopBarDownloadPill() {
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     if (activeTask.status == TaskStatus.RUNNING) {
-                        TextButton(
+                        DesktopTextButton(
                             onClick = {
                                 AppDownloadManager.cancelDownload(activeTask.id)
                                 showDetailsDialog = false
@@ -257,11 +260,11 @@ fun TopBarDownloadPill() {
                             Text("Cancel Download")
                         }
                         Spacer(modifier = Modifier.width(8.dp))
-                        Button(onClick = { showDetailsDialog = false }) {
+                        DesktopButton(onClick = { showDetailsDialog = false }) {
                             Text("Hide to Background")
                         }
                     } else {
-                        Button(
+                        DesktopButton(
                             onClick = {
                                 AppDownloadManager.dismissTask(activeTask.id)
                                 showDetailsDialog = false

@@ -81,7 +81,7 @@ fun LinksDialogHost(
         title = { Text("Player error") },
         text = { Text(playerLaunchError ?: "") },
         confirmButton = {
-            TextButton(onClick = onDismissPlayerLaunchError) { Text("OK") }
+            com.lagradost.cloudstream3.desktop.ui.components.DesktopTextButton(onClick = onDismissPlayerLaunchError) { Text("OK") }
         },
     )
 }

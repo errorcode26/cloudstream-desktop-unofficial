@@ -17,6 +17,8 @@ import androidx.compose.ui.unit.dp
 import com.lagradost.cloudstream3.desktop.downloader.DesktopDownloadManager
 import com.lagradost.cloudstream3.desktop.player.PlayerConfig
 import com.lagradost.cloudstream3.desktop.ui.components.AppToastManager
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopOutlinedButton
 import com.lagradost.cloudstream3.desktop.ui.screens.settings.contract.SettingsUiEvent
 import com.lagradost.cloudstream3.desktop.utils.NativeFileDialog
 import com.lagradost.common.logging.AppLogger
@@ -85,7 +87,7 @@ fun SettingsPlayerDownloadsScreen(viewModel: SettingsViewModel) {
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Button(
+                    DesktopButton(
                         onClick = {
                             scope.launch(Dispatchers.IO) {
                                 val selected = NativeFileDialog.chooseDirectory(
@@ -98,14 +100,13 @@ fun SettingsPlayerDownloadsScreen(viewModel: SettingsViewModel) {
                                 }
                             }
                         },
-                        shape = RoundedCornerShape(8.dp),
                     ) {
                         Icon(Icons.Default.FolderOpen, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(6.dp))
                         Text("Change Folder...")
                     }
 
-                    OutlinedButton(
+                    DesktopOutlinedButton(
                         onClick = {
                             scope.launch(Dispatchers.IO) {
                                 try {
@@ -116,7 +117,6 @@ fun SettingsPlayerDownloadsScreen(viewModel: SettingsViewModel) {
                                 }
                             }
                         },
-                        shape = RoundedCornerShape(8.dp),
                     ) {
                         Text("Open in Explorer")
                     }
@@ -191,7 +191,7 @@ fun SettingsPlayerDownloadsScreen(viewModel: SettingsViewModel) {
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Button(
+                    DesktopButton(
                         onClick = {
                             scope.launch(Dispatchers.IO) {
                                 val selected = NativeFileDialog.chooseDirectory(
@@ -204,14 +204,13 @@ fun SettingsPlayerDownloadsScreen(viewModel: SettingsViewModel) {
                                 }
                             }
                         },
-                        shape = RoundedCornerShape(8.dp),
                     ) {
                         Icon(Icons.Default.FolderOpen, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(6.dp))
                         Text("Change Folder...")
                     }
 
-                    OutlinedButton(
+                    DesktopOutlinedButton(
                         onClick = {
                             scope.launch(Dispatchers.IO) {
                                 try {
@@ -222,7 +221,6 @@ fun SettingsPlayerDownloadsScreen(viewModel: SettingsViewModel) {
                                 }
                             }
                         },
-                        shape = RoundedCornerShape(8.dp),
                     ) {
                         Text("Open in Explorer")
                     }

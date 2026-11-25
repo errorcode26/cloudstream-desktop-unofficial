@@ -23,6 +23,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lagradost.cloudstream3.desktop.ui.components.AppDropdownMenu
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopFilledTonalButton
 import com.lagradost.cloudstream3.desktop.ui.components.LocalDesktopTheme
 import com.lagradost.cloudstream3.desktop.ui.screens.settings.contract.SettingsUiEvent
 import com.lagradost.cloudstream3.desktop.ui.screens.settings.contract.SettingsUiState
@@ -201,7 +202,7 @@ fun <T> SettingsDropdownItem(
         }
 
         Box {
-            FilledTonalButton(
+            DesktopFilledTonalButton(
                 onClick = { expanded = true },
                 enabled = enabled,
             ) {
@@ -313,6 +314,7 @@ fun SettingsChipGroupItem(
                     selected = selectedValue == id,
                     onClick = { onSelectionChanged(id) },
                     label = { Text(title) },
+                    shape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact,
                     colors = FilterChipDefaults.filterChipColors(
                         selectedContainerColor = MaterialTheme.colorScheme.primary,
                         selectedLabelColor = Color.White,

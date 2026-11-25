@@ -144,7 +144,7 @@ fun DetailsSidebarStats(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 if (screenshots.isNotEmpty()) {
-                    IconButton(
+                    com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton(
                         onClick = {
                             appScope.launch(Dispatchers.IO) {
                                 AppearanceConfig.setScreensaverEnabled(!screensaverEnabled)
@@ -161,7 +161,7 @@ fun DetailsSidebarStats(
                     }
                 }
 
-                IconButton(
+                com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton(
                     onClick = onTogglePin,
                     modifier = Modifier.size(36.dp),
                 ) {

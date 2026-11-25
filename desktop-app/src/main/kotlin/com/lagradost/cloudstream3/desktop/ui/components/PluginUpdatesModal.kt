@@ -148,14 +148,13 @@ fun PluginUpdatesModal(
 
                 // Header Action Buttons
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    FilledTonalButton(
+                    DesktopFilledTonalButton(
                         onClick = {
                             if (!isCheckingUpdates) {
                                 onCheckForUpdates()
                             }
                         },
                         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                        shape = RoundedCornerShape(12.dp),
                         enabled = !isCheckingUpdates,
                     ) {
                         if (isCheckingUpdates) {
@@ -178,10 +177,9 @@ fun PluginUpdatesModal(
                     }
 
                     if (hasUnreadUpdates) {
-                        OutlinedButton(
+                        DesktopOutlinedButton(
                             onClick = { onMarkUpdatesRead() },
                             contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
-                            shape = RoundedCornerShape(12.dp),
                         ) {
                             Icon(
                                 Icons.Default.DoneAll,
@@ -193,7 +191,7 @@ fun PluginUpdatesModal(
                         }
                     }
 
-                    IconButton(
+                    DesktopIconButton(
                         onClick = onDismissRequest,
                         modifier = Modifier.size(36.dp),
                     ) {
@@ -250,7 +248,7 @@ fun PluginUpdatesModal(
                                 )
                             }
                             if (searchQuery.isNotEmpty()) {
-                                IconButton(onClick = { searchQuery = "" }, modifier = Modifier.size(24.dp)) {
+                                DesktopIconButton(onClick = { searchQuery = "" }, modifier = Modifier.size(24.dp)) {
                                     Icon(Icons.Default.Clear, contentDescription = "Clear", modifier = Modifier.size(16.dp))
                                 }
                             }

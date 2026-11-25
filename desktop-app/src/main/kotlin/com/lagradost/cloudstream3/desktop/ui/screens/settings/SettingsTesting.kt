@@ -21,6 +21,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lagradost.cloudstream3.APIHolder
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopOutlinedButton
 import com.lagradost.cloudstream3.desktop.ui.screens.settings.contract.ProviderTestFilter
 import com.lagradost.cloudstream3.desktop.ui.screens.settings.contract.SettingsUiEvent
 import com.lagradost.cloudstream3.utils.TestingUtils
@@ -78,7 +81,7 @@ fun SettingsTesting(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Button(
+            DesktopButton(
                 onClick = {
                     if (!testState.isRunning) {
                         viewModel.onEvent(SettingsUiEvent.StartProviderTests)
@@ -102,7 +105,7 @@ fun SettingsTesting(
 
             // Cancel button — only visible while batch running
             if (testState.isRunning) {
-                OutlinedButton(
+                DesktopOutlinedButton(
                     onClick = { viewModel.onEvent(SettingsUiEvent.CancelProviderTests) },
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
                     border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.6f)),
@@ -127,15 +130,18 @@ fun SettingsTesting(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             val currentFilter = testState.filter
+            val chipShape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact
             FilterChip(
                 selected = currentFilter == ProviderTestFilter.ALL,
                 onClick = { viewModel.onEvent(SettingsUiEvent.SetProviderTestFilter(ProviderTestFilter.ALL)) },
                 label = { Text("All (${allProviders.size})") },
+                shape = chipShape,
             )
             FilterChip(
                 selected = currentFilter == ProviderTestFilter.PASSED,
                 onClick = { viewModel.onEvent(SettingsUiEvent.SetProviderTestFilter(ProviderTestFilter.PASSED)) },
                 label = { Text("Passed (${testState.passed})") },
+                shape = chipShape,
                 colors = FilterChipDefaults.filterChipColors(
                     selectedContainerColor = Color(0xFF4CAF50).copy(alpha = 0.2f),
                     selectedLabelColor = Color(0xFF4CAF50),
@@ -145,6 +151,7 @@ fun SettingsTesting(
                 selected = currentFilter == ProviderTestFilter.FAILED,
                 onClick = { viewModel.onEvent(SettingsUiEvent.SetProviderTestFilter(ProviderTestFilter.FAILED)) },
                 label = { Text("Failed (${testState.failed})") },
+                shape = chipShape,
                 colors = FilterChipDefaults.filterChipColors(
                     selectedContainerColor = Color(0xFFF44336).copy(alpha = 0.2f),
                     selectedLabelColor = Color(0xFFF44336),
@@ -226,7 +233,7 @@ fun SettingsTesting(
                                         Text("Not Tested", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
 
-                                IconButton(
+                                DesktopIconButton(
                                     onClick = { viewModel.onEvent(SettingsUiEvent.StartSingleProviderTest(api.name)) },
                                     enabled = !isThisProviderTesting && !testState.isRunning,
                                     modifier = Modifier.size(32.dp),

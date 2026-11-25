@@ -142,7 +142,7 @@ fun FullCastDialog(
                     },
                     trailingIcon = {
                         if (searchQuery.isNotEmpty()) {
-                            IconButton(onClick = { searchQuery = "" }, modifier = Modifier.size(24.dp)) {
+                            com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton(onClick = { searchQuery = "" }, modifier = Modifier.size(24.dp)) {
                                 Icon(Icons.Default.Clear, contentDescription = "Clear", modifier = Modifier.size(14.dp))
                             }
                         }
@@ -160,7 +160,7 @@ fun FullCastDialog(
 
                 Spacer(Modifier.width(12.dp))
 
-                IconButton(
+                com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton(
                     onClick = onDismissRequest,
                     modifier = Modifier.size(36.dp),
                 ) {
@@ -184,12 +184,13 @@ fun FullCastDialog(
                     CastFilterCategory.PRODUCERS to producers.size,
                 )
 
+                val categoryChipShape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact
                 categories.forEach { (cat, count) ->
                     if (count > 0 || cat == CastFilterCategory.ALL) {
                         val isSelected = selectedCategory == cat
                         Surface(
                             onClick = { selectedCategory = cat },
-                            shape = RoundedCornerShape(20.dp),
+                            shape = categoryChipShape,
                             color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
                             border = BorderStroke(
                                 width = 1.dp,
@@ -302,6 +303,8 @@ private fun FullCastGridCard(
     val mainImg = provider.fixUrlNull(mainImgRaw)
     val cornerImg = provider.fixUrlNull(cornerImgRaw)
 
+    val profileShapes = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopProfileShapes.current
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -312,34 +315,40 @@ private fun FullCastGridCard(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .aspectRatio(0.72f)
-                .clip(RoundedCornerShape(14.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant)
-                .border(
-                    width = if (isHovered) 2.dp else 1.dp,
-                    color = if (isHovered) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
-                    shape = RoundedCornerShape(14.dp),
-                ),
-            contentAlignment = Alignment.Center,
+                .aspectRatio(profileShapes.portraitAspectRatio),
         ) {
-            if (mainImg != null) {
-                AsyncImage(
-                    model = coil3.request.ImageRequest.Builder(coil3.compose.LocalPlatformContext.current)
-                        .data(mainImg)
-                        .size(300, 420)
-                        .crossfade(true)
-                        .build(),
-                    contentDescription = mainName,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize(),
-                )
-            } else {
-                Icon(
-                    Icons.Default.Person,
-                    contentDescription = mainName,
-                    modifier = Modifier.size(48.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-                )
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(profileShapes.card)
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .border(
+                        width = if (isHovered) 2.dp else 1.dp,
+                        color = if (isHovered) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                        shape = profileShapes.card,
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (mainImg != null) {
+                    AsyncImage(
+                        model = coil3.request.ImageRequest.Builder(coil3.compose.LocalPlatformContext.current)
+                            .data(mainImg)
+                            .size(if (profileShapes.isCircular) 360 else 300, if (profileShapes.isCircular) 360 else 420)
+                            .crossfade(true)
+                            .build(),
+                        contentDescription = mainName,
+                        contentScale = ContentScale.Crop,
+                        alignment = profileShapes.portraitAlignment,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                } else {
+                    Icon(
+                        Icons.Default.Person,
+                        contentDescription = mainName,
+                        modifier = Modifier.size(48.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                    )
+                }
             }
 
             // Anime character flip button
@@ -347,11 +356,11 @@ private fun FullCastGridCard(
                 Box(
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
-                        .padding(6.dp)
+                        .padding(if (profileShapes.isCircular) 2.dp else 6.dp)
                         .size(36.dp)
-                        .clip(CircleShape)
+                        .clip(profileShapes.badge)
                         .background(MaterialTheme.colorScheme.surface)
-                        .border(1.5.dp, MaterialTheme.colorScheme.primary, CircleShape)
+                        .border(1.5.dp, MaterialTheme.colorScheme.primary, profileShapes.badge)
                         .clickable { onInvertToggle() },
                     contentAlignment = Alignment.Center,
                 ) {
@@ -363,7 +372,8 @@ private fun FullCastGridCard(
                             .build(),
                         contentDescription = "Switch image",
                         contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize().clip(CircleShape),
+                        alignment = profileShapes.portraitAlignment,
+                        modifier = Modifier.fillMaxSize().clip(profileShapes.badge),
                     )
                 }
             }

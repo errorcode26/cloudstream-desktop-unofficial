@@ -17,6 +17,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.request.crossfade
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopOutlinedButton
 import com.lagradost.cloudstream3.desktop.ui.screens.settings.SettingsGroupCard
 import com.lagradost.cloudstream3.desktop.ui.screens.settings.SettingsSliderItem
 import com.lagradost.cloudstream3.desktop.ui.screens.settings.SettingsToggleItem
@@ -121,7 +123,7 @@ fun SettingsWallpaperAmbienceScreen() {
                                 leadingIcon = if (isSelected) {
                                     { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(14.dp)) }
                                 } else null,
-                                shape = RoundedCornerShape(8.dp),
+                                shape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact,
                             )
                         }
                     }
@@ -149,9 +151,9 @@ fun SettingsWallpaperAmbienceScreen() {
                         )
                     }
                     if (bgImagePath.isNotBlank()) {
-                        OutlinedButton(
+                        DesktopOutlinedButton(
                             onClick = { AppearanceConfig.clearBackgroundImage() },
-                            shape = RoundedCornerShape(8.dp),
+                            shape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact,
                             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
                         ) {
                             Icon(Icons.Default.Clear, contentDescription = null, modifier = Modifier.size(14.dp))
@@ -212,7 +214,7 @@ fun SettingsWallpaperAmbienceScreen() {
                                         overflow = TextOverflow.Ellipsis,
                                     )
                                 }
-                                Button(
+                                DesktopButton(
                                     onClick = {
                                         val chosen = com.lagradost.cloudstream3.desktop.utils.NativeFileDialog.open(
                                             title = "Choose Wallpaper Image",
@@ -221,7 +223,6 @@ fun SettingsWallpaperAmbienceScreen() {
                                         )
                                         if (chosen != null) AppearanceConfig.setBackgroundImagePath(chosen.absolutePath)
                                     },
-                                    shape = RoundedCornerShape(8.dp),
                                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                                 ) {
                                     Text("Change Image")
@@ -257,7 +258,7 @@ fun SettingsWallpaperAmbienceScreen() {
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
-                            Button(
+                            DesktopButton(
                                 onClick = {
                                     val chosen = com.lagradost.cloudstream3.desktop.utils.NativeFileDialog.open(
                                         title = "Choose Wallpaper Image",
@@ -266,7 +267,6 @@ fun SettingsWallpaperAmbienceScreen() {
                                     )
                                     if (chosen != null) AppearanceConfig.setBackgroundImagePath(chosen.absolutePath)
                                 },
-                                shape = RoundedCornerShape(10.dp),
                                 modifier = Modifier.padding(top = 4.dp),
                             ) {
                                 Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))

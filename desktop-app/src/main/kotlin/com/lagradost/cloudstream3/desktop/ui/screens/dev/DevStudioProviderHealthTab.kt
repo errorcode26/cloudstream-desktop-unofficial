@@ -13,6 +13,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopButton
 import com.lagradost.runtime.executor.PluginHealthStats
 import com.lagradost.runtime.executor.PluginHealthStatus
 
@@ -39,10 +40,10 @@ internal fun ProviderHealthTabContent(
             Text("Plugin & Provider Circuit Breakers", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
 
             if (state.pluginHealth.isNotEmpty()) {
-                Button(
+                DesktopButton(
                     onClick = { onEvent(DevStudioUiEvent.ResetAllCircuits) },
                     colors = ButtonDefaults.buttonColors(containerColor = DevAccentCyan.copy(alpha = 0.2f)),
-                    shape = RoundedCornerShape(6.dp),
+                    shape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact,
                     modifier = Modifier.height(30.dp),
                 ) {
                     Text("Reset All Circuits", fontSize = 11.sp, color = DevAccentCyan, fontWeight = FontWeight.Bold)
@@ -134,10 +135,10 @@ private fun ProviderHealthDetailCard(
             }
 
             if (health.status == PluginHealthStatus.TRIPPED_AUTO_DISABLED || health.status == PluginHealthStatus.DEGRADED) {
-                Button(
+                DesktopButton(
                     onClick = onReset,
                     colors = ButtonDefaults.buttonColors(containerColor = DevAccentCyan.copy(alpha = 0.25f)),
-                    shape = RoundedCornerShape(6.dp),
+                    shape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact,
                     modifier = Modifier.height(30.dp),
                 ) {
                     Text("Reset Circuit", fontSize = 11.sp, color = DevAccentCyan, fontWeight = FontWeight.Bold)

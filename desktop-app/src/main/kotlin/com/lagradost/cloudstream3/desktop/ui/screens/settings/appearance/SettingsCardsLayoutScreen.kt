@@ -39,6 +39,7 @@ import com.lagradost.cloudstream3.Score
 import com.lagradost.cloudstream3.SearchQuality
 import com.lagradost.cloudstream3.TvType
 import com.lagradost.cloudstream3.desktop.ui.badges.CardMetadataConfig
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopTextButton
 import com.lagradost.cloudstream3.desktop.ui.components.PosterCard
 import com.lagradost.cloudstream3.desktop.ui.screens.details.contract.DetailsSectionKey
 import com.lagradost.cloudstream3.desktop.ui.screens.settings.SettingsDropdownItem
@@ -479,7 +480,7 @@ fun SettingsCardsLayoutScreen() {
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                TextButton(
+                DesktopTextButton(
                     onClick = { AppearanceConfig.resetDetailsSectionOrder() },
                 ) {
                     Icon(

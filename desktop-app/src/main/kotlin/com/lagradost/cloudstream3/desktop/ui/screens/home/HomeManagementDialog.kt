@@ -128,9 +128,9 @@ fun HomeManagementDialog(
                     val p = activeCatalogProvider
                     val hasCustomOrder = orderedCatalogs[p.name]?.isNotEmpty() == true
                     if (hasCustomOrder) {
-                        OutlinedButton(
+                        com.lagradost.cloudstream3.desktop.ui.components.DesktopOutlinedButton(
                             onClick = { onResetCatalogOrder(p.name) },
-                            shape = RoundedCornerShape(8.dp),
+                            shape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact,
                         ) {
                             Icon(Icons.Default.RestartAlt, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(6.dp))
@@ -231,12 +231,12 @@ fun HomeManagementDialog(
             // BOTTOM ACTION BAR
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                 if (activeCatalogProvider != null) {
-                    OutlinedButton(onClick = { catalogProvider = null }) {
+                    com.lagradost.cloudstream3.desktop.ui.components.DesktopOutlinedButton(onClick = { catalogProvider = null }) {
                         Text("Back")
                     }
                     Spacer(modifier = Modifier.width(12.dp))
                 }
-                Button(onClick = {
+                com.lagradost.cloudstream3.desktop.ui.components.DesktopButton(onClick = {
                     if (!isAdvancedMode && activeProviders.size > 1) {
                         val topProvider = activeProviders.firstOrNull() ?: allProviders.firstOrNull()?.name
                         if (topProvider != null) {
@@ -296,7 +296,7 @@ fun HomeManagementDialog(
             )
         },
         confirmButton = {
-            TextButton(
+            com.lagradost.cloudstream3.desktop.ui.components.DesktopTextButton(
                 onClick = {
                     showHybridTorrentDialog = false
                     val key = pendingTorrentProviderKey
@@ -321,7 +321,7 @@ fun HomeManagementDialog(
         },
         dismissButton = {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TextButton(
+                com.lagradost.cloudstream3.desktop.ui.components.DesktopTextButton(
                     onClick = {
                         showHybridTorrentDialog = false
                         pendingTorrentProviderKey = null
@@ -330,7 +330,7 @@ fun HomeManagementDialog(
                 ) {
                     Text("Cancel")
                 }
-                TextButton(
+                com.lagradost.cloudstream3.desktop.ui.components.DesktopTextButton(
                     onClick = {
                         showHybridTorrentDialog = false
                         val key = pendingTorrentProviderKey

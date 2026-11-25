@@ -40,7 +40,7 @@ fun AnimatedCategoryTab(
 
     Surface(
         onClick = onClick,
-        shape = RoundedCornerShape(20.dp),
+        shape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact,
         color = backgroundColor,
         border = BorderStroke(0.5.dp, borderColor),
         modifier = Modifier.height(34.dp),

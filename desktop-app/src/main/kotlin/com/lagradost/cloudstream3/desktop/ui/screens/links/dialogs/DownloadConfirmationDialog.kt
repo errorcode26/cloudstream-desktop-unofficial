@@ -123,7 +123,7 @@ fun DownloadConfirmationDialog(
                     )
                 }
 
-                IconButton(
+                com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton(
                     onClick = onDismiss,
                     modifier = Modifier.size(32.dp),
                 ) {
@@ -362,16 +362,14 @@ fun DownloadConfirmationDialog(
                 horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                OutlinedButton(
+                com.lagradost.cloudstream3.desktop.ui.components.DesktopOutlinedButton(
                     onClick = onDismiss,
-                    shape = RoundedCornerShape(10.dp),
                 ) {
                     Text("Cancel")
                 }
 
-                Button(
+                com.lagradost.cloudstream3.desktop.ui.components.DesktopButton(
                     onClick = onConfirmDownload,
-                    shape = RoundedCornerShape(10.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                 ) {
                     Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(16.dp))

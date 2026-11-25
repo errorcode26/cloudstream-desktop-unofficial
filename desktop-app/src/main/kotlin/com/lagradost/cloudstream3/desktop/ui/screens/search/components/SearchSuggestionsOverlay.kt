@@ -89,7 +89,7 @@ fun SearchSuggestionsOverlay(
                         }
 
                         // Fill Arrow (Sets search query without submitting immediately)
-                        IconButton(
+                        com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton(
                             onClick = {
                                 onFillSuggestion(item.title)
                             },

@@ -21,6 +21,10 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopFilledTonalButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopOutlinedButton
 import com.lagradost.cloudstream3.desktop.ui.screens.extensions.contract.ExtensionsUiEvent
 import com.lagradost.cloudstream3.desktop.ui.theme.AppearanceConfig
 
@@ -73,13 +77,12 @@ fun RepositoriesTab(viewModel: ExtensionsViewModel) {
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    FilledTonalButton(
+                    DesktopFilledTonalButton(
                         onClick = {
                             selectedRepoForDetail = null
                             repoSearchQuery = ""
                             viewModel.onEvent(ExtensionsUiEvent.OnInspectRepository(""))
                         },
-                        shape = RoundedCornerShape(10.dp),
                     ) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(6.dp))
@@ -118,7 +121,7 @@ fun RepositoriesTab(viewModel: ExtensionsViewModel) {
                             java.awt.Toolkit.getDefaultToolkit().systemClipboard.setContents(selection, selection)
                             copied = true
                         },
-                        shape = RoundedCornerShape(8.dp),
+                        shape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact,
                         color = MaterialTheme.colorScheme.secondaryContainer,
                     ) {
                         Row(
@@ -141,13 +144,12 @@ fun RepositoriesTab(viewModel: ExtensionsViewModel) {
                         }
                     }
 
-                    OutlinedButton(
+                    DesktopOutlinedButton(
                         onClick = {
                             viewModel.onEvent(ExtensionsUiEvent.OnRemoveRepository(repo.url))
                             selectedRepoForDetail = null
                             viewModel.onEvent(ExtensionsUiEvent.OnInspectRepository(""))
                         },
-                        shape = RoundedCornerShape(8.dp),
                         border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.5f)),
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
                     ) {
@@ -268,7 +270,7 @@ fun RepositoriesTab(viewModel: ExtensionsViewModel) {
                         singleLine = true,
                         shape = RoundedCornerShape(8.dp),
                     )
-                    Button(
+                    DesktopButton(
                         onClick = {
                             if (repoUrl.isNotBlank()) {
                                 viewModel.onEvent(ExtensionsUiEvent.OnAddRepositoryFromInput(repoUrl))
@@ -277,7 +279,6 @@ fun RepositoriesTab(viewModel: ExtensionsViewModel) {
                         },
                         modifier = Modifier.height(buttonHeight),
                         contentPadding = if (isCompactHeight) PaddingValues(horizontal = 14.dp, vertical = 6.dp) else ButtonDefaults.ContentPadding,
-                        shape = RoundedCornerShape(8.dp),
                     ) {
                         Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(6.dp))
@@ -378,7 +379,7 @@ fun RepositoriesTab(viewModel: ExtensionsViewModel) {
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
                                     var cardCopied by remember(repo.url) { mutableStateOf(false) }
-                                    IconButton(
+                                    DesktopIconButton(
                                         onClick = {
                                             val installUrl = com.lagradost.cloudstream3.desktop.repo.DesktopRepositoryManager.getPluginsJsonUrl(repo.url)
                                             val selection = java.awt.datatransfer.StringSelection(installUrl)
@@ -393,7 +394,7 @@ fun RepositoriesTab(viewModel: ExtensionsViewModel) {
                                             tint = if (cardCopied) androidx.compose.ui.graphics.Color(0xFF81C784) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                                         )
                                     }
-                                    IconButton(
+                                    DesktopIconButton(
                                         onClick = {
                                             viewModel.onEvent(ExtensionsUiEvent.OnRemoveRepository(repo.url))
                                         },

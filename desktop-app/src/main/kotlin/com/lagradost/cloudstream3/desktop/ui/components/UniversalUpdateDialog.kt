@@ -144,7 +144,7 @@ fun UniversalUpdateDialog() {
                 }
 
                 if (activeUpdate.releaseHtmlUrl != null) {
-                    OutlinedButton(
+                    DesktopOutlinedButton(
                         onClick = {
                             try {
                                 Desktop.getDesktop().browse(URI(activeUpdate.releaseHtmlUrl))
@@ -367,7 +367,7 @@ fun UniversalUpdateDialog() {
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                TextButton(
+                DesktopTextButton(
                     onClick = {
                         scope.launch(Dispatchers.IO) {
                             UnifiedUpdateManager.ignoreUpdate(activeUpdate)
@@ -396,7 +396,7 @@ fun UniversalUpdateDialog() {
                     when {
                         isDownloaded && activeUpdate.type == UpdateType.APP_CLIENT -> {
                             val isPortable = PlatformPaths.isPortable
-                            OutlinedButton(
+                            DesktopOutlinedButton(
                                 onClick = {
                                     val sourceFile = UnifiedUpdateManager.getAppInstallerFile(activeUpdate.newVersion)
                                     if (sourceFile.exists()) {
@@ -418,7 +418,7 @@ fun UniversalUpdateDialog() {
                             ) {
                                 Text("Save to Downloads")
                             }
-                            OutlinedButton(
+                            DesktopOutlinedButton(
                                 onClick = {
                                     val file = UnifiedUpdateManager.getAppInstallerFile(activeUpdate.newVersion)
                                     try {
@@ -431,7 +431,7 @@ fun UniversalUpdateDialog() {
                                 Text("Open in Folder")
                             }
                             if (isPortable) {
-                                Button(
+                                DesktopButton(
                                     onClick = {
                                         val file = UnifiedUpdateManager.getAppInstallerFile(activeUpdate.newVersion)
                                         try {
@@ -451,7 +451,7 @@ fun UniversalUpdateDialog() {
                                     Text("Open Archive")
                                 }
                             } else {
-                                Button(
+                                DesktopButton(
                                     onClick = {
                                         val file = UnifiedUpdateManager.getAppInstallerFile(activeUpdate.newVersion)
                                         UnifiedUpdateManager.launchInstallerAndExit(file)
@@ -470,14 +470,14 @@ fun UniversalUpdateDialog() {
                         }
 
                         appTask != null && appTask.status == TaskStatus.RUNNING -> {
-                            TextButton(
+                            DesktopTextButton(
                                 onClick = {
                                     AppDownloadManager.cancelDownload("app_update")
                                 },
                             ) {
                                 Text("Cancel")
                             }
-                            Button(
+                            DesktopButton(
                                 onClick = {
                                     UnifiedUpdateManager.dismissDialog()
                                 },
@@ -487,10 +487,10 @@ fun UniversalUpdateDialog() {
                         }
 
                         appTask != null && appTask.status == TaskStatus.FAILED -> {
-                            TextButton(onClick = { UnifiedUpdateManager.dismissDialog() }) {
+                            DesktopTextButton(onClick = { UnifiedUpdateManager.dismissDialog() }) {
                                 Text("Close")
                             }
-                            Button(
+                            DesktopButton(
                                 onClick = {
                                     UnifiedUpdateManager.downloadAppUpdate(activeUpdate)
                                 },
@@ -500,10 +500,10 @@ fun UniversalUpdateDialog() {
                         }
 
                         else -> {
-                            TextButton(onClick = { UnifiedUpdateManager.dismissDialog() }) {
+                            DesktopTextButton(onClick = { UnifiedUpdateManager.dismissDialog() }) {
                                 Text("Later")
                             }
-                            Button(onClick = { UnifiedUpdateManager.installUpdate(activeUpdate) }) {
+                            DesktopButton(onClick = { UnifiedUpdateManager.installUpdate(activeUpdate) }) {
                                 Text(
                                     when (activeUpdate.type) {
                                         UpdateType.APP_CLIENT -> "Download Update"

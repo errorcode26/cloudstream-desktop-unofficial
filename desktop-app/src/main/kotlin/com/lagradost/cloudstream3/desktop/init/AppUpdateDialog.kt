@@ -10,10 +10,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.*
-import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -32,6 +30,8 @@ import androidx.compose.ui.unit.dp
 import com.lagradost.cloudstream3.desktop.AppUpdater
 import com.lagradost.cloudstream3.desktop.repo.DesktopRepositoryManager
 import com.lagradost.cloudstream3.desktop.ui.components.CloudstreamCustomDialog
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopTextButton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -158,7 +158,7 @@ fun AppUpdateDialog() {
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                TextButton(onClick = {
+                DesktopTextButton(onClick = {
                     scope.launch(Dispatchers.IO) {
                         AppUpdater.ignoreRelease(release.tag_name)
                     }
@@ -174,10 +174,10 @@ fun AppUpdateDialog() {
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
-                    TextButton(onClick = { showUpdateDialog = false }) {
+                    DesktopTextButton(onClick = { showUpdateDialog = false }) {
                         Text("Ignore")
                     }
-                    Button(onClick = {
+                    DesktopButton(onClick = {
                         try {
                             Desktop.getDesktop().browse(URI(release.html_url))
                         } catch (e: Exception) {

@@ -75,4 +75,55 @@ class AppearanceConfigTest {
         assertEquals(HeroBannerStyle.FULLSCREEN_IMMERSIVE, HeroBannerStyle.fromString("FULLSCREEN_IMMERSIVE"))
         assertEquals(HeroBannerStyle.CARDS_CAROUSEL, HeroBannerStyle.fromString("Cards Carousel (Peeking)"))
     }
+
+    @Test
+    fun testButtonShapeStyleFallbackAndMapping() {
+        assertEquals(ButtonShapeStyle.ROUNDED, ButtonShapeStyle.fromString(null))
+        assertEquals(ButtonShapeStyle.ROUNDED, ButtonShapeStyle.fromString("unknown"))
+        assertEquals(ButtonShapeStyle.PILL, ButtonShapeStyle.fromString("pill"))
+        assertEquals(ButtonShapeStyle.SOFT, ButtonShapeStyle.fromString("Soft"))
+        assertEquals(ButtonShapeStyle.SHARP, ButtonShapeStyle.fromString("SHARP"))
+
+        ButtonShapeStyle.entries.forEach { style ->
+            val tokens = DesktopButtonShapes.fromStyle(style)
+            assertEquals(style, tokens.style)
+            assertTrue(style.label.isNotBlank())
+            assertTrue(style.description.isNotBlank())
+        }
+
+        val pillTokens = DesktopButtonShapes.fromStyle(ButtonShapeStyle.PILL)
+        assertEquals(androidx.compose.foundation.shape.CircleShape, pillTokens.primary)
+        assertEquals(androidx.compose.foundation.shape.CircleShape, pillTokens.medium)
+        assertEquals(androidx.compose.foundation.shape.CircleShape, pillTokens.compact)
+        assertEquals(androidx.compose.foundation.shape.CircleShape, pillTokens.icon)
+    }
+
+    @Test
+    fun testCastProfileShapeStyleFallbackAndMapping() {
+        assertEquals(CastProfileShapeStyle.ROUNDED, CastProfileShapeStyle.fromString(null))
+        assertEquals(CastProfileShapeStyle.ROUNDED, CastProfileShapeStyle.fromString("unknown"))
+        assertEquals(CastProfileShapeStyle.CIRCLE, CastProfileShapeStyle.fromString("circle"))
+        assertEquals(CastProfileShapeStyle.SOFT, CastProfileShapeStyle.fromString("Soft"))
+        assertEquals(CastProfileShapeStyle.SHARP, CastProfileShapeStyle.fromString("SHARP"))
+
+        CastProfileShapeStyle.entries.forEach { style ->
+            val tokens = DesktopProfileShapes.fromStyle(style)
+            assertEquals(style, tokens.style)
+            assertTrue(style.label.isNotBlank())
+            assertTrue(style.description.isNotBlank())
+            if (style == CastProfileShapeStyle.CIRCLE) {
+                assertTrue(tokens.isCircular)
+                assertEquals(1f, tokens.portraitAspectRatio)
+                assertEquals(androidx.compose.foundation.shape.CircleShape, tokens.card)
+                assertEquals(androidx.compose.foundation.shape.CircleShape, tokens.hero)
+                assertEquals(androidx.compose.foundation.shape.CircleShape, tokens.compact)
+                assertEquals(androidx.compose.foundation.shape.CircleShape, tokens.badge)
+                assertFalse(tokens.portraitAlignment == androidx.compose.ui.Alignment.Center)
+            } else {
+                assertFalse(tokens.isCircular)
+                assertEquals(2f / 3f, tokens.portraitAspectRatio)
+                assertEquals(androidx.compose.ui.Alignment.Center, tokens.portraitAlignment)
+            }
+        }
+    }
 }

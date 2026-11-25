@@ -12,6 +12,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopOutlinedButton
 import com.lagradost.cloudstream3.desktop.ui.components.LocalDesktopTheme
 
 @Composable
@@ -26,7 +28,7 @@ fun PosterStudioTopBar(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            IconButton(onClick = onBack, modifier = Modifier.size(34.dp)) {
+            DesktopIconButton(onClick = onBack, modifier = Modifier.size(34.dp)) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                     contentDescription = "Back to appearance settings",
@@ -81,9 +83,8 @@ fun PosterStudioTopBar(
                 )
             }
             Spacer(modifier = Modifier.width(12.dp))
-            OutlinedButton(
+            DesktopOutlinedButton(
                 onClick = onReset,
-                shape = RoundedCornerShape(10.dp),
                 contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
             ) {
                 Icon(

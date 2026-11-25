@@ -101,13 +101,11 @@ internal fun ExploreProviderSourcesPane(
                     }
                 }
 
-                IconButton(
+                com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton(
                     onClick = onDismissRequest,
-                    modifier = Modifier
-                        .size(32.dp)
-                        .clip(CircleShape)
-                        .background(Color.White.copy(alpha = 0.06f))
-                        .border(0.5.dp, Color.White.copy(alpha = 0.15f), CircleShape),
+                    colors = IconButtonDefaults.iconButtonColors(containerColor = Color.White.copy(alpha = 0.06f)),
+                    border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.15f)),
+                    modifier = Modifier.size(32.dp),
                 ) {
                     Icon(
                         imageVector = Icons.Default.Close,
@@ -227,13 +225,12 @@ internal fun ExploreProviderSourcesPane(
                             modifier = Modifier.padding(top = 4.dp),
                         ) {
                             if (onOpenAddonMode != null && hasStreamAddons) {
-                                Button(
+                                com.lagradost.cloudstream3.desktop.ui.components.DesktopButton(
                                     onClick = { onOpenAddonMode(item) },
                                     colors = ButtonDefaults.buttonColors(
                                         containerColor = MaterialTheme.colorScheme.primary,
                                         contentColor = Color.Black,
                                     ),
-                                    shape = RoundedCornerShape(8.dp),
                                 ) {
                                     Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
                                     Spacer(modifier = Modifier.width(6.dp))
@@ -241,12 +238,11 @@ internal fun ExploreProviderSourcesPane(
                                 }
                             }
                             if (onNavigateToExtensions != null) {
-                                OutlinedButton(
+                                com.lagradost.cloudstream3.desktop.ui.components.DesktopOutlinedButton(
                                     onClick = {
                                         onDismissRequest()
                                         onNavigateToExtensions.invoke(0)
                                     },
-                                    shape = RoundedCornerShape(8.dp),
                                 ) {
                                     Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(16.dp))
                                     Spacer(modifier = Modifier.width(6.dp))

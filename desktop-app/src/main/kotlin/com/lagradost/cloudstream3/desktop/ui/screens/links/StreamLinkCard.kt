@@ -330,6 +330,7 @@ private fun StreamActionIconButton(
         else -> DesktopUi.TextPrimary.copy(alpha = 0.70f)
     }
 
+    val buttonShape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.icon
     TooltipArea(
         tooltip = {
             Surface(
@@ -353,9 +354,9 @@ private fun StreamActionIconButton(
             modifier = modifier
                 .size(36.dp)
                 .hoverable(interaction)
-                .clip(RoundedCornerShape(8.dp))
+                .clip(buttonShape)
                 .clickable(enabled = enabled, onClick = onClick),
-            shape = RoundedCornerShape(8.dp),
+            shape = buttonShape,
             color = containerBg,
             border = BorderStroke(1.dp, borderColor),
         ) {

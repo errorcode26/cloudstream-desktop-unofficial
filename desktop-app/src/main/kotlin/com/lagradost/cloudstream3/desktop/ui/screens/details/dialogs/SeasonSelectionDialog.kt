@@ -53,7 +53,7 @@ fun SeasonSelectionDialog(
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                 )
-                IconButton(
+                com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton(
                     onClick = onDismissRequest,
                     modifier = Modifier.size(32.dp),
                 ) {

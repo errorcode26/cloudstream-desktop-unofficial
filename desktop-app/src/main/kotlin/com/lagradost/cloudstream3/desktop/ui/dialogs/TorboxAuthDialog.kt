@@ -194,7 +194,7 @@ fun TorboxAuthDialog(
                 }
 
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(
+                    com.lagradost.cloudstream3.desktop.ui.components.DesktopOutlinedButton(
                         onClick = {
                             clipboardManager.setText(AnnotatedString(auth.userCode))
                             isCopied = true
@@ -209,7 +209,7 @@ fun TorboxAuthDialog(
                         Text(if (isCopied) "Copied!" else "Copy Code")
                     }
 
-                    OutlinedButton(
+                    com.lagradost.cloudstream3.desktop.ui.components.DesktopOutlinedButton(
                         onClick = {
                             try {
                                 if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
@@ -229,7 +229,7 @@ fun TorboxAuthDialog(
                         Text("Open in Browser")
                     }
 
-                    IconButton(onClick = onDismiss) {
+                    com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton(onClick = onDismiss) {
                         Icon(
                             imageVector = Icons.Rounded.Close,
                             contentDescription = "Close",
@@ -277,7 +277,7 @@ fun TorboxAuthDialog(
                             color = Color.LightGray,
                             textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                         )
-                        Button(
+                        com.lagradost.cloudstream3.desktop.ui.components.DesktopButton(
                             onClick = {
                                 try {
                                     if (Desktop.isDesktopSupported()) {

@@ -94,14 +94,16 @@ fun DesktopFilterPill(
         else -> Color.White.copy(alpha = 0.85f)
     }
 
+    val pillShape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact
+
     Surface(
-        shape = RoundedCornerShape(8.dp),
+        shape = pillShape,
         color = containerColor,
         border = BorderStroke(1.dp, borderColor),
         modifier = modifier
             .height(32.dp)
             .hoverable(interactionSource)
-            .clip(RoundedCornerShape(8.dp))
+            .clip(pillShape)
             .clickable(onClick = onClick),
     ) {
         Row(
@@ -160,8 +162,9 @@ fun LinksSourceFilterRow(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         // Player Selector Toggle (MPV / VLC)
+        val switcherShapes = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current
         Surface(
-            shape = RoundedCornerShape(8.dp),
+            shape = switcherShapes.medium,
             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
             border = BorderStroke(1.dp, DesktopUi.Divider.copy(alpha = 0.35f)),
         ) {
@@ -172,10 +175,10 @@ fun LinksSourceFilterRow(
                 listOf("mpv" to "MPV", "vlc" to "VLC").forEach { (id, label) ->
                     val isSel = selectedPlayer == id
                     Surface(
-                        shape = RoundedCornerShape(6.dp),
+                        shape = switcherShapes.compact,
                         color = if (isSel) MaterialTheme.colorScheme.primary else Color.Transparent,
                         modifier = Modifier
-                            .clip(RoundedCornerShape(6.dp))
+                            .clip(switcherShapes.compact)
                             .clickable { onPlayerSelected(id) },
                     ) {
                         Text(
@@ -262,7 +265,7 @@ fun LinksSourceFilterRow(
         Spacer(modifier = Modifier.width(4.dp))
 
         // Priority Settings Icon Button
-        IconButton(
+        com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton(
             onClick = onOpenPriorityDialog,
             modifier = Modifier.size(30.dp),
         ) {

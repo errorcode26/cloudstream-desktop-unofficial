@@ -76,34 +76,7 @@ fun ComposeCategoryGridScreen(
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             modifier = Modifier.padding(start = dockPaddingStart, end = dockPaddingEnd, bottom = 24.dp),
         ) {
-            Surface(
-                shape = RoundedCornerShape(10.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)),
-                modifier = Modifier
-                    .clip(RoundedCornerShape(10.dp))
-                    .pointerHoverIcon(PointerIcon.Hand)
-                    .clickable { onBack() },
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Icon(
-                        Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Back",
-                        tint = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.size(16.dp),
-                    )
-                    Text(
-                        text = "Back",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                }
-            }
+            com.lagradost.cloudstream3.desktop.ui.components.DesktopInlineBackButton(onClick = onBack)
 
             Column {
                 Text(

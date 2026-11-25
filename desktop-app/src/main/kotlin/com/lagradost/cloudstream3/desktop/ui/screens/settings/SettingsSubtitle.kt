@@ -28,6 +28,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lagradost.cloudstream3.desktop.player.PlayerConfig
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopOutlinedButton
 import com.lagradost.cloudstream3.desktop.ui.screens.settings.contract.SettingsUiEvent
 import com.lagradost.cloudstream3.desktop.ui.screens.settings.contract.SettingsUiState
 import kotlinx.coroutines.Dispatchers
@@ -232,7 +234,7 @@ fun SettingsSubtitleEditorScreen(viewModel: SettingsViewModel) {
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        OutlinedButton(
+                        DesktopOutlinedButton(
                             onClick = {
                                 scope.launch(Dispatchers.IO) {
                                     try {
@@ -252,19 +254,19 @@ fun SettingsSubtitleEditorScreen(viewModel: SettingsViewModel) {
                                     }
                                 }
                             },
-                            shape = RoundedCornerShape(8.dp),
+                            shape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact,
                             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
                         ) {
                             Text("Install Font (.ttf / .otf)", style = MaterialTheme.typography.labelMedium)
                         }
 
-                        OutlinedButton(
+                        DesktopOutlinedButton(
                             onClick = {
                                 scope.launch(Dispatchers.IO) {
                                     com.lagradost.cloudstream3.desktop.ui.theme.CustomFontManager.openFontsDirectory()
                                 }
                             },
-                            shape = RoundedCornerShape(8.dp),
+                            shape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact,
                             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
                         ) {
                             Text("Open Fonts Folder", style = MaterialTheme.typography.labelMedium)
@@ -304,6 +306,7 @@ fun SettingsSubtitleEditorScreen(viewModel: SettingsViewModel) {
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             val subBold = uiState.stringSettings[PlayerConfig.PREF_SUB_BOLD] ?: "no"
                             val subItalic = uiState.stringSettings[PlayerConfig.PREF_SUB_ITALIC] ?: "no"
+                            val chipShape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact
 
                             FilterChip(
                                 selected = subBold == "yes",
@@ -312,6 +315,7 @@ fun SettingsSubtitleEditorScreen(viewModel: SettingsViewModel) {
                                     viewModel.onEvent(SettingsUiEvent.OnUpdateString(PlayerConfig.PREF_SUB_BOLD, v))
                                 },
                                 label = { Text("Bold") },
+                                shape = chipShape,
                             )
                             FilterChip(
                                 selected = subItalic == "yes",
@@ -320,6 +324,7 @@ fun SettingsSubtitleEditorScreen(viewModel: SettingsViewModel) {
                                     viewModel.onEvent(SettingsUiEvent.OnUpdateString(PlayerConfig.PREF_SUB_ITALIC, v))
                                 },
                                 label = { Text("Italic") },
+                                shape = chipShape,
                             )
                         }
                     }
@@ -399,7 +404,7 @@ fun SettingsSubtitleEditorScreen(viewModel: SettingsViewModel) {
                         defaultValue = "0",
                     )
                 }
-                Button(
+                DesktopButton(
                     onClick = {
                         viewModel.onEvent(SettingsUiEvent.OnUpdateString(PlayerConfig.PREF_SUB_SIZE, "45"))
                         viewModel.onEvent(SettingsUiEvent.OnUpdateString(PlayerConfig.PREF_SUB_COLOR, "#FFFFFF"))

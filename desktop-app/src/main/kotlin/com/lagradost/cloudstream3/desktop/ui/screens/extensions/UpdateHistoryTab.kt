@@ -26,6 +26,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.lagradost.cloudstream3.desktop.repo.DesktopRepositoryManager
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopFilledTonalButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton
 import com.lagradost.cloudstream3.desktop.ui.components.PluginPlaceholderAvatar
 import com.lagradost.cloudstream3.desktop.ui.screens.extensions.contract.ExtensionsUiEvent
 import com.lagradost.cloudstream3.desktop.ui.theme.AppearanceConfig
@@ -71,7 +73,7 @@ fun UpdateHistoryTab(viewModel: ExtensionsViewModel) {
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
                 trailingIcon = {
                     if (searchQuery.isNotEmpty()) {
-                        IconButton(onClick = { searchQuery = "" }) {
+                        DesktopIconButton(onClick = { searchQuery = "" }) {
                             Icon(Icons.Default.Clear, contentDescription = "Clear")
                         }
                     }
@@ -81,11 +83,10 @@ fun UpdateHistoryTab(viewModel: ExtensionsViewModel) {
             )
 
             if (updatesHistory.isNotEmpty()) {
-                FilledTonalButton(
+                DesktopFilledTonalButton(
                     onClick = {
                         viewModel.onEvent(ExtensionsUiEvent.OnClearUpdateHistory)
                     },
-                    shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.filledTonalButtonColors(
                         containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.8f),
                         contentColor = MaterialTheme.colorScheme.onErrorContainer,

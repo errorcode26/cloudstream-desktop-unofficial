@@ -237,7 +237,7 @@ fun AboutVersionDialog(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                OutlinedButton(
+                DesktopOutlinedButton(
                     onClick = {
                         try {
                             val url = currentRelease?.html_url
@@ -257,7 +257,7 @@ fun AboutVersionDialog(
                     Text("View on GitHub", fontSize = 13.sp)
                 }
 
-                Button(
+                DesktopButton(
                     onClick = onDismissRequest,
                 ) {
                     Text("Close", fontSize = 13.sp)

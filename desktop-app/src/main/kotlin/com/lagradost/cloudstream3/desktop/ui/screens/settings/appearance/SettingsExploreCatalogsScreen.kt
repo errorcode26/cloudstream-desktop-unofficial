@@ -32,6 +32,9 @@ import androidx.compose.ui.zIndex
 import com.lagradost.cloudstream3.desktop.explore.models.ManifestCatalogDescriptor
 import com.lagradost.cloudstream3.desktop.explore.settings.ExploreCatalogSettingsManager
 import com.lagradost.cloudstream3.desktop.ui.components.CloudstreamAlertDialog
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopTextButton
 import com.lagradost.cloudstream3.desktop.ui.components.LocalDesktopTheme
 import com.lagradost.cloudstream3.desktop.ui.navigation.Config
 import com.lagradost.cloudstream3.desktop.ui.screens.settings.SettingsGroupCard
@@ -147,7 +150,7 @@ fun SettingsExploreCatalogsScreen(onNavigate: (Config) -> Unit = {}) {
                 }
             },
             confirmButton = {
-                TextButton(
+                DesktopTextButton(
                     onClick = {
                         ExploreCatalogSettingsManager.setCustomTitle(cat.key, renameInputText)
                         editingCatalogForRename = null
@@ -157,7 +160,7 @@ fun SettingsExploreCatalogsScreen(onNavigate: (Config) -> Unit = {}) {
                 }
             },
             dismissButton = {
-                TextButton(onClick = { editingCatalogForRename = null }) {
+                DesktopTextButton(onClick = { editingCatalogForRename = null }) {
                     Text("Cancel")
                 }
             },
@@ -193,7 +196,7 @@ fun SettingsExploreCatalogsScreen(onNavigate: (Config) -> Unit = {}) {
                 }
 
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TextButton(
+                    DesktopTextButton(
                         onClick = {
                             val keys = filteredCatalogs.map { it.key }
                             val allCurrentlyEnabled = keys.all { preferences[it]?.enabled != false }
@@ -210,7 +213,7 @@ fun SettingsExploreCatalogsScreen(onNavigate: (Config) -> Unit = {}) {
                         Text(if (allEnabled) "Hide All" else "Show All")
                     }
 
-                    TextButton(
+                    DesktopTextButton(
                         onClick = {
                             ExploreCatalogSettingsManager.resetToDefaults(discoveredCatalogs)
                         },
@@ -285,10 +288,9 @@ fun SettingsExploreCatalogsScreen(onNavigate: (Config) -> Unit = {}) {
                             style = MaterialTheme.typography.bodyMedium,
                             color = theme.TextMuted,
                         )
-                        Button(
+                        DesktopButton(
                             onClick = { onNavigate(Config.Extensions(initialTab = 3)) },
                             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                            shape = RoundedCornerShape(8.dp),
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Add,
@@ -472,7 +474,7 @@ fun SettingsExploreCatalogsScreen(onNavigate: (Config) -> Unit = {}) {
                                 }
 
                                 // Rename / Edit Button
-                                IconButton(
+                                DesktopIconButton(
                                     onClick = {
                                         editingCatalogForRename = descriptor
                                         renameInputText = customTitle

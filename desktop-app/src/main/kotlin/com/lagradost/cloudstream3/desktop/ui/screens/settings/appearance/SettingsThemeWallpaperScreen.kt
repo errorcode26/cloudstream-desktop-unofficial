@@ -19,14 +19,26 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lagradost.cloudstream3.desktop.ui.components.CloudstreamAlertDialog
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopOutlinedButton
+import com.lagradost.cloudstream3.desktop.ui.components.HeroPrimaryCtaButton
 import com.lagradost.cloudstream3.desktop.ui.screens.settings.SettingsGroupCard
 import com.lagradost.cloudstream3.desktop.ui.theme.AppearanceConfig
 import com.lagradost.cloudstream3.desktop.ui.theme.BuiltInPresets
+import com.lagradost.cloudstream3.desktop.ui.theme.ButtonShapeStyle
+import com.lagradost.cloudstream3.desktop.ui.theme.CastProfileShapeStyle
+import com.lagradost.cloudstream3.desktop.ui.theme.DesktopButtonShapes
+import com.lagradost.cloudstream3.desktop.ui.theme.DesktopProfileShapes
+import com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes
+import com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopProfileShapes
 import com.lagradost.cloudstream3.desktop.ui.theme.ThemeMode
 import com.lagradost.cloudstream3.desktop.ui.theme.ThemePreset
 import com.lagradost.cloudstream3.desktop.ui.theme.accentColorFromName
@@ -37,6 +49,8 @@ fun SettingsThemeWallpaperScreen() {
     val isLightMode by AppearanceConfig.isLightMode.collectAsState()
     val amoledMode by AppearanceConfig.amoledMode.collectAsState()
     val themeAccent by AppearanceConfig.themeAccent.collectAsState()
+    val buttonShapeStyle by AppearanceConfig.buttonShapeStyle.collectAsState()
+    val castProfileShapeStyle by AppearanceConfig.castProfileShapeStyle.collectAsState()
     val appThemeBackground by AppearanceConfig.appThemeBackground.collectAsState()
     val customThemeAccent by AppearanceConfig.customThemeAccent.collectAsState()
     val customAppThemeBackground by AppearanceConfig.customAppThemeBackground.collectAsState()
@@ -161,6 +175,203 @@ fun SettingsThemeWallpaperScreen() {
                                     overflow = TextOverflow.Ellipsis,
                                 )
                             }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Card 1B: Shape & Corner Identity (Merged Buttons + Cast/Profile Shapes)
+        SettingsGroupCard(title = "Shape & Corner Identity") {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                ShapeSegmentedSettingRow(
+                    title = "Buttons & Controls",
+                    subtitle = "Action CTAs, filters, dialogs, and icon buttons",
+                    options = ButtonShapeStyle.entries,
+                    selectedOption = buttonShapeStyle,
+                    labelFor = { it.label },
+                    onSelect = { AppearanceConfig.setButtonShapeStyle(it) },
+                    swatch = { preset, isSelected ->
+                        val previewTokens = remember(preset) { DesktopButtonShapes.fromStyle(preset) }
+                        Box(
+                            modifier = Modifier
+                                .width(18.dp)
+                                .height(11.dp)
+                                .clip(previewTokens.primary)
+                                .background(
+                                    if (isSelected) MaterialTheme.colorScheme.primary
+                                    else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
+                                ),
+                        )
+                    },
+                )
+
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f))
+
+                ShapeSegmentedSettingRow(
+                    title = "Cast & Profile Photos",
+                    subtitle = "Cast carousels, full roster, dual-cast badges, and person pages",
+                    options = CastProfileShapeStyle.entries,
+                    selectedOption = castProfileShapeStyle,
+                    labelFor = { it.label },
+                    onSelect = { AppearanceConfig.setCastProfileShapeStyle(it) },
+                    swatch = { preset, isSelected ->
+                        val previewTokens = remember(preset) { DesktopProfileShapes.fromStyle(preset) }
+                        Box(
+                            modifier = Modifier
+                                .height(14.dp)
+                                .aspectRatio(previewTokens.portraitAspectRatio)
+                                .clip(previewTokens.card)
+                                .background(
+                                    if (isSelected) MaterialTheme.colorScheme.primary
+                                    else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
+                                ),
+                        )
+                    },
+                )
+
+                val activeButtonShapes = LocalDesktopButtonShapes.current
+                val activeProfileShapes = LocalDesktopProfileShapes.current
+
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.28f),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.28f)),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    @OptIn(ExperimentalLayoutApi::class)
+                    FlowRow(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp, vertical = 10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        itemVerticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = "Preview",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+
+                        Box(
+                            modifier = if (isLightMode) {
+                                Modifier
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(Color(0xFF12141E))
+                                    .padding(horizontal = 8.dp, vertical = 5.dp)
+                            } else {
+                                Modifier
+                            },
+                        ) {
+                            HeroPrimaryCtaButton(
+                                text = "Play",
+                                icon = Icons.Default.PlayArrow,
+                                onClick = {},
+                                shape = activeButtonShapes.primary,
+                                contentPadding = PaddingValues(horizontal = 16.dp),
+                                iconSize = 16.dp,
+                                fontSize = 12.5.sp,
+                                iconSpacing = 5.dp,
+                                modifier = Modifier.height(34.dp),
+                            )
+                        }
+
+                        DesktopOutlinedButton(
+                            onClick = {},
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                            modifier = Modifier.height(34.dp),
+                        ) {
+                            Text("Filter", style = MaterialTheme.typography.labelMedium)
+                        }
+
+                        DesktopIconButton(
+                            onClick = {},
+                            colors = IconButtonDefaults.filledTonalIconButtonColors(),
+                            modifier = Modifier.size(34.dp),
+                        ) {
+                            Icon(
+                                Icons.Default.Tune,
+                                contentDescription = "Icon button preview",
+                                modifier = Modifier.size(16.dp),
+                            )
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .width(1.dp)
+                                .height(24.dp)
+                                .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)),
+                        )
+
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .width(if (activeProfileShapes.isCircular) 38.dp else 28.dp)
+                                    .aspectRatio(activeProfileShapes.portraitAspectRatio),
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .clip(activeProfileShapes.card)
+                                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.22f))
+                                        .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.55f), activeProfileShapes.card),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Icon(
+                                        Icons.Default.Person,
+                                        contentDescription = "Cast preview",
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(16.dp),
+                                    )
+                                }
+                                Box(
+                                    modifier = Modifier
+                                        .size(14.dp)
+                                        .align(Alignment.BottomEnd)
+                                        .offset(x = 2.dp, y = 2.dp)
+                                        .background(MaterialTheme.colorScheme.surface, activeProfileShapes.badge)
+                                        .padding(1.5.dp)
+                                        .clip(activeProfileShapes.badge)
+                                        .background(MaterialTheme.colorScheme.secondary.copy(alpha = 0.85f)),
+                                )
+                            }
+                            Text(
+                                text = "Cast",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .width(if (activeProfileShapes.isCircular) 38.dp else 28.dp)
+                                    .aspectRatio(activeProfileShapes.portraitAspectRatio)
+                                    .clip(activeProfileShapes.hero)
+                                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                                    .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.45f), activeProfileShapes.hero),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(
+                                    Icons.Default.Person,
+                                    contentDescription = "Person preview",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(16.dp),
+                                )
+                            }
+                            Text(
+                                text = "Person",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
                         }
                     }
                 }
@@ -456,6 +667,135 @@ fun SettingsThemeWallpaperScreen() {
 }
 
 @Composable
+private fun <T> ShapeSegmentedSettingRow(
+    title: String,
+    subtitle: String,
+    options: List<T>,
+    selectedOption: T,
+    labelFor: (T) -> String,
+    onSelect: (T) -> Unit,
+    swatch: @Composable (option: T, isSelected: Boolean) -> Unit,
+) {
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+        val isWide = maxWidth >= 660.dp
+
+        if (isWide) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                ShapePickerTray(
+                    options = options,
+                    selectedOption = selectedOption,
+                    labelFor = labelFor,
+                    onSelect = onSelect,
+                    swatch = swatch,
+                    modifier = Modifier.width(388.dp),
+                )
+            }
+        } else {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Column {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                ShapePickerTray(
+                    options = options,
+                    selectedOption = selectedOption,
+                    labelFor = labelFor,
+                    onSelect = onSelect,
+                    swatch = swatch,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun <T> ShapePickerTray(
+    options: List<T>,
+    selectedOption: T,
+    labelFor: (T) -> String,
+    onSelect: (T) -> Unit,
+    swatch: @Composable (option: T, isSelected: Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        shape = RoundedCornerShape(10.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.22f)),
+        modifier = modifier,
+    ) {
+        Row(
+            modifier = Modifier.padding(3.dp),
+            horizontalArrangement = Arrangement.spacedBy(3.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            options.forEach { option ->
+                val isSelected = selectedOption == option
+                Surface(
+                    onClick = { onSelect(option) },
+                    shape = RoundedCornerShape(7.dp),
+                    color = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.16f) else Color.Transparent,
+                    border = if (isSelected) {
+                        BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.85f))
+                    } else {
+                        null
+                    },
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(34.dp)
+                        .pointerHoverIcon(PointerIcon.Hand),
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
+                    ) {
+                        swatch(option, isSelected)
+                        Text(
+                            text = labelFor(option),
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun ThemePresetCard(
     preset: ThemePreset,
     isSelected: Boolean,
@@ -627,7 +967,7 @@ private fun CustomColorPickerDialog(
             )
         },
         confirmButton = {
-            Button(
+            DesktopButton(
                 onClick = {
                     parsedColor?.let {
                         val formatted = hexText.trim().let { if (!it.startsWith("#")) "#$it" else it }.uppercase()
@@ -635,15 +975,15 @@ private fun CustomColorPickerDialog(
                     }
                 },
                 enabled = parsedColor != null,
-                shape = RoundedCornerShape(8.dp),
+                shape = LocalDesktopButtonShapes.current.medium,
             ) {
                 Text("Apply Color")
             }
         },
         dismissButton = {
-            OutlinedButton(
+            DesktopOutlinedButton(
                 onClick = onDismissRequest,
-                shape = RoundedCornerShape(8.dp),
+                shape = LocalDesktopButtonShapes.current.medium,
             ) {
                 Text("Cancel")
             }

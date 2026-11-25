@@ -20,6 +20,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopFilledTonalButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopOutlinedButton
 import com.lagradost.runtime.executor.PluginHealthStatus
 import kotlinx.coroutines.flow.collectLatest
 import java.awt.Toolkit
@@ -190,7 +194,7 @@ private fun DevStudioTopBar(
 
                             Surface(
                                 color = if (isSelected) DevCardDark else Color.Transparent,
-                                shape = RoundedCornerShape(6.dp),
+                                shape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact,
                                 border = if (isSelected) androidx.compose.foundation.BorderStroke(1.dp, DevAccentCyan.copy(alpha = 0.5f)) else null,
                                 modifier = Modifier.clickable { onEvent(DevStudioUiEvent.SwitchTab(tab)) },
                             ) {
@@ -228,15 +232,16 @@ private fun DevStudioTopBar(
 
             // Right: Global Actions
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                val compactShape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact
                 // Switch to Simple Mode
-                FilledTonalButton(
+                DesktopFilledTonalButton(
                     onClick = { onEvent(DevStudioUiEvent.ToggleAdvancedMode) },
                     colors = ButtonDefaults.filledTonalButtonColors(
                         containerColor = DevBgDark,
                         contentColor = Color.LightGray,
                     ),
                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                    shape = RoundedCornerShape(6.dp),
+                    shape = compactShape,
                     modifier = Modifier.height(30.dp),
                 ) {
                     Icon(Icons.Default.ViewAgenda, contentDescription = null, tint = Color.LightGray, modifier = Modifier.size(14.dp))
@@ -245,11 +250,11 @@ private fun DevStudioTopBar(
                 }
 
                 // Copy All Logs
-                Button(
+                DesktopButton(
                     onClick = { onEvent(DevStudioUiEvent.CopyAllLogs) },
                     colors = ButtonDefaults.buttonColors(containerColor = DevAccentCyan.copy(alpha = 0.2f)),
                     contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                    shape = RoundedCornerShape(6.dp),
+                    shape = compactShape,
                     modifier = Modifier.height(30.dp),
                 ) {
                     Icon(Icons.Default.ContentCopy, contentDescription = null, tint = DevAccentCyan, modifier = Modifier.size(14.dp))
@@ -258,11 +263,11 @@ private fun DevStudioTopBar(
                 }
 
                 // Bug report
-                Button(
+                DesktopButton(
                     onClick = { onEvent(DevStudioUiEvent.CopyAiSnapshot(null)) },
                     colors = ButtonDefaults.buttonColors(containerColor = DevAccentCyan.copy(alpha = 0.2f)),
                     contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                    shape = RoundedCornerShape(6.dp),
+                    shape = compactShape,
                     modifier = Modifier.height(30.dp),
                 ) {
                     Icon(Icons.Default.ContentCopy, contentDescription = null, tint = DevAccentCyan, modifier = Modifier.size(14.dp))
@@ -271,7 +276,7 @@ private fun DevStudioTopBar(
                 }
 
                 // Discord Community
-                OutlinedButton(
+                DesktopOutlinedButton(
                     onClick = {
                         try {
                             java.awt.Desktop.getDesktop().browse(java.net.URI("https://discord.gg/cgy9GZcdAH"))
@@ -279,14 +284,14 @@ private fun DevStudioTopBar(
                     },
                     border = androidx.compose.foundation.BorderStroke(1.dp, DevAccentCyan.copy(alpha = 0.4f)),
                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                    shape = RoundedCornerShape(6.dp),
+                    shape = compactShape,
                     modifier = Modifier.height(30.dp),
                 ) {
                     Text("Discord (benene)", fontSize = 11.sp, color = DevAccentCyan, fontWeight = FontWeight.Medium)
                 }
 
                 // Pop-out / Dock Toggle
-                IconButton(
+                DesktopIconButton(
                     onClick = {
                         if (isDetached) {
                             DevStudioState.dockToMain()
@@ -305,7 +310,7 @@ private fun DevStudioTopBar(
                 }
 
                 // Close Button
-                IconButton(
+                DesktopIconButton(
                     onClick = onClose,
                     modifier = Modifier.size(30.dp),
                 ) {
@@ -386,12 +391,13 @@ private fun DevStudioSimpleTopBar(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
+                val compactShape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact
                 // Primary: Copy All Logs
-                Button(
+                DesktopButton(
                     onClick = { onEvent(DevStudioUiEvent.CopyAllLogs) },
                     colors = ButtonDefaults.buttonColors(containerColor = DevAccentCyan),
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                    shape = RoundedCornerShape(6.dp),
+                    shape = compactShape,
                     modifier = Modifier.height(30.dp),
                 ) {
                     Icon(Icons.Default.ContentCopy, contentDescription = null, tint = Color.Black, modifier = Modifier.size(14.dp))
@@ -400,18 +406,18 @@ private fun DevStudioSimpleTopBar(
                 }
 
                 // Secondary: Copy Bug Report
-                OutlinedButton(
+                DesktopOutlinedButton(
                     onClick = { onEvent(DevStudioUiEvent.CopyAiSnapshot(null)) },
                     border = androidx.compose.foundation.BorderStroke(1.dp, DevAccentCyan.copy(alpha = 0.5f)),
                     contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                    shape = RoundedCornerShape(6.dp),
+                    shape = compactShape,
                     modifier = Modifier.height(30.dp),
                 ) {
                     Text("Copy Bug Report", fontSize = 11.sp, color = DevAccentCyan, fontWeight = FontWeight.SemiBold)
                 }
 
                 // Discord Community
-                OutlinedButton(
+                DesktopOutlinedButton(
                     onClick = {
                         try {
                             java.awt.Desktop.getDesktop().browse(java.net.URI("https://discord.gg/cgy9GZcdAH"))
@@ -419,21 +425,21 @@ private fun DevStudioSimpleTopBar(
                     },
                     border = androidx.compose.foundation.BorderStroke(1.dp, DevAccentCyan.copy(alpha = 0.5f)),
                     contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                    shape = RoundedCornerShape(6.dp),
+                    shape = compactShape,
                     modifier = Modifier.height(30.dp),
                 ) {
                     Text("Discord (benene)", fontSize = 11.sp, color = DevAccentCyan, fontWeight = FontWeight.SemiBold)
                 }
 
                 // Switch to Advanced Mode
-                FilledTonalButton(
+                DesktopFilledTonalButton(
                     onClick = { onEvent(DevStudioUiEvent.ToggleAdvancedMode) },
                     colors = ButtonDefaults.filledTonalButtonColors(
                         containerColor = DevCardDark,
                         contentColor = Color.LightGray,
                     ),
                     contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                    shape = RoundedCornerShape(6.dp),
+                    shape = compactShape,
                     modifier = Modifier.height(30.dp),
                 ) {
                     Icon(Icons.Default.Terminal, contentDescription = null, tint = Color.LightGray, modifier = Modifier.size(14.dp))
@@ -442,7 +448,7 @@ private fun DevStudioSimpleTopBar(
                 }
 
                 // Pop-out / Dock Toggle
-                IconButton(
+                DesktopIconButton(
                     onClick = {
                         if (isDetached) {
                             DevStudioState.dockToMain()
@@ -461,7 +467,7 @@ private fun DevStudioSimpleTopBar(
                 }
 
                 // Close Button
-                IconButton(
+                DesktopIconButton(
                     onClick = onClose,
                     modifier = Modifier.size(30.dp),
                 ) {

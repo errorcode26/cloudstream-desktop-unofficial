@@ -8,12 +8,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -24,6 +21,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.lagradost.cloudstream3.desktop.ui.components.CloudstreamAlertDialog
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopOutlinedButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopTextButton
 import com.lagradost.common.logging.AppLogger
 import com.lagradost.common.storage.DesktopDataStore
 import kotlinx.coroutines.Dispatchers
@@ -191,7 +191,7 @@ fun ExternalLinkConfirmationDialog(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier.padding(top = 8.dp),
             ) {
-                OutlinedButton(
+                DesktopOutlinedButton(
                     onClick = {
                         ExternalLinkHandler.copyToClipboard(url)
                         onDismiss()
@@ -199,7 +199,7 @@ fun ExternalLinkConfirmationDialog(
                 ) {
                     Text("Copy")
                 }
-                Button(
+                DesktopButton(
                     onClick = {
                         if (dontAskAgain) {
                             appScope.launch(Dispatchers.IO) {
@@ -219,7 +219,7 @@ fun ExternalLinkConfirmationDialog(
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
+            DesktopTextButton(onClick = onDismiss) {
                 Text("Cancel")
             }
         },

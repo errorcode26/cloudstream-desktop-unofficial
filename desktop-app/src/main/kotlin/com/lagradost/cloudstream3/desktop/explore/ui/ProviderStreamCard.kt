@@ -39,7 +39,7 @@ internal fun ProviderFilterPill(
 ) {
     val theme = LocalDesktopTheme.current
     Surface(
-        shape = RoundedCornerShape(20.dp),
+        shape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact,
         color = if (selected) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.06f),
         border = BorderStroke(0.5.dp, if (selected) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.12f)),
         modifier = Modifier.clickable(onClick = onClick),

@@ -99,7 +99,7 @@ fun PlayerShortcutsModal(
                         fontWeight = FontWeight.Bold,
                     )
                 }
-                IconButton(onClick = onDismissRequest) {
+                DesktopIconButton(onClick = onDismissRequest) {
                     Icon(
                         Icons.Default.Close,
                         contentDescription = "Close",

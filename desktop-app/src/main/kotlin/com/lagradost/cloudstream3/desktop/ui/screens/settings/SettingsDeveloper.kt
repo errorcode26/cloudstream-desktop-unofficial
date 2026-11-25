@@ -13,6 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopTextButton
 import com.lagradost.cloudstream3.desktop.ui.screens.dev.DevStudioState
 
 @Composable
@@ -63,7 +64,7 @@ fun SettingsDeveloper(
                         )
                     }
                 }
-                TextButton(
+                DesktopTextButton(
                     onClick = { DevStudioState.open() },
                 ) {
                     Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null, modifier = Modifier.size(16.dp))
@@ -90,7 +91,7 @@ fun SettingsDeveloper(
                             .weight(1f)
                             .padding(horizontal = 4.dp),
                         onClick = { selectedTabIndex = index },
-                        shape = RoundedCornerShape(12.dp),
+                        shape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.medium,
                         color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
                         contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
                     ) {
