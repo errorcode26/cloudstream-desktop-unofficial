@@ -310,7 +310,6 @@ fun ScreenshotLightbox(
             .fillMaxSize()
             .background(Color(0xFF09090B).copy(alpha = 0.97f))
             .focusRequester(focusRequester)
-            .focusable()
             .onKeyEvent { event ->
                 if (event.type == KeyEventType.KeyDown) {
                     when (event.key) {
@@ -331,7 +330,14 @@ fun ScreenshotLightbox(
                 } else {
                     false
                 }
-            },
+            }
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+            ) {
+                focusRequester.requestFocus()
+            }
+            .focusable(),
     ) {
         LaunchedEffect(Unit) { focusRequester.requestFocus() }
 

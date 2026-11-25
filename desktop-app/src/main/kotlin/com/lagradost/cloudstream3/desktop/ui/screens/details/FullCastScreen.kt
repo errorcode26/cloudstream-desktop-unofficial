@@ -378,41 +378,12 @@ private fun FullCastCard(
         else -> null
     }
 
-    val secondaryText = when {
-        !subName.isNullOrBlank() -> {
-            if (!isInverted) {
-                "🎙 Voice: $subName"
-            } else {
-                val raw = subName.trim()
-                if (raw.contains("(voice)", ignoreCase = true)) {
-                    val cleanChar = raw.replace(Regex("(?i)\\s*\\(voice(?:\\s+actor)?\\)"), "").trim()
-                    if (cleanChar.isNotEmpty()) "Voice of $cleanChar" else "Voice"
-                } else if (raw.startsWith("as ", ignoreCase = true) || raw.contains(" • ")) {
-                    raw
-                } else {
-                    "as $raw"
-                }
-            }
-        }
-        !actorRole.isNullOrBlank() &&
-            actor.roleString?.equals("Director", ignoreCase = true) != true &&
-            actor.roleString?.equals("Creator", ignoreCase = true) != true &&
-            actor.roleString?.equals("Producer", ignoreCase = true) != true &&
-            actor.roleString?.equals("Executive Producer", ignoreCase = true) != true &&
-            actor.roleString?.equals("Writer", ignoreCase = true) != true &&
-            actor.roleString?.equals("Screenplay", ignoreCase = true) != true -> {
-            val raw = actorRole.trim()
-            if (raw.contains("(voice)", ignoreCase = true)) {
-                val cleanChar = raw.replace(Regex("(?i)\\s*\\(voice(?:\\s+actor)?\\)"), "").trim()
-                if (cleanChar.isNotEmpty()) "🎙 Voice of $cleanChar" else "🎙 Voice"
-            } else if (raw.startsWith("as ", ignoreCase = true) || raw.contains(" • ")) {
-                raw
-            } else {
-                "as $raw"
-            }
-        }
-        else -> null
-    }
+    val secondaryText = formatCastSecondaryRole(
+        subName = subName,
+        actorRole = actorRole,
+        isInverted = isInverted,
+        isCrewRole = roleStr != null,
+    )
 
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()

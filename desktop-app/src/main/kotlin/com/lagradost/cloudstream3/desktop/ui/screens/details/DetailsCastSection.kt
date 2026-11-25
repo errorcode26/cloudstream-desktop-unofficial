@@ -316,17 +316,9 @@ private fun CompactActorCard(
     val actorName = actor.actor.name
     val actorRole = actor.roleString
     val roleStr = when {
-        actor.voiceActor?.name?.isNotBlank() == true -> "🎙 ${actor.voiceActor?.name}"
+        actor.voiceActor?.name?.isNotBlank() == true -> "Voice: ${actor.voiceActor?.name}"
         !actorRole.isNullOrBlank() && !actorRole.equals("Director", ignoreCase = true) && !actorRole.equals("Creator", ignoreCase = true) -> {
-            val raw = actorRole.trim()
-            if (raw.contains("(voice)", ignoreCase = true)) {
-                val cleanChar = raw.replace(Regex("(?i)\\s*\\(voice(?:\\s+actor)?\\)"), "").trim()
-                if (cleanChar.isNotEmpty()) "🎙 Voice of $cleanChar" else "🎙 Voice"
-            } else if (raw.startsWith("as ", ignoreCase = true)) {
-                raw
-            } else {
-                "as $raw"
-            }
+            formatCharacterOrVoiceRole(actorRole)
         }
         else -> actor.roleString ?: actor.role?.name
     }
@@ -424,40 +416,12 @@ private fun ActorCard(
         else -> null
     }
 
-    val secondaryText = when {
-        !subName.isNullOrBlank() -> {
-            if (!isInverted) {
-                "🎙 Voice: $subName"
-            } else {
-                val raw = subName.trim()
-                if (raw.contains("(voice)", ignoreCase = true)) {
-                    val cleanChar = raw.replace(Regex("(?i)\\s*\\(voice(?:\\s+actor)?\\)"), "").trim()
-                    if (cleanChar.isNotEmpty()) "Voice of $cleanChar" else "Voice"
-                } else if (raw.startsWith("as ", ignoreCase = true) || raw.contains(" • ")) {
-                    raw
-                } else {
-                    "as $raw"
-                }
-            }
-        }
-        !actorRole.isNullOrBlank() &&
-            actor.roleString?.equals("Director", ignoreCase = true) != true &&
-            actor.roleString?.equals("Creator", ignoreCase = true) != true &&
-            actor.roleString?.equals("Writer", ignoreCase = true) != true &&
-            actor.roleString?.equals("Producer", ignoreCase = true) != true &&
-            actor.roleString?.equals("Executive Producer", ignoreCase = true) != true -> {
-            val raw = actorRole.trim()
-            if (raw.contains("(voice)", ignoreCase = true)) {
-                val cleanChar = raw.replace(Regex("(?i)\\s*\\(voice(?:\\s+actor)?\\)"), "").trim()
-                if (cleanChar.isNotEmpty()) "🎙 Voice of $cleanChar" else "🎙 Voice"
-            } else if (raw.startsWith("as ", ignoreCase = true) || raw.contains(" • ")) {
-                raw
-            } else {
-                "as $raw"
-            }
-        }
-        else -> null
-    }
+    val secondaryText = formatCastSecondaryRole(
+        subName = subName,
+        actorRole = actorRole,
+        isInverted = isInverted,
+        isCrewRole = roleStr != null,
+    )
 
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
@@ -622,5 +586,36 @@ private fun ActorCard(
                 modifier = Modifier.fillMaxWidth(),
             )
         }
+    }
+}
+
+private val VOICE_SUFFIX_REGEX = Regex("(?i)\\s*\\(voice(?:\\s+actor)?\\)")
+
+internal fun formatCastSecondaryRole(
+    subName: String?,
+    actorRole: String?,
+    isInverted: Boolean,
+    isCrewRole: Boolean,
+): String? = when {
+    !subName.isNullOrBlank() -> {
+        if (!isInverted) {
+            "Voice: $subName"
+        } else {
+            formatCharacterOrVoiceRole(subName)
+        }
+    }
+    !actorRole.isNullOrBlank() && !isCrewRole -> formatCharacterOrVoiceRole(actorRole)
+    else -> null
+}
+
+private fun formatCharacterOrVoiceRole(rawRole: String): String {
+    val raw = rawRole.trim()
+    return when {
+        VOICE_SUFFIX_REGEX.containsMatchIn(raw) -> {
+            val cleanChar = raw.replace(VOICE_SUFFIX_REGEX, "").trim()
+            if (cleanChar.isNotEmpty()) "Voice of $cleanChar" else "Voice"
+        }
+        raw.startsWith("as ", ignoreCase = true) || raw.contains(" • ") -> raw
+        else -> "as $raw"
     }
 }

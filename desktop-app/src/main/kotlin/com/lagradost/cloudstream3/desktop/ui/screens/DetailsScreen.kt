@@ -29,6 +29,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -45,6 +46,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import coil3.request.crossfade
 import com.lagradost.cloudstream3.*
+import com.lagradost.cloudstream3.desktop.ui.components.CloudstreamCustomDialog
 import com.lagradost.cloudstream3.desktop.ui.components.DesktopBackButton
 import com.lagradost.cloudstream3.desktop.ui.components.DesktopVerticalScrollbar
 import com.lagradost.cloudstream3.desktop.ui.components.DesktopThemeColors.*
@@ -726,14 +728,18 @@ fun DetailsContent(
                         val collItems = uiState?.enrichedCollectionItems ?: emptyList()
                         if (!collName.isNullOrBlank()) {
                             item(key = "Collection") {
-                                Box(modifier = Modifier.animateItem().fillMaxWidth().padding(top = 48.dp).then(backdropDimModifier)) {
-                                    com.lagradost.cloudstream3.desktop.ui.screens.details.DetailsCollectionSection(
-                                        collName = collName,
-                                        collBg = collBg,
-                                        collItems = collItems,
-                                        provider = provider,
-                                        onNavigate = onNavigate,
-                                    )
+                                BoxWithConstraints(modifier = Modifier.animateItem().fillMaxWidth()) {
+                                    val hPadding = if (maxWidth < 1100.dp) 24.dp else 64.dp
+                                    Box(modifier = Modifier.fillMaxWidth().padding(top = 48.dp).then(backdropDimModifier)) {
+                                        com.lagradost.cloudstream3.desktop.ui.screens.details.DetailsCollectionSection(
+                                            collName = collName,
+                                            collBg = collBg,
+                                            collItems = collItems,
+                                            provider = provider,
+                                            onNavigate = onNavigate,
+                                            horizontalPadding = hPadding,
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -784,7 +790,6 @@ fun DetailsContent(
             modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
         )
 
-        // Fullscreen screenshot lightbox — must be at outer Box level to cover the whole window
         val lightboxScreenshots = screenshots
         var lastValidLightboxIndex by remember { mutableStateOf(0) }
         LaunchedEffect(lightboxIndex) {
@@ -793,16 +798,17 @@ fun DetailsContent(
             }
         }
 
-        androidx.compose.animation.AnimatedVisibility(
-            visible = lightboxIndex != null && !lightboxScreenshots.isNullOrEmpty(),
-            enter = androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(240, easing = androidx.compose.animation.core.FastOutSlowInEasing)) +
-                androidx.compose.animation.scaleIn(androidx.compose.animation.core.tween(240, easing = androidx.compose.animation.core.FastOutSlowInEasing), initialScale = 0.95f),
-            exit = androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(180, easing = androidx.compose.animation.core.FastOutSlowInEasing)) +
-                androidx.compose.animation.scaleOut(androidx.compose.animation.core.tween(180, easing = androidx.compose.animation.core.FastOutSlowInEasing), targetScale = 0.97f),
+        // Render via CloudstreamCustomDialog so the lightbox sits above floating top controls and window chrome.
+        CloudstreamCustomDialog(
+            show = lightboxIndex != null && !lightboxScreenshots.isNullOrEmpty(),
+            onDismissRequest = { lightboxIndex = null },
+            modifier = Modifier.fillMaxSize(),
+            containerColor = Color.Transparent,
+            shape = RectangleShape,
         ) {
             if (!lightboxScreenshots.isNullOrEmpty()) {
                 val safeIndex = (lightboxIndex ?: lastValidLightboxIndex).coerceIn(0, lightboxScreenshots.lastIndex)
-                com.lagradost.cloudstream3.desktop.ui.screens.details.ScreenshotLightbox(
+                ScreenshotLightbox(
                     screenshots = lightboxScreenshots,
                     initialIndex = safeIndex,
                     onDismiss = { lightboxIndex = null },
