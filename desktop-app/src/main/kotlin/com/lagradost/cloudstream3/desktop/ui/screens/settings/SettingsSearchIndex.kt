@@ -51,6 +51,8 @@ object SettingsSearchIndex {
         // Playback & Video Tab
         SettingsSearchEntry("Hardware Decoding", LeafTab.PLAYER, listOf("hwdec", "hardware", "decoding", "acceleration", "gpu", "mpv"), uiLabel = "Hardware Acceleration"),
         SettingsSearchEntry("Smooth Video / Interpolation", LeafTab.PLAYER, listOf("interpolation", "smooth", "motion", "video", "60fps", "display resample"), uiLabel = "Smooth Video (Display Resample)"),
+        SettingsSearchEntry("Ambient Mode (Blurred Borders)", LeafTab.PLAYER, listOf("ambient", "blur", "borders", "letterbox", "black bars", "gpu-next", "libplacebo", "cinematic"), uiLabel = "Ambient Mode (Blurred Borders)", subScreen = SettingsSubScreen.PLAYER_RENDERING_ENGINE),
+        SettingsSearchEntry("Ambient Blur Intensity", LeafTab.PLAYER, listOf("ambient", "blur", "radius", "intensity", "borders", "letterbox"), uiLabel = "Ambient Blur Intensity", subScreen = SettingsSubScreen.PLAYER_RENDERING_ENGINE),
         // Stream Priorities Tab
         SettingsSearchEntry("Stream & Quality Priorities", LeafTab.STREAM_PRIORITIES, listOf("priority", "quality", "source", "4k", "1080p", "ranking", "server", "sort"), uiLabel = "Stream Priorities"),
         SettingsSearchEntry("Audio Language Priorities", LeafTab.STREAM_PRIORITIES, listOf("audio", "language", "priority", "dub", "order", "ranking", "preferred audio", "track"), uiLabel = "Audio Languages"),

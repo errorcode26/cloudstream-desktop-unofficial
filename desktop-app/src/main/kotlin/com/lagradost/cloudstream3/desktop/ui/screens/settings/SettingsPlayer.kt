@@ -30,8 +30,10 @@ fun SettingsPlayerHubScreen(
     val hwdec = uiState.stringSettings[PlayerConfig.PREF_HWDEC] ?: "auto-safe"
     val gpuApi = uiState.stringSettings[PlayerConfig.PREF_GPU_API] ?: "d3d11"
     val voDriver = uiState.stringSettings[PlayerConfig.PREF_VO_DRIVER] ?: "gpu"
+    val ambientMode = uiState.booleanSettings[PlayerConfig.PREF_AMBIENT_MODE]
+        ?: remember { DesktopDataStore.getKey<Boolean>(PlayerConfig.PREF_AMBIENT_MODE) ?: false }
     val hwdecBadge = when {
-        voDriver == "gpu-next" -> "libplacebo • GPU"
+        ambientMode || voDriver == "gpu-next" -> "libplacebo • GPU"
         gpuApi == "opengl" -> "OpenGL • GPU"
         hwdec == "auto-safe" -> "Auto-Safe GPU"
         hwdec == "auto-copy" -> "Auto-Copy GPU"
@@ -201,6 +203,34 @@ fun SettingsPlayerRenderingScreen(viewModel: SettingsViewModel) {
                 uiState = uiState,
                 onEvent = viewModel::onEvent,
                 defaultValue = false,
+            )
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+            MviSettingsToggle(
+                key = PlayerConfig.PREF_AMBIENT_MODE,
+                label = "Ambient Mode (Blurred Borders)",
+                subtitle = "Fills letterbox and pillarbox bars with blurred video edge colors via MPV (forces gpu-next; reopen player if active)",
+                uiState = uiState,
+                onEvent = viewModel::onEvent,
+                defaultValue = false,
+            )
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+            MviSettingsDropdown(
+                key = PlayerConfig.PREF_AMBIENT_BLUR_RADIUS,
+                label = "Ambient Blur Intensity",
+                subtitle = "Controls how softly blurred video colors spread across letterbox bars",
+                options = listOf(
+                    "10" to "Subtle (10px)",
+                    "20" to "Balanced (20px — Default)",
+                    "35" to "Soft (35px)",
+                    "60" to "Heavy (60px)",
+                ),
+                uiState = uiState,
+                onEvent = viewModel::onEvent,
+                defaultValue = PlayerConfig.DEFAULT_AMBIENT_BLUR_RADIUS,
             )
         }
 

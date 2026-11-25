@@ -33,6 +33,10 @@ class PlayerState {
         com.lagradost.common.storage.DesktopDataStore.getKey<Boolean>(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_INTERPOLATION) ?: false,
     )
     val isInterpolationEnabled: StateFlow<Boolean> = _isInterpolationEnabled.asStateFlow()
+    internal val _isAmbientModeEnabled = MutableStateFlow(
+        com.lagradost.cloudstream3.desktop.player.PlayerConfig.isAmbientModeEnabled(),
+    )
+    val isAmbientModeEnabled: StateFlow<Boolean> = _isAmbientModeEnabled.asStateFlow()
 
     internal val _isSeekable = MutableStateFlow(true)
     val isSeekable: StateFlow<Boolean> = _isSeekable.asStateFlow()
@@ -181,6 +185,7 @@ class PlayerState {
         _isAudioMode.value = false
         _autoFetchedSubtitles.value = emptyList()
         lastAutoFetchKey = null
+        engine?.setPropertyString("video-crop", "")
         com.lagradost.player.impl.proxy.LocalStreamProxyState.reset()
     }
 
@@ -460,6 +465,213 @@ class PlayerState {
             engine?.setPropertyString("video-sync", "audio")
             engine?.setPropertyString("interpolation", "no")
         }
+    }
+
+    suspend fun applyAmbientMode(enabled: Boolean) {
+        _isAmbientModeEnabled.value = enabled
+        com.lagradost.common.storage.DesktopDataStore.setKey(
+            com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_AMBIENT_MODE,
+            enabled,
+        )
+        val activeVo = engine?.getPropertyString("current-vo")?.trim()
+        if (activeVo == "gpu-next") {
+            if (enabled) {
+                engine?.setPropertyString("border-background", "blur")
+                engine?.setPropertyString(
+                    "background-blur-radius",
+                    com.lagradost.cloudstream3.desktop.player.PlayerConfig.resolveAmbientBlurRadius(),
+                )
+            } else {
+                engine?.setPropertyString("border-background", "color")
+            }
+        } else if (enabled && activeVo != null) {
+            showToast("Ambient Mode saved — reopen player to switch video driver to gpu-next")
+        }
+    }
+
+    suspend fun applyAmbientBlurRadius(radius: String) {
+        val sanitized = com.lagradost.cloudstream3.desktop.player.PlayerConfig.sanitizeAmbientBlurRadius(radius)
+        com.lagradost.common.storage.DesktopDataStore.setKey(
+            com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_AMBIENT_BLUR_RADIUS,
+            sanitized,
+        )
+        if (engine?.getPropertyString("current-vo")?.trim() == "gpu-next") {
+            engine?.setPropertyString("background-blur-radius", sanitized)
+        }
+    }
+
+    fun setAmbientMode(enabled: Boolean) {
+        _isAmbientModeEnabled.value = enabled
+        com.lagradost.cloudstream3.desktop.utils.appScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            applyAmbientMode(enabled)
+        }
+    }
+
+    fun setAmbientBlurRadius(radius: String) {
+        com.lagradost.cloudstream3.desktop.utils.appScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            applyAmbientBlurRadius(radius)
+        }
+    }
+
+    fun applyLetterboxCrop(mode: String): String {
+        val eng = engine ?: return "off"
+        val normalized = mode.trim().lowercase()
+        if (normalized == "off" || normalized.isBlank()) {
+            eng.setPropertyString("video-crop", "")
+            return "off"
+        }
+
+        if (normalized == "auto") {
+            return detectAndApplyLetterboxCrop(eng)
+        }
+
+        val targetRatio = when (normalized) {
+            "1.85" -> 1.85
+            "2.00" -> 2.00
+            "2.35" -> 2.35
+            "2.39" -> 2.39
+            else -> return "off"
+        }
+
+        val srcW = eng.getPropertyDouble("width", 0.0).toInt().takeIf { it > 0 }
+            ?: eng.getPropertyDouble("video-params/w", 0.0).toInt()
+        val srcH = eng.getPropertyDouble("height", 0.0).toInt().takeIf { it > 0 }
+            ?: eng.getPropertyDouble("video-params/h", 0.0).toInt()
+        if (srcW <= 0 || srcH <= 0) {
+            showToast("Video dimensions unavailable yet")
+            return "off"
+        }
+
+        val srcRatio = srcW.toDouble() / srcH.toDouble()
+        val cropRect = if (srcRatio < targetRatio) {
+            val rawH = kotlin.math.round(srcW / targetRatio).toInt()
+            val evenH = (rawH and 1.inv()).coerceIn(2, srcH)
+            "${srcW}x$evenH"
+        } else {
+            val rawW = kotlin.math.round(srcH * targetRatio).toInt()
+            val evenW = (rawW and 1.inv()).coerceIn(2, srcW)
+            "${evenW}x$srcH"
+        }
+        eng.setPropertyString("video-crop", cropRect)
+        showToast("Cropped to $normalized:1 ($cropRect)")
+        return normalized
+    }
+
+    private fun detectAndApplyLetterboxCrop(eng: DesktopMpvEngine): String {
+        val tempFile = java.io.File(
+            System.getProperty("java.io.tmpdir"),
+            "cs3_crop_probe_${System.nanoTime()}.jpg",
+        )
+        val prevFormat = eng.getPropertyString("screenshot-format")
+        val prevCrop = eng.getPropertyString("video-crop")
+        var formatSwitched = false
+        try {
+            if (!prevCrop.isNullOrBlank()) {
+                eng.setPropertyString("video-crop", "")
+            }
+            if (prevFormat != "jpg" && prevFormat != "jpeg") {
+                eng.setPropertyString("screenshot-format", "jpg")
+                formatSwitched = true
+            }
+            val pathArg = tempFile.absolutePath.replace("\\", "/")
+            val res = eng.executeCommandArray(arrayOf("screenshot-to-file", pathArg, "video", null))
+            if (res < 0 || !tempFile.exists() || tempFile.length() == 0L) {
+                showToast("Could not sample current frame for crop detection")
+                return "off"
+            }
+
+            val img = javax.imageio.ImageIO.read(tempFile) ?: run {
+                showToast("Failed to decode frame sample")
+                return "off"
+            }
+            val cropRect = findSymmetricBlackBarCrop(img)
+            if (cropRect == null) {
+                eng.setPropertyString("video-crop", "")
+                showToast("No hardcoded black bars detected on current frame")
+                return "off"
+            }
+            eng.setPropertyString("video-crop", cropRect)
+            showToast("Auto-cropped black bars ($cropRect)")
+            return "auto"
+        } catch (t: Throwable) {
+            com.lagradost.common.logging.AppLogger.w("PlayerState", "Auto letterbox crop failed: ${t.message}")
+            showToast("Auto black-bar detection failed")
+            return "off"
+        } finally {
+            if (formatSwitched && !prevFormat.isNullOrBlank()) {
+                eng.setPropertyString("screenshot-format", prevFormat)
+            }
+            runCatching { tempFile.delete() }
+        }
+    }
+
+    private fun isSampleLineBlack(
+        coords: IntArray,
+        fixedIndex: Int,
+        horizontal: Boolean,
+        img: java.awt.image.BufferedImage,
+    ): Boolean {
+        val lumaLimit = 24
+        var brightCount = 0
+        for (c in coords) {
+            val rgb = if (horizontal) img.getRGB(c, fixedIndex) else img.getRGB(fixedIndex, c)
+            val r = (rgb shr 16) and 0xFF
+            val g = (rgb shr 8) and 0xFF
+            val b = rgb and 0xFF
+            if (maxOf(r, g, b) > lumaLimit) {
+                brightCount++
+                if (brightCount > 1) return false
+            }
+        }
+        return true
+    }
+
+    private fun measureSymmetricBars(
+        span: Int,
+        orthogonalSpan: Int,
+        horizontal: Boolean,
+        img: java.awt.image.BufferedImage,
+    ): Pair<Int, Int>? {
+        val sampleCount = 24
+        val start = (orthogonalSpan * 0.08).toInt()
+        val end = (orthogonalSpan * 0.92).toInt().coerceAtLeast(start + 1)
+        val coords = IntArray(sampleCount) { idx ->
+            start + (idx * (end - start)) / (sampleCount - 1)
+        }
+
+        var leadBar = 0
+        while (leadBar < span && isSampleLineBlack(coords, leadBar, horizontal, img)) leadBar++
+        var trailBar = 0
+        while (trailBar < span - leadBar && isSampleLineBlack(coords, span - 1 - trailBar, horizontal, img)) trailBar++
+
+        val minBar = maxOf(8, (span * 0.02).toInt())
+        val tolerance = maxOf(8, (span * 0.03).toInt())
+        val activeSpan = span - leadBar - trailBar
+        if (leadBar < minBar ||
+            trailBar < minBar ||
+            kotlin.math.abs(leadBar - trailBar) > tolerance ||
+            activeSpan < (span * 0.45).toInt()
+        ) {
+            return null
+        }
+
+        val offset = leadBar and 1.inv()
+        val cropped = (activeSpan and 1.inv()).coerceIn(2, span - offset)
+        return offset to cropped
+    }
+
+    private fun findSymmetricBlackBarCrop(img: java.awt.image.BufferedImage): String? {
+        val w = img.width
+        val h = img.height
+        if (w < 64 || h < 64) return null
+
+        measureSymmetricBars(span = h, orthogonalSpan = w, horizontal = true, img = img)?.let { (y, cropH) ->
+            return "${w}x$cropH+0+$y"
+        }
+        measureSymmetricBars(span = w, orthogonalSpan = h, horizontal = false, img = img)?.let { (x, cropW) ->
+            return "${cropW}x$h+$x+0"
+        }
+        return null
     }
 
     fun setSubtitleDelay(delayMs: Long) {

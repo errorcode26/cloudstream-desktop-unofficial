@@ -4705,6 +4705,14 @@
     // Expose globally so Kotlin can call via executeScript("window.__dismissProbingOverlay()")
     window.__dismissProbingOverlay = dismissProbingOverlay;
 
+    let ambientModeEnabled = false;
+    const syncAmbientModeUI = () => {
+        const btn = document.getElementById('btnToggleAmbientMode');
+        if (btn) btn.classList.toggle('active', ambientModeEnabled);
+        const row = document.getElementById('ambientBlurRow');
+        if (row) row.style.display = ambientModeEnabled ? 'flex' : 'none';
+    };
+
     // Handles volume/mute/app-loading-status sent by Kotlin (separate from C++ state_update)
     const handleAppStateUpdate = (s) => {
         if (s.debugWait !== undefined) window.debugWait = s.debugWait;
@@ -4760,6 +4768,18 @@
                     btn.innerText = 'Off';
                 }
             }
+        }
+
+        if (s.ambientModeEnabled !== undefined) {
+            ambientModeEnabled = s.ambientModeEnabled === true;
+            syncAmbientModeUI();
+        }
+
+        if (s.ambientBlurRadius !== undefined && s.ambientBlurRadius !== null) {
+            const blurVal = String(s.ambientBlurRadius);
+            document.querySelectorAll('#ambientBlurChips .chip').forEach(c => {
+                c.classList.toggle('active', c.dataset.blur === blurVal);
+            });
         }
 
         if (s.autoPlayEnabled !== undefined) {
@@ -5013,6 +5033,13 @@
         }
     };
 
+    const syncCropChipsUI = (mode) => {
+        const target = mode || 'off';
+        document.querySelectorAll('#cropChips .chip').forEach(c => {
+            c.classList.toggle('active', c.dataset.crop === target);
+        });
+    };
+
     const handleMessage = (data) => {
         try {
             // WebView2 PostWebMessageAsJson delivers the message as EITHER:
@@ -5034,6 +5061,7 @@
             else if (p.type === 'show_inactivity_prompt') showInactivityPrompt();
             else if (p.type === 'hide_inactivity_prompt') hideInactivityPrompt();
             else if (p.type === 'sync_sleep_timer') syncSleepTimerUI(p.value);
+            else if (p.type === 'letterbox_crop_state') syncCropChipsUI(p.mode);
             else if (p.type === 'seek_thumbnail_response') {
                 if (p.dataUri && typeof p.timeMs === 'number') {
                     const bucket = Math.round(p.timeMs / 2000) * 2000;
@@ -7018,6 +7046,19 @@
         const defDither = document.querySelector('#ditherChips .chip[data-dither="fruit"]');
         if (defDither) defDither.classList.add('active');
         send('setMpvProperty', 'dither:fruit');
+
+        // Reset Ambient Mode
+        ambientModeEnabled = false;
+        syncAmbientModeUI();
+        send('toggleAmbientMode', 'false');
+        document.querySelectorAll('#ambientBlurChips .chip').forEach(c => c.classList.remove('active'));
+        const defAmbientBlur = document.querySelector('#ambientBlurChips .chip[data-blur="20"]');
+        if (defAmbientBlur) defAmbientBlur.classList.add('active');
+        send('setAmbientBlurRadius', '20');
+
+        // Reset Crop Black Bars
+        syncCropChipsUI('off');
+        send('setLetterboxCrop', 'off');
     });
 
     // Scale filter
@@ -7187,6 +7228,34 @@
             send('toggleInterpolation', interpolationEnabled.toString());
         });
     }
+
+    // Ambient mode toggle & blur intensity chips
+    const btnToggleAmbientMode = document.getElementById('btnToggleAmbientMode');
+    if (btnToggleAmbientMode) {
+        btnToggleAmbientMode.addEventListener('click', e => {
+            e.stopPropagation();
+            ambientModeEnabled = !ambientModeEnabled;
+            syncAmbientModeUI();
+            send('toggleAmbientMode', ambientModeEnabled.toString());
+        });
+    }
+    document.querySelectorAll('#ambientBlurChips .chip').forEach(c => {
+        c.addEventListener('click', e => {
+            e.stopPropagation();
+            document.querySelectorAll('#ambientBlurChips .chip').forEach(x => x.classList.remove('active'));
+            c.classList.add('active');
+            send('setAmbientBlurRadius', c.dataset.blur || '20');
+        });
+    });
+
+    document.querySelectorAll('#cropChips .chip').forEach(c => {
+        c.addEventListener('click', e => {
+            e.stopPropagation();
+            const mode = c.dataset.crop || 'off';
+            syncCropChipsUI(mode);
+            send('setLetterboxCrop', mode);
+        });
+    });
 
     // Tabs Navigation (scoped to parent panel)
     function setupTabs(panelId) {

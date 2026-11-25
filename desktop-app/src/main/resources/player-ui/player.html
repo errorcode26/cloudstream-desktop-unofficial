@@ -815,6 +815,20 @@
                         <div class="chip" data-aspect="stretch">Stretch</div>
                     </div>
                 </div>
+                <div class="settings-row-col" style="margin-top: 12px;">
+                    <div>
+                        <span class="settings-label-text">Crop Black Bars</span>
+                        <div class="settings-sublabel">Removes baked-in letterbox bars so Ambient Mode fills top and bottom edges</div>
+                    </div>
+                    <div class="chip-row" id="cropChips" style="margin-top: 4px;">
+                        <div class="chip active" data-crop="off">Off</div>
+                        <div class="chip" data-crop="auto">Auto</div>
+                        <div class="chip" data-crop="1.85">1.85:1</div>
+                        <div class="chip" data-crop="2.00">2.00:1</div>
+                        <div class="chip" data-crop="2.35">2.35:1</div>
+                        <div class="chip" data-crop="2.39">2.39:1</div>
+                    </div>
+                </div>
                 <div class="settings-row" style="margin-top: 14px;">
                     <div>
                         <div class="settings-label-text">Video Zoom</div>
@@ -848,6 +862,24 @@
                     <button class="desktop-switch" id="btnToggleInterpolation">
                         <div class="desktop-switch-thumb"></div>
                     </button>
+                </div>
+                <div class="settings-row" style="margin-top: 10px;">
+                    <div>
+                        <div class="settings-label-text">Ambient Mode</div>
+                        <div class="settings-sublabel">Fills black bars with blurred video colors (requires gpu-next)</div>
+                    </div>
+                    <button class="desktop-switch" id="btnToggleAmbientMode">
+                        <div class="desktop-switch-thumb"></div>
+                    </button>
+                </div>
+                <div class="settings-row-col" id="ambientBlurRow" style="margin-top: 8px; display: none;">
+                    <span class="settings-label-text">Ambient Blur Intensity</span>
+                    <div class="chip-row" id="ambientBlurChips" style="margin-top: 4px;">
+                        <div class="chip" data-blur="10">Subtle</div>
+                        <div class="chip active" data-blur="20">Balanced</div>
+                        <div class="chip" data-blur="35">Soft</div>
+                        <div class="chip" data-blur="60">Heavy</div>
+                    </div>
                 </div>
                 <div class="settings-row" style="margin-top: 10px;">
                     <div>

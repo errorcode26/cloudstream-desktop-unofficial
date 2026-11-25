@@ -513,7 +513,7 @@ fun ComposeNativeWebPlayer(
             val childHwnd = NativePlayerBridge.safeInitWebView(canvasWid, w, h)
             NativePlayerBridge.syncUiScale(globalUiScale)
             MpvLibrary.INSTANCE.mpv_set_option_string(handle, "wid", childHwnd.toString())
-            val voDriver = com.lagradost.common.storage.DesktopDataStore.getKey<String>(PlayerConfig.PREF_VO_DRIVER) ?: "gpu"
+            val voDriver = PlayerConfig.resolveEffectiveVoDriver()
             MpvLibrary.INSTANCE.mpv_set_option_string(handle, "vo", voDriver)
             val gpuApi = com.lagradost.common.storage.DesktopDataStore.getKey<String>(PlayerConfig.PREF_GPU_API) ?: "d3d11"
             MpvLibrary.INSTANCE.mpv_set_option_string(handle, "gpu-api", gpuApi)

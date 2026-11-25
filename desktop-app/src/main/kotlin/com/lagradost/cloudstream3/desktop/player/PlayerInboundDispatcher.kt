@@ -552,6 +552,36 @@ class PlayerInboundDispatcher(
             is PlayerInboundEvent.ToggleInterpolation -> {
                 playerState?.setInterpolation(event.enabled)
             }
+            is PlayerInboundEvent.ToggleAmbientMode -> {
+                scope.launch(Dispatchers.IO) {
+                    if (playerState != null) {
+                        playerState.applyAmbientMode(event.enabled)
+                    } else {
+                        DesktopDataStore.setKey(PlayerConfig.PREF_AMBIENT_MODE, event.enabled)
+                    }
+                    pushMetadataToWebView()
+                }
+            }
+            is PlayerInboundEvent.SetAmbientBlurRadius -> {
+                scope.launch(Dispatchers.IO) {
+                    if (playerState != null) {
+                        playerState.applyAmbientBlurRadius(event.radius)
+                    } else {
+                        DesktopDataStore.setKey(
+                            PlayerConfig.PREF_AMBIENT_BLUR_RADIUS,
+                            PlayerConfig.sanitizeAmbientBlurRadius(event.radius),
+                        )
+                    }
+                    pushMetadataToWebView()
+                }
+            }
+            is PlayerInboundEvent.SetLetterboxCrop -> {
+                scope.launch(Dispatchers.IO) {
+                    val appliedMode = playerState?.applyLetterboxCrop(event.mode) ?: "off"
+                    val payload = mapOf("type" to "letterbox_crop_state", "mode" to appliedMode)
+                    NativePlayerBridge.safePostMessage(playerObjectMapper.writeValueAsString(payload))
+                }
+            }
             is PlayerInboundEvent.ToggleDeband -> {
                 scope.launch(Dispatchers.IO) {
                     DesktopDataStore.setKey(PlayerConfig.PREF_DEBAND, event.enabled)

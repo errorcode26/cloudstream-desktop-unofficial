@@ -147,6 +147,8 @@ data class AppStateUpdatePayload(
     val debugHasEver: Boolean = true,
     val debugPos: Double = 0.0,
     val interpolationEnabled: Boolean = false,
+    val ambientModeEnabled: Boolean = false,
+    val ambientBlurRadius: String = PlayerConfig.DEFAULT_AMBIENT_BLUR_RADIUS,
     val autoPlayEnabled: Boolean = true,
     val showEndTime: Boolean = false,
     val showClock: Boolean = false,

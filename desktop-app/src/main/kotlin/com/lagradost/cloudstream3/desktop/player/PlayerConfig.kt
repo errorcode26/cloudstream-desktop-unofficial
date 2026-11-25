@@ -68,6 +68,25 @@ object PlayerConfig {
     const val PREF_SCRAPE_FLOW_CONTROL = "player_scrape_flow_control"
     const val PREF_PLAYER_UI_THEME = "player_ui_theme" // "modern_default", "horizon_cinema"
     const val PREF_INACTIVITY_EPISODE_LIMIT = "player_inactivity_episode_limit"
+    const val PREF_AMBIENT_MODE = "player_ambient_mode"
+    const val PREF_AMBIENT_BLUR_RADIUS = "player_ambient_blur_radius"
+    const val DEFAULT_AMBIENT_BLUR_RADIUS = "20"
+
+    fun sanitizeAmbientBlurRadius(raw: String?): String {
+        val parsed = raw?.trim()?.toIntOrNull() ?: return DEFAULT_AMBIENT_BLUR_RADIUS
+        return parsed.coerceIn(1, 200).toString()
+    }
+
+    fun isAmbientModeEnabled(): Boolean = DesktopDataStore.getKey<Boolean>(PREF_AMBIENT_MODE) ?: false
+
+    fun resolveAmbientBlurRadius(): String {
+        return sanitizeAmbientBlurRadius(DesktopDataStore.getKey<String>(PREF_AMBIENT_BLUR_RADIUS))
+    }
+
+    fun resolveEffectiveVoDriver(): String {
+        if (isAmbientModeEnabled()) return "gpu-next"
+        return DesktopDataStore.getKey<String>(PREF_VO_DRIVER) ?: "gpu"
+    }
 
     fun getVideoBufferBytes(): Long {
         val pref = com.lagradost.common.storage.DesktopDataStore.getKey<String>(PREF_VIDEO_BUFFER_SIZE)
@@ -123,9 +142,14 @@ object PlayerConfig {
         val startSpeed = DesktopDataStore.getKey<Float>(PREF_PLAYBACK_SPEED) ?: 1f
         lib.mpv_set_option_string(handle, "speed", startSpeed.toString())
 
-        // Video Output Driver: gpu vs gpu-next (libplacebo)
-        val voDriver = DesktopDataStore.getKey<String>(PREF_VO_DRIVER) ?: "gpu"
+        // Video Output Driver: gpu vs gpu-next (libplacebo); Ambient Mode requires gpu-next
+        val ambientMode = isAmbientModeEnabled()
+        val voDriver = resolveEffectiveVoDriver()
         lib.mpv_set_option_string(handle, "vo", voDriver)
+        if (ambientMode) {
+            lib.mpv_set_option_string(handle, "border-background", "blur")
+            lib.mpv_set_option_string(handle, "background-blur-radius", resolveAmbientBlurRadius())
+        }
 
         // Rendering profile & scalers
         val qualityProfile = DesktopDataStore.getKey<String>(PREF_VIDEO_QUALITY_PROFILE) ?: "balanced"

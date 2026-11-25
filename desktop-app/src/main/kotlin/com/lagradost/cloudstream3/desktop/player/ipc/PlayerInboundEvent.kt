@@ -78,6 +78,9 @@ sealed interface PlayerInboundEvent {
 
     // Video Processing & Audio Enhancements
     data class ToggleInterpolation(val enabled: Boolean) : PlayerInboundEvent
+    data class ToggleAmbientMode(val enabled: Boolean) : PlayerInboundEvent
+    data class SetAmbientBlurRadius(val radius: String) : PlayerInboundEvent
+    data class SetLetterboxCrop(val mode: String) : PlayerInboundEvent
     data class ToggleDeband(val enabled: Boolean) : PlayerInboundEvent
     data class SetDebandQuality(val quality: String) : PlayerInboundEvent
     data class SetAudioNormalization(val enabled: Boolean) : PlayerInboundEvent
@@ -204,6 +207,9 @@ sealed interface PlayerInboundEvent {
                 }
 
                 "toggleInterpolation" -> ToggleInterpolation(eventValue.toBoolean())
+                "toggleAmbientMode" -> ToggleAmbientMode(eventValue.toBoolean())
+                "setAmbientBlurRadius" -> SetAmbientBlurRadius(eventValue)
+                "setLetterboxCrop" -> SetLetterboxCrop(eventValue)
                 "toggleDeband" -> ToggleDeband(eventValue.toBoolean())
                 "setDebandQuality" -> SetDebandQuality(eventValue)
                 "setAudioNormalization" -> SetAudioNormalization(eventValue.toBoolean())

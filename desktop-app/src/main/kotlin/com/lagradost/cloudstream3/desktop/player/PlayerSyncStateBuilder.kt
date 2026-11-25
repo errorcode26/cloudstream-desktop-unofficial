@@ -315,6 +315,8 @@ object PlayerSyncStateBuilder {
         fileSizeBytes: Long,
     ): AppStateUpdatePayload {
         val interpolationEnabled = com.lagradost.common.storage.DesktopDataStore.getKey<Boolean>(PlayerConfig.PREF_INTERPOLATION) ?: false
+        val ambientModeEnabled = PlayerConfig.isAmbientModeEnabled()
+        val ambientBlurRadius = PlayerConfig.resolveAmbientBlurRadius()
         val autoPlayEnabled = com.lagradost.common.storage.DesktopDataStore.getKey<Boolean>(PlayerConfig.PREF_AUTO_PLAY) ?: true
         val showEndTime = com.lagradost.common.storage.DesktopDataStore.getKey<Boolean>(PlayerConfig.PREF_SHOW_END_TIME) ?: false
         val showClock = com.lagradost.common.storage.DesktopDataStore.getKey<Boolean>(PlayerConfig.PREF_SHOW_CLOCK) ?: false
@@ -336,6 +338,8 @@ object PlayerSyncStateBuilder {
             debugHasEver = true,
             debugPos = 0.0,
             interpolationEnabled = interpolationEnabled,
+            ambientModeEnabled = ambientModeEnabled,
+            ambientBlurRadius = ambientBlurRadius,
             autoPlayEnabled = autoPlayEnabled,
             showEndTime = showEndTime,
             showClock = showClock,
