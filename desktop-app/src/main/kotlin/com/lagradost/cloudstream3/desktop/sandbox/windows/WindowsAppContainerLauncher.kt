@@ -393,7 +393,7 @@ object WindowsAppContainerLauncher {
         fun exitValue(): Int {
             val exitCode = IntByReference()
             if (!Kernel32.INSTANCE.GetExitCodeProcess(processHandle, exitCode)) {
-                throw IOException("Failed to get process exit code")
+                throw IOException("Failed to get process exit code (Win32 error ${Native.getLastError()})")
             }
             if (exitCode.value == STILL_ACTIVE) {
                 throw IllegalThreadStateException("Process has not exited yet")
@@ -431,7 +431,14 @@ object WindowsAppContainerLauncher {
             val bytesRead = IntByReference()
             val buf = if (off == 0 && len == b.size) b else ByteArray(len)
             val ok = Kernel32.INSTANCE.ReadFile(handle, buf, len, bytesRead, null)
-            if (!ok || bytesRead.value == 0) {
+            if (!ok) {
+                val err = Native.getLastError()
+                if (err != 109) { // 109 = ERROR_BROKEN_PIPE (normal EOF when child closes pipe)
+                    logger.warn("Win32HandleInputStream ReadFile failed with Win32 error $err")
+                }
+                return -1
+            }
+            if (bytesRead.value == 0) {
                 return -1
             }
             if (buf !== b) {

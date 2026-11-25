@@ -12,8 +12,10 @@ import com.sun.jna.Pointer
  */
 internal class MpvTrackManager(
     private val playerState: PlayerState?,
-    private val lib: MpvLibrary = MpvLibrary.INSTANCE,
+    private val libProvider: () -> MpvLibrary? = { MpvLibrary.instanceOrNull },
 ) {
+    private val lib: MpvLibrary? by lazy(libProvider)
+
     var hasAutoSwitchedAudio = false
     var hasAutoSwitchedSub = false
 
@@ -123,7 +125,7 @@ internal class MpvTrackManager(
                 if (target != null) {
                     if (!target.second) {
                         AppLogger.i("DesktopMpvEngine", "Auto-switching audio track to id=${target.first} for priority lang=$langCode")
-                        lib.mpv_set_property_string(h, "aid", target.first.toString())
+                        lib?.mpv_set_property_string(h, "aid", target.first.toString())
                     }
                     hasAutoSwitchedAudio = true
                     break
@@ -139,7 +141,7 @@ internal class MpvTrackManager(
             if (!hasAutoSwitchedSub) {
                 val currentSid = MpvLibrary.getPropertyString(h, "sid")
                 if (currentSid != null && currentSid != "no") {
-                    lib.mpv_set_property_string(h, "sid", "no")
+                    lib?.mpv_set_property_string(h, "sid", "no")
                 }
                 hasAutoSwitchedSub = true
             }
@@ -152,8 +154,8 @@ internal class MpvTrackManager(
                 if (target != null) {
                     if (!target.second) {
                         AppLogger.i("DesktopMpvEngine", "Auto-switching subtitle track to id=${target.first} for priority lang=$langCode")
-                        lib.mpv_set_property_string(h, "sid", target.first.toString())
-                        lib.mpv_set_property_string(h, "sub-visibility", "yes")
+                        lib?.mpv_set_property_string(h, "sid", target.first.toString())
+                        lib?.mpv_set_property_string(h, "sub-visibility", "yes")
                     }
                     hasAutoSwitchedSub = true
                     break

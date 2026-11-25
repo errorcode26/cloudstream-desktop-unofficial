@@ -8,34 +8,51 @@ import com.lagradost.cloudstream3.desktop.ui.screens.downloads.contract.Download
 import com.lagradost.cloudstream3.desktop.ui.screens.downloads.contract.DownloadsUiEffect
 import com.lagradost.cloudstream3.desktop.ui.screens.downloads.contract.DownloadsUiEvent
 import com.lagradost.cloudstream3.desktop.ui.screens.downloads.contract.DownloadsUiState
+import com.lagradost.common.storage.DesktopDataStore
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import java.util.concurrent.atomic.AtomicLong
 
 typealias DownloadsTab = com.lagradost.cloudstream3.desktop.ui.screens.downloads.contract.DownloadsTab
 typealias DownloadsUiState = com.lagradost.cloudstream3.desktop.ui.screens.downloads.contract.DownloadsUiState
 
-class DownloadsViewModel : BaseMviViewModel<DownloadsUiState, DownloadsUiEvent, DownloadsUiEffect>(
+class DownloadsViewModel(
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val readFloatPref: (String) -> Float? = { key -> DesktopDataStore.getKey<Float>(key) },
+    private val writeFloatPref: (String, Float) -> Unit = { key, value -> DesktopDataStore.setKey(key, value) },
+    private val writeStringPref: (String, String) -> Unit = { key, value -> DesktopDataStore.setKey(key, value) },
+    private val resolveDownloadPath: () -> String = { DesktopDownloadManager.downloadsDir.absolutePath },
+    private val dispatchDownloadQueue: () -> Unit = { DesktopDownloadManager.dispatchNextTasks() },
+    initialDownloadPath: String = DesktopDownloadManager.downloadsDir.absolutePath,
+    observeDownloadManager: Boolean = true,
+) : BaseMviViewModel<DownloadsUiState, DownloadsUiEvent, DownloadsUiEffect>(
     initialState = DownloadsUiState(
-        downloadPath = DesktopDownloadManager.downloadsDir.absolutePath,
+        downloadPath = initialDownloadPath,
         downloadThreads = 8f,
         maxConcurrent = 2f,
     ),
 ) {
+    private val prefIoMutex = Mutex()
+    private val threadsEpoch = AtomicLong(0L)
+    private val maxConcurrentEpoch = AtomicLong(0L)
+    private val pathEpoch = AtomicLong(0L)
+
     init {
-        viewModelScope.launch(Dispatchers.IO) {
-            val threads = com.lagradost.common.storage.DesktopDataStore.getKey<Float>(com.lagradost.common.storage.DesktopDataStore.PREF_DOWNLOAD_THREADS) ?: 8f
-            val max = com.lagradost.common.storage.DesktopDataStore.getKey<Float>(com.lagradost.common.storage.DesktopDataStore.PREF_DOWNLOAD_MAX_CONCURRENT) ?: 2f
-            updateState { copy(downloadThreads = threads, maxConcurrent = max) }
-        }
-        viewModelScope.launch {
-            DesktopDownloadManager.tasks.collect { taskList ->
-                updateState { copy(tasks = taskList) }
+        loadDownloadPreferences()
+        if (observeDownloadManager) {
+            viewModelScope.launch {
+                DesktopDownloadManager.tasks.collect { taskList ->
+                    updateState { copy(tasks = taskList) }
+                }
             }
-        }
-        viewModelScope.launch {
-            DesktopDownloadManager.activeSpeed.collect { speed ->
-                updateState { copy(totalActiveSpeed = speed) }
+            viewModelScope.launch {
+                DesktopDownloadManager.activeSpeed.collect { speed ->
+                    updateState { copy(totalActiveSpeed = speed) }
+                }
             }
         }
     }
@@ -62,7 +79,7 @@ class DownloadsViewModel : BaseMviViewModel<DownloadsUiState, DownloadsUiEvent, 
     }
 
     private fun deleteTaskInternal(task: DownloadTask, deleteFile: Boolean) {
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(ioDispatcher) {
             val ok = DesktopDownloadManager.delete(task.id, deleteFile)
             val msg = if (ok) "Deleted '${task.displayTitle}'" else "Removed '${task.displayTitle}' from downloads. File is currently locked by a player."
             sendEffect(DownloadsUiEffect.ShowToast(msg, isError = !ok))
@@ -77,7 +94,7 @@ class DownloadsViewModel : BaseMviViewModel<DownloadsUiState, DownloadsUiEvent, 
     }
 
     private fun deleteShowInternal(showName: String, deleteFiles: Boolean) {
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(ioDispatcher) {
             val showTasks = uiState.value.tasks.filter { it.showName.equals(showName, ignoreCase = true) }
             var deletedCount = 0
             var totalBytesReclaimed = 0L
@@ -97,7 +114,7 @@ class DownloadsViewModel : BaseMviViewModel<DownloadsUiState, DownloadsUiEvent, 
     }
 
     private fun cleanOrphanedJunkInternal() {
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(ioDispatcher) {
             val reclaimed = DesktopDownloadManager.cleanOrphanedTempFiles()
             val msg = if (reclaimed > 0) {
                 "Successfully purged ${formatSize(reclaimed)} of orphaned temp chunks and dangling files."
@@ -108,49 +125,75 @@ class DownloadsViewModel : BaseMviViewModel<DownloadsUiState, DownloadsUiEvent, 
         }
     }
 
+    private fun loadDownloadPreferences() {
+        val loadThreadsEpoch = threadsEpoch.get()
+        val loadMaxEpoch = maxConcurrentEpoch.get()
+        viewModelScope.launch(ioDispatcher) {
+            val (loadedThreads, loadedMaxConcurrent) = prefIoMutex.withLock {
+                val t = readFloatPref(DesktopDataStore.PREF_DOWNLOAD_THREADS) ?: 8f
+                val m = readFloatPref(DesktopDataStore.PREF_DOWNLOAD_MAX_CONCURRENT) ?: 2f
+                t to m
+            }
+            // Guard against overwriting newer user edits completed while preference I/O was in flight
+            updateState {
+                copy(
+                    downloadThreads = if (threadsEpoch.get() == loadThreadsEpoch) loadedThreads else this.downloadThreads,
+                    maxConcurrent = if (maxConcurrentEpoch.get() == loadMaxEpoch) loadedMaxConcurrent else this.maxConcurrent,
+                )
+            }
+        }
+    }
+
     private fun toggleSettings(open: Boolean) {
         if (open) {
-            val currentPath = DesktopDownloadManager.downloadsDir.absolutePath
+            val openPathEpoch = pathEpoch.get()
+            val currentPath = resolveDownloadPath()
             updateState {
                 copy(
                     isSettingsOpen = true,
-                    downloadPath = currentPath,
+                    downloadPath = if (pathEpoch.get() == openPathEpoch) currentPath else downloadPath,
                 )
             }
-            viewModelScope.launch(Dispatchers.IO) {
-                val threads = com.lagradost.common.storage.DesktopDataStore.getKey<Float>(com.lagradost.common.storage.DesktopDataStore.PREF_DOWNLOAD_THREADS) ?: 8f
-                val maxConcurrent = com.lagradost.common.storage.DesktopDataStore.getKey<Float>(com.lagradost.common.storage.DesktopDataStore.PREF_DOWNLOAD_MAX_CONCURRENT) ?: 2f
-                updateState {
-                    copy(
-                        downloadThreads = threads,
-                        maxConcurrent = maxConcurrent,
-                    )
-                }
-            }
+            loadDownloadPreferences()
         } else {
             updateState { copy(isSettingsOpen = false) }
         }
     }
 
     private fun updateDownloadPathInternal(newPath: String) {
+        val epoch = pathEpoch.incrementAndGet()
         updateState { copy(downloadPath = newPath) }
-        viewModelScope.launch(Dispatchers.IO) {
-            com.lagradost.common.storage.DesktopDataStore.setKey(com.lagradost.common.storage.DesktopDataStore.PREF_DOWNLOAD_PATH, newPath)
+        viewModelScope.launch(ioDispatcher) {
+            prefIoMutex.withLock {
+                if (pathEpoch.get() == epoch) {
+                    writeStringPref(DesktopDataStore.PREF_DOWNLOAD_PATH, newPath)
+                }
+            }
         }
     }
 
     private fun updateDownloadThreadsInternal(threads: Float) {
+        val epoch = threadsEpoch.incrementAndGet()
         updateState { copy(downloadThreads = threads) }
-        viewModelScope.launch(Dispatchers.IO) {
-            com.lagradost.common.storage.DesktopDataStore.setKey(com.lagradost.common.storage.DesktopDataStore.PREF_DOWNLOAD_THREADS, threads)
+        viewModelScope.launch(ioDispatcher) {
+            prefIoMutex.withLock {
+                if (threadsEpoch.get() == epoch) {
+                    writeFloatPref(DesktopDataStore.PREF_DOWNLOAD_THREADS, threads)
+                }
+            }
         }
     }
 
     private fun updateMaxConcurrentInternal(max: Float) {
+        val epoch = maxConcurrentEpoch.incrementAndGet()
         updateState { copy(maxConcurrent = max) }
-        viewModelScope.launch(Dispatchers.IO) {
-            com.lagradost.common.storage.DesktopDataStore.setKey(com.lagradost.common.storage.DesktopDataStore.PREF_DOWNLOAD_MAX_CONCURRENT, max)
-            DesktopDownloadManager.dispatchNextTasks()
+        viewModelScope.launch(ioDispatcher) {
+            prefIoMutex.withLock {
+                if (maxConcurrentEpoch.get() == epoch) {
+                    writeFloatPref(DesktopDataStore.PREF_DOWNLOAD_MAX_CONCURRENT, max)
+                }
+            }
+            dispatchDownloadQueue()
         }
     }
 

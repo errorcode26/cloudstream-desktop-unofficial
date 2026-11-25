@@ -4,8 +4,21 @@ import com.lagradost.cloudstream3.desktop.ui.screens.downloads.DownloadsViewMode
 import com.lagradost.cloudstream3.desktop.ui.screens.downloads.contract.DownloadsTab
 import com.lagradost.cloudstream3.desktop.ui.screens.downloads.contract.DownloadsUiEvent
 import com.lagradost.cloudstream3.desktop.ui.screens.downloads.contract.DownloadsUiState
+import com.lagradost.common.storage.DesktopDataStore
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.ExecutorCoroutineDispatcher
+import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
@@ -14,11 +27,44 @@ import kotlin.test.assertTrue
 class DownloadsViewModelTest {
 
     private var activeVm: DownloadsViewModel? = null
+    private var activeDispatcher: ExecutorCoroutineDispatcher? = null
 
     @AfterEach
     fun tearDown() {
         activeVm?.dispose()
         activeVm = null
+        activeDispatcher?.close()
+        activeDispatcher = null
+    }
+
+    private fun createIsolatedDispatcher(): CoroutineDispatcher {
+        return Executors.newSingleThreadExecutor().asCoroutineDispatcher().also {
+            activeDispatcher = it
+        }
+    }
+
+    private fun drainDispatcher(dispatcher: CoroutineDispatcher) = runBlocking {
+        val done = CompletableDeferred<Unit>()
+        CoroutineScope(dispatcher).launch { done.complete(Unit) }
+        withTimeout(5_000L) { done.await() }
+    }
+
+    private fun createIsolatedViewModel(
+        floatPrefs: ConcurrentHashMap<String, Float> = ConcurrentHashMap(),
+        stringPrefs: ConcurrentHashMap<String, String> = ConcurrentHashMap(),
+        ioDispatcher: CoroutineDispatcher = createIsolatedDispatcher(),
+        readFloatOverride: ((String) -> Float?)? = null,
+    ): DownloadsViewModel {
+        return DownloadsViewModel(
+            ioDispatcher = ioDispatcher,
+            readFloatPref = readFloatOverride ?: { key -> floatPrefs[key] },
+            writeFloatPref = { key, value -> floatPrefs[key] = value },
+            writeStringPref = { key, value -> stringPrefs[key] = value },
+            resolveDownloadPath = { "/downloads" },
+            dispatchDownloadQueue = {},
+            initialDownloadPath = "/downloads",
+            observeDownloadManager = false,
+        ).also { activeVm = it }
     }
 
     private fun createSampleTask(
@@ -220,7 +266,7 @@ class DownloadsViewModelTest {
 
     @Test
     fun testDownloadsViewModel_SelectTab() {
-        val vm = DownloadsViewModel().also { activeVm = it }
+        val vm = createIsolatedViewModel()
         assertEquals(DownloadsTab.ALL, vm.uiState.value.activeTab)
 
         vm.onEvent(DownloadsUiEvent.SelectTab(DownloadsTab.SHOWS))
@@ -235,7 +281,7 @@ class DownloadsViewModelTest {
 
     @Test
     fun testDownloadsViewModel_UpdateSearchQuery() {
-        val vm = DownloadsViewModel().also { activeVm = it }
+        val vm = createIsolatedViewModel()
         assertEquals("", vm.uiState.value.searchQuery)
 
         vm.onEvent(DownloadsUiEvent.UpdateSearchQuery("Lord of the Rings"))
@@ -247,10 +293,13 @@ class DownloadsViewModelTest {
 
     @Test
     fun testDownloadsViewModel_ToggleSettingsDialog() {
-        val vm = DownloadsViewModel().also { activeVm = it }
+        val floatPrefs = ConcurrentHashMap<String, Float>()
+        val ioDispatcher = createIsolatedDispatcher()
+        val vm = createIsolatedViewModel(floatPrefs = floatPrefs, ioDispatcher = ioDispatcher)
         assertFalse(vm.uiState.value.isSettingsOpen)
 
         vm.onEvent(DownloadsUiEvent.ToggleSettingsDialog(true))
+        drainDispatcher(ioDispatcher)
         assertTrue(vm.uiState.value.isSettingsOpen)
 
         vm.onEvent(DownloadsUiEvent.ToggleSettingsDialog(false))
@@ -259,7 +308,7 @@ class DownloadsViewModelTest {
 
     @Test
     fun testDownloadsViewModel_DismissJunkMessage() {
-        val vm = DownloadsViewModel().also { activeVm = it }
+        val vm = createIsolatedViewModel()
 
         vm.onEvent(DownloadsUiEvent.DismissJunkMessage)
         assertNull(vm.uiState.value.reclaimedBytesMessage)
@@ -267,23 +316,71 @@ class DownloadsViewModelTest {
 
     @Test
     fun testDownloadsViewModel_UpdateDownloadThreads() {
-        val vm = DownloadsViewModel().also { activeVm = it }
+        val floatPrefs = ConcurrentHashMap<String, Float>()
+        val ioDispatcher = createIsolatedDispatcher()
+        val vm = createIsolatedViewModel(floatPrefs = floatPrefs, ioDispatcher = ioDispatcher)
 
         vm.onEvent(DownloadsUiEvent.UpdateDownloadThreads(16f))
         assertEquals(16f, vm.uiState.value.downloadThreads)
 
         vm.onEvent(DownloadsUiEvent.UpdateDownloadThreads(4f))
         assertEquals(4f, vm.uiState.value.downloadThreads)
+
+        drainDispatcher(ioDispatcher)
+        assertEquals(4f, vm.uiState.value.downloadThreads)
+        assertEquals(4f, floatPrefs[DesktopDataStore.PREF_DOWNLOAD_THREADS])
     }
 
     @Test
     fun testDownloadsViewModel_UpdateMaxConcurrent() {
-        val vm = DownloadsViewModel().also { activeVm = it }
+        val floatPrefs = ConcurrentHashMap<String, Float>()
+        val ioDispatcher = createIsolatedDispatcher()
+        val vm = createIsolatedViewModel(floatPrefs = floatPrefs, ioDispatcher = ioDispatcher)
 
         vm.onEvent(DownloadsUiEvent.UpdateMaxConcurrent(5f))
         assertEquals(5f, vm.uiState.value.maxConcurrent)
 
         vm.onEvent(DownloadsUiEvent.UpdateMaxConcurrent(1f))
         assertEquals(1f, vm.uiState.value.maxConcurrent)
+
+        drainDispatcher(ioDispatcher)
+        assertEquals(1f, vm.uiState.value.maxConcurrent)
+        assertEquals(1f, floatPrefs[DesktopDataStore.PREF_DOWNLOAD_MAX_CONCURRENT])
+    }
+
+    @Test
+    fun testDownloadsViewModel_DelayedInitPrefLoadDoesNotOverwriteUserEdit() {
+        val floatPrefs = ConcurrentHashMap<String, Float>()
+        val readStarted = CountDownLatch(1)
+        val allowReadToFinish = CountDownLatch(1)
+        val ioDispatcher = createIsolatedDispatcher()
+
+        val vm = createIsolatedViewModel(
+            floatPrefs = floatPrefs,
+            ioDispatcher = ioDispatcher,
+            readFloatOverride = { key ->
+                readStarted.countDown()
+                assertTrue(allowReadToFinish.await(5, TimeUnit.SECONDS), "Blocked init read timed out")
+                when (key) {
+                    DesktopDataStore.PREF_DOWNLOAD_THREADS -> 8f
+                    DesktopDataStore.PREF_DOWNLOAD_MAX_CONCURRENT -> 2f
+                    else -> null
+                }
+            },
+        )
+
+        assertTrue(readStarted.await(5, TimeUnit.SECONDS), "Init preference load did not start")
+        vm.onEvent(DownloadsUiEvent.UpdateDownloadThreads(16f))
+        vm.onEvent(DownloadsUiEvent.UpdateMaxConcurrent(5f))
+        assertEquals(16f, vm.uiState.value.downloadThreads)
+        assertEquals(5f, vm.uiState.value.maxConcurrent)
+
+        allowReadToFinish.countDown()
+        drainDispatcher(ioDispatcher)
+
+        assertEquals(16f, vm.uiState.value.downloadThreads)
+        assertEquals(5f, vm.uiState.value.maxConcurrent)
+        assertEquals(16f, floatPrefs[DesktopDataStore.PREF_DOWNLOAD_THREADS])
+        assertEquals(5f, floatPrefs[DesktopDataStore.PREF_DOWNLOAD_MAX_CONCURRENT])
     }
 }

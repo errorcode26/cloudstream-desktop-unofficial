@@ -10,7 +10,7 @@ class MpvTrackManagerTest {
     @Test
     fun testTrackManagerReset() {
         val playerState = PlayerState()
-        val manager = MpvTrackManager(playerState)
+        val manager = MpvTrackManager(playerState, libProvider = { null })
 
         manager.hasAutoSwitchedAudio = true
         manager.hasAutoSwitchedSub = true
@@ -19,6 +19,14 @@ class MpvTrackManagerTest {
 
         assertFalse(manager.hasAutoSwitchedAudio, "hasAutoSwitchedAudio must be false after reset")
         assertFalse(manager.hasAutoSwitchedSub, "hasAutoSwitchedSub must be false after reset")
+    }
+
+    @Test
+    fun testTrackManagerDefaultConstruction_DoesNotEagerlyRequireNativeLibrary() {
+        val manager = MpvTrackManager(PlayerState())
+        manager.hasAutoSwitchedAudio = true
+        manager.reset()
+        assertFalse(manager.hasAutoSwitchedAudio)
     }
 
     @Test

@@ -94,11 +94,43 @@ class WindowsSandboxTest {
         }
     }
 
+    private data class ProcessResult(
+        val exitCode: Int,
+        val stdout: String,
+        val stderr: String,
+    )
+
+    private fun awaitAndCapture(
+        process: WindowsAppContainerLauncher.SandboxedProcess,
+        timeoutMs: Long = 10_000L,
+    ): ProcessResult {
+        var stdout = ""
+        var stderr = ""
+        val outThread = Thread { stdout = process.stdout.bufferedReader().readText() }.apply {
+            isDaemon = true
+            start()
+        }
+        val errThread = Thread { stderr = process.stderr.bufferedReader().readText() }.apply {
+            isDaemon = true
+            start()
+        }
+        val exited = process.waitFor(timeoutMs)
+        assertTrue(exited, "Sandboxed process did not exit within ${timeoutMs}ms")
+        outThread.join(timeoutMs)
+        errThread.join(timeoutMs)
+        return ProcessResult(
+            exitCode = process.exitValue(),
+            stdout = stdout,
+            stderr = stderr,
+        )
+    }
+
     @Test
     fun testLaunchJvmInsideAppContainer() {
         assumeTrue(isWindows(), "AppContainer process launching is only available on Windows")
 
-        val containerName = "CloudStream.Worker.JvmLaunchTest"
+        val runId = System.nanoTime()
+        val containerName = "CloudStream.Worker.JvmLaunchTest.$runId"
         val sid = WindowsAppContainerApi.getOrCreateAppContainer(
             containerName = containerName,
             capabilities = listOf(WindowsAppContainerApi.CAPABILITY_INTERNET_CLIENT)
@@ -112,10 +144,11 @@ class WindowsSandboxTest {
         // Grant read access to JRE directory so sandboxed JVM can load its native runtime DLLs and modules
         WindowsSandboxAcl.grantFolderAccess(javaHome, sid, readOnly = true, allowExecute = true)
 
-        val job = WindowsJobObject("CS3_Jvm_Job", 512L * 1024L * 1024L)
+        val job = WindowsJobObject("CS3_Jvm_Job_$runId", 512L * 1024L * 1024L)
+        var process: WindowsAppContainerLauncher.SandboxedProcess? = null
 
         try {
-            val process = WindowsAppContainerLauncher.launch(
+            process = WindowsAppContainerLauncher.launch(
                 commandLine = "\"${javaExe.absolutePath}\" -version",
                 containerName = containerName,
                 workingDir = File(System.getenv("SystemRoot") ?: "C:\\Windows", "System32"),
@@ -123,22 +156,17 @@ class WindowsSandboxTest {
                 jobObject = job
             )
 
-            val stdout = process.stdout.bufferedReader().readText()
-            val stderr = process.stderr.bufferedReader().readText()
-            process.waitFor(5000)
-
-            val exitCode = process.exitValue()
-            val combinedOutput = "$stdout\n$stderr"
+            val result = awaitAndCapture(process)
+            val combinedOutput = "${result.stdout}\n${result.stderr}"
             println("Sandboxed JVM Output:\n$combinedOutput")
 
-            assertEquals(0, exitCode, "Sandboxed JVM (java.exe -version) must exit with code 0. Stderr: $stderr")
+            assertEquals(0, result.exitCode, "Sandboxed JVM (java.exe -version) must exit with code 0. Stderr: ${result.stderr}")
             assertTrue(
                 combinedOutput.lowercase().contains("version") || combinedOutput.lowercase().contains("runtime"),
                 "Output must contain JVM runtime version confirmation"
             )
-
-            process.close()
         } finally {
+            process?.close()
             job.close()
             WindowsAppContainerApi.deleteAppContainer(containerName)
         }
@@ -148,14 +176,16 @@ class WindowsSandboxTest {
     fun testLaunchWhoamiLowIntegrityInsideAppContainer() {
         assumeTrue(isWindows(), "AppContainer process launching is only available on Windows")
 
-        val containerName = "CloudStream.Worker.IntegrityTest"
-        val job = WindowsJobObject("CS3_Integrity_Job", 512L * 1024L * 1024L)
+        val runId = System.nanoTime()
+        val containerName = "CloudStream.Worker.IntegrityTest.$runId"
+        val job = WindowsJobObject("CS3_Integrity_Job_$runId", 512L * 1024L * 1024L)
         val systemRoot = System.getenv("SystemRoot") ?: "C:\\Windows"
         val system32Dir = File(systemRoot, "System32")
         val whoamiBinary = File(system32Dir, "whoami.exe").absolutePath
+        var process: WindowsAppContainerLauncher.SandboxedProcess? = null
 
         try {
-            val process = WindowsAppContainerLauncher.launch(
+            process = WindowsAppContainerLauncher.launch(
                 commandLine = "\"$whoamiBinary\" /groups",
                 containerName = containerName,
                 workingDir = system32Dir,
@@ -163,26 +193,21 @@ class WindowsSandboxTest {
                 jobObject = job
             )
 
-            val stdout = process.stdout.bufferedReader().readText()
-            val stderr = process.stderr.bufferedReader().readText()
-            process.waitFor(5000)
+            val result = awaitAndCapture(process)
+            println("Sandboxed whoami /groups Output:\n${result.stdout}\nStderr: ${result.stderr}")
 
-            val exitCode = process.exitValue()
-            println("Sandboxed whoami /groups Output:\n$stdout\nStderr: $stderr")
-
-            assertEquals(0, exitCode, "whoami /groups should exit with code 0")
+            assertEquals(0, result.exitCode, "whoami /groups should exit with code 0")
 
             assertTrue(
-                stdout.contains("Low Mandatory Level") && stdout.contains("S-1-16-4096"),
+                result.stdout.contains("Low Mandatory Level") && result.stdout.contains("S-1-16-4096"),
                 "Output must verify Low Mandatory Level integrity containment (S-1-16-4096)"
             )
             assertTrue(
-                stdout.contains("Group used for deny only") || stdout.contains("S-1-16-4096"),
+                result.stdout.contains("Group used for deny only") || result.stdout.contains("S-1-16-4096"),
                 "Output must verify administrator privileges are stripped (deny only)"
             )
-
-            process.close()
         } finally {
+            process?.close()
             job.close()
             WindowsAppContainerApi.deleteAppContainer(containerName)
         }
