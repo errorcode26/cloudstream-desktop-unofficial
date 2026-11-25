@@ -141,8 +141,8 @@ class WindowsSandboxTest {
         val javaExe = File(javaHome, "bin/java.exe")
         assertTrue(javaExe.exists(), "java.exe must exist in current java.home")
 
-        // Grant read access to JRE directory so sandboxed JVM can load its native runtime DLLs and modules
-        WindowsSandboxAcl.grantFolderAccess(javaHome, sid, readOnly = true, allowExecute = true)
+        // Grant read access to JRE directory and bootstrap files so sandboxed JVM can open jvm.cfg and runtime DLLs
+        WindowsSandboxAcl.grantJvmRuntimeAccess(javaHome, sid)
 
         val job = WindowsJobObject("CS3_Jvm_Job_$runId", 512L * 1024L * 1024L)
         var process: WindowsAppContainerLauncher.SandboxedProcess? = null

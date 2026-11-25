@@ -150,11 +150,21 @@ object WindowsSandboxAcl {
     }
 
     /**
-     * Grants the specified AppContainer SID full read/write access to the target folder and all sub-items.
+     * Grants the specified AppContainer SID read/write access to the target folder and all sub-items.
      */
     fun grantFolderAccess(folder: File, sidString: String, readOnly: Boolean = false, allowExecute: Boolean = false): Boolean {
         if (!folder.exists()) {
             folder.mkdirs()
+        }
+        return grantPathAccess(folder, sidString, readOnly, allowExecute)
+    }
+
+    /**
+     * Grants the specified AppContainer SID access to an existing file or folder without creating directories.
+     */
+    fun grantPathAccess(target: File, sidString: String, readOnly: Boolean = false, allowExecute: Boolean = false): Boolean {
+        if (!target.exists()) {
+            return false
         }
 
         val pSidRef = PointerByReference()
@@ -169,12 +179,11 @@ object WindowsSandboxAcl {
         }
 
         val pSid = pSidRef.value
-        val pathStr = WString(folder.absolutePath)
+        val pathStr = WString(target.absolutePath)
         val pSecDescRef = PointerByReference()
         val pOldDaclRef = PointerByReference()
 
         try {
-            // Get existing DACL
             val getResult = Advapi32Acl.INSTANCE.GetNamedSecurityInfoW(
                 pathStr,
                 SE_FILE_OBJECT,
@@ -187,10 +196,9 @@ object WindowsSandboxAcl {
             )
 
             if (getResult != 0) {
-                logger.warn("GetNamedSecurityInfoW returned $getResult for '${folder.absolutePath}'. Will create fresh DACL.")
+                logger.warn("GetNamedSecurityInfoW returned $getResult for '${target.absolutePath}'. Will create fresh DACL.")
             }
 
-            // Create explicit access entry for the container SID
             val ea = EXPLICIT_ACCESS_W().apply {
                 grfAccessPermissions = if (readOnly) {
                     if (allowExecute) FILE_GENERIC_READ or FILE_GENERIC_EXECUTE else FILE_GENERIC_READ
@@ -198,7 +206,7 @@ object WindowsSandboxAcl {
                     if (allowExecute) FILE_ALL_ACCESS else FILE_DATA_READ_WRITE
                 }
                 grfAccessMode = SET_ACCESS
-                grfInheritance = SUB_CONTAINERS_AND_OBJECTS_INHERIT
+                grfInheritance = if (target.isDirectory) SUB_CONTAINERS_AND_OBJECTS_INHERIT else 0
                 Trustee.TrusteeForm = TRUSTEE_IS_SID
                 Trustee.TrusteeType = TRUSTEE_IS_UNKNOWN
                 Trustee.ptstrName = pSid
@@ -219,7 +227,6 @@ object WindowsSandboxAcl {
             }
 
             try {
-                // Apply new DACL to the folder
                 val setResult = Advapi32Acl.INSTANCE.SetNamedSecurityInfoW(
                     pathStr,
                     SE_FILE_OBJECT,
@@ -232,14 +239,14 @@ object WindowsSandboxAcl {
 
                 if (setResult != 0) {
                     if (setResult == 5) {
-                        logger.debug("SetNamedSecurityInfoW returned ACCESS_DENIED (5) for '${folder.absolutePath}'. Assuming default system permissions.")
+                        logger.debug("SetNamedSecurityInfoW returned ACCESS_DENIED (5) for '${target.absolutePath}'. Assuming default system permissions.")
                     } else {
-                        logger.error("SetNamedSecurityInfoW failed with error code $setResult for '${folder.absolutePath}'")
+                        logger.error("SetNamedSecurityInfoW failed with error code $setResult for '${target.absolutePath}'")
                     }
                     return false
                 }
 
-                logger.info("Successfully granted AppContainer ACL to '${folder.absolutePath}' for SID $sidString")
+                logger.info("Successfully granted AppContainer ACL to '${target.absolutePath}' for SID $sidString")
                 return true
             } finally {
                 Kernel32.INSTANCE.LocalFree(pNewDaclRef.value)
@@ -249,6 +256,22 @@ object WindowsSandboxAcl {
                 Kernel32.INSTANCE.LocalFree(pSecDescRef.value)
             }
             Kernel32.INSTANCE.LocalFree(pSid)
+        }
+    }
+
+    /**
+     * Grants read/execute ACLs for a Java runtime root and critical bootstrap subpaths (`bin`, `lib`, `lib/jvm.cfg`, `conf`)
+     * so AppContainer child processes do not fail opening `jvm.cfg` when folder inheritance alone skips existing files.
+     */
+    fun grantJvmRuntimeAccess(javaRoot: File, sidString: String) {
+        if (javaRoot.exists()) {
+            grantPathAccess(javaRoot, sidString, readOnly = true, allowExecute = true)
+        }
+        listOf("bin", "lib", "lib/jvm.cfg", "conf").forEach { relative ->
+            val target = File(javaRoot, relative)
+            if (target.exists()) {
+                grantPathAccess(target, sidString, readOnly = true, allowExecute = target.isDirectory)
+            }
         }
     }
 

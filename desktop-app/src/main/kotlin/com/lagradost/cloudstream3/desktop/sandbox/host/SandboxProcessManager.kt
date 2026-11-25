@@ -14,11 +14,14 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import org.slf4j.LoggerFactory
 import java.io.BufferedWriter
@@ -238,9 +241,11 @@ class SandboxProcessManager(
         val exeDir = javaExeFile.parentFile
         if (exeDir != null && exeDir.exists()) {
             try {
-                WindowsSandboxAcl.grantFolderAccess(exeDir, sid, readOnly = true, allowExecute = true)
-                exeDir.parentFile?.let { exeRoot ->
-                    WindowsSandboxAcl.grantFolderAccess(exeRoot, sid, readOnly = true, allowExecute = true)
+                val exeRoot = exeDir.parentFile
+                if (exeRoot != null && exeRoot.exists()) {
+                    WindowsSandboxAcl.grantJvmRuntimeAccess(exeRoot, sid)
+                } else {
+                    WindowsSandboxAcl.grantFolderAccess(exeDir, sid, readOnly = true, allowExecute = true)
                 }
             } catch (t: Throwable) {
                 logger.debug("Granting ACL for worker binary dir ${exeDir.absolutePath}: ${t.message}")
@@ -324,50 +329,8 @@ class SandboxProcessManager(
             this.processWriter = BufferedWriter(OutputStreamWriter(process.stdin, StandardCharsets.UTF_8), 65536)
         }
 
-        // Background stdout reader
-        scope.launch {
-            val reader = java.io.BufferedReader(java.io.InputStreamReader(process.stdout, StandardCharsets.UTF_8), 65536)
-            try {
-                while (isActive) {
-                    val line = reader.readLine() ?: break
-                    val trimmed = line.trim()
-                    if (!trimmed.startsWith("{") || !trimmed.endsWith("}")) {
-                        logger.debug("Ignoring non-JSON line from worker stdout: {}", trimmed)
-                        continue
-                    }
-
-                    if (trimmed.contains("\"type\":\"CALLBACK_REQUEST\"") || trimmed.contains("\"callbackId\"")) {
-                        try {
-                            val cbReq = WorkerProtocolSerializer.deserializeCallbackRequest(trimmed)
-                            scope.launch {
-                                onCallbackRequest?.invoke(cbReq)
-                            }
-                        } catch (e: Throwable) {
-                            logger.error("Failed to parse callback request from worker: $trimmed", e)
-                        }
-                        continue
-                    }
-
-                    try {
-                        val resp = WorkerProtocolSerializer.deserializeResponse(trimmed)
-                        val pending = pendingRequests[resp.id]
-                        if (pending != null && pending.generation == generation) {
-                            pendingRequests.remove(resp.id, pending)
-                            pending.deferred.complete(resp)
-                        }
-                    } catch (e: Throwable) {
-                        logger.error("Failed to parse response JSON from worker: $line", e)
-                    }
-                }
-            } catch (e: Throwable) {
-                logger.warn("Worker stdout reader stream closed: ${e.message}")
-            } finally {
-                handleWorkerTermination(process, job, generation)
-            }
-        }
-
-        // Background stderr logger
-        scope.launch {
+        // Background stderr logger (launched before stdout reader so termination can join it deterministically)
+        val stderrJob = scope.launch {
             val errReader = process.stderr.bufferedReader(StandardCharsets.UTF_8)
             try {
                 while (isActive) {
@@ -437,6 +400,48 @@ class SandboxProcessManager(
             }
         }
 
+        // Background stdout reader
+        scope.launch {
+            val reader = java.io.BufferedReader(java.io.InputStreamReader(process.stdout, StandardCharsets.UTF_8), 65536)
+            try {
+                while (isActive) {
+                    val line = reader.readLine() ?: break
+                    val trimmed = line.trim()
+                    if (!trimmed.startsWith("{") || !trimmed.endsWith("}")) {
+                        logger.debug("Ignoring non-JSON line from worker stdout: {}", trimmed)
+                        continue
+                    }
+
+                    if (trimmed.contains("\"type\":\"CALLBACK_REQUEST\"") || trimmed.contains("\"callbackId\"")) {
+                        try {
+                            val cbReq = WorkerProtocolSerializer.deserializeCallbackRequest(trimmed)
+                            scope.launch {
+                                onCallbackRequest?.invoke(cbReq)
+                            }
+                        } catch (e: Throwable) {
+                            logger.error("Failed to parse callback request from worker: $trimmed", e)
+                        }
+                        continue
+                    }
+
+                    try {
+                        val resp = WorkerProtocolSerializer.deserializeResponse(trimmed)
+                        val pending = pendingRequests[resp.id]
+                        if (pending != null && pending.generation == generation) {
+                            pendingRequests.remove(resp.id, pending)
+                            pending.deferred.complete(resp)
+                        }
+                    } catch (e: Throwable) {
+                        logger.error("Failed to parse response JSON from worker: $line", e)
+                    }
+                }
+            } catch (e: Throwable) {
+                logger.warn("Worker stdout reader stream closed: ${e.message}")
+            } finally {
+                handleWorkerTermination(process, job, generation, stderrJob)
+            }
+        }
+
         logger.info("Sandboxed worker process started successfully (PID: ${process.pid})")
         com.lagradost.common.logging.AppLogger.i("Sandbox:Process", "Sandboxed worker process started successfully (PID: ${process.pid})")
     }
@@ -452,20 +457,14 @@ class SandboxProcessManager(
         }
     }
 
-    private fun handleWorkerTermination(
+    private suspend fun handleWorkerTermination(
         terminatedProcess: WindowsAppContainerLauncher.SandboxedProcess,
         terminatedJob: WindowsJobObject,
         terminatedGeneration: Long,
+        stderrJob: Job,
     ) {
-        val exit = try { terminatedProcess.exitValue() } catch (_: Throwable) { null }
-        val exitHex = exit?.let { "0x" + Integer.toHexString(it).uppercase() } ?: "unknown"
-
-        // Allow a brief window for background stderr reader to flush any fatal error lines before closing handles.
-        try { Thread.sleep(100) } catch (_: Throwable) {}
-
         val isActiveInstance = synchronized(processStateLock) {
             if (currentProcess === terminatedProcess) {
-                lastExitCode = "$exit ($exitHex)"
                 currentProcess = null
                 processWriter = null
                 currentJobObject = null
@@ -476,6 +475,27 @@ class SandboxProcessManager(
             }
         }
 
+        if (!isActiveInstance) {
+            // recycleWorker() already terminated and closed this instance's handles; avoid racing or double-closing.
+            failPendingForGeneration(
+                generation = terminatedGeneration,
+                reason = "Sandboxed worker process recycled",
+            )
+            logger.debug("Stale worker generation {} finished cleanup", terminatedGeneration)
+            return
+        }
+
+        // Wait deterministically for buffered stderr error lines to flush before closing handles.
+        try {
+            withContext(NonCancellable) {
+                withTimeoutOrNull(250L) { stderrJob.join() }
+            }
+        } catch (_: Throwable) {}
+
+        val exit = try { terminatedProcess.exitValue() } catch (_: Throwable) { null }
+        val exitHex = exit?.let { "0x" + Integer.toHexString(it).uppercase() } ?: "unknown"
+        lastExitCode = "$exit ($exitHex)"
+
         failPendingForGeneration(
             generation = terminatedGeneration,
             reason = "Sandboxed worker process terminated unexpectedly (exit: $exitHex)",
@@ -484,23 +504,19 @@ class SandboxProcessManager(
         try { terminatedProcess.close() } catch (_: Throwable) {}
         try { terminatedJob.close() } catch (_: Throwable) {}
 
-        if (isActiveInstance) {
-            scope.launch(Dispatchers.IO) {
-                try {
-                    File(PlatformPaths.sandboxDir, "tmp").listFiles()?.forEach { file ->
-                        try { file.deleteRecursively() } catch (t: Throwable) {
-                            logger.debug("Failed cleaning sandbox tmp during termination: ${t.message}")
-                        }
+        scope.launch(Dispatchers.IO) {
+            try {
+                File(PlatformPaths.sandboxDir, "tmp").listFiles()?.forEach { file ->
+                    try { file.deleteRecursively() } catch (t: Throwable) {
+                        logger.debug("Failed cleaning sandbox tmp during termination: ${t.message}")
                     }
-                } catch (t: Throwable) {
-                    logger.debug("Failed accessing sandbox tmp during termination: ${t.message}")
                 }
+            } catch (t: Throwable) {
+                logger.debug("Failed accessing sandbox tmp during termination: ${t.message}")
             }
-            logger.warn("Sandboxed worker process terminated. Exit code: $exit ($exitHex). Ready for auto-recovery on next query.")
-            com.lagradost.common.logging.AppLogger.w("Sandbox:Process", "Sandboxed worker process terminated. Exit code: $exit ($exitHex). Ready for auto-recovery on next query.")
-        } else {
-            logger.debug("Stale worker generation {} finished cleanup (exit: {} ({}))", terminatedGeneration, exit, exitHex)
         }
+        logger.warn("Sandboxed worker process terminated. Exit code: $exit ($exitHex). Ready for auto-recovery on next query.")
+        com.lagradost.common.logging.AppLogger.w("Sandbox:Process", "Sandboxed worker process terminated. Exit code: $exit ($exitHex). Ready for auto-recovery on next query.")
     }
 
     private fun registerAndWriteLocked(request: WorkerRequest): PendingWorkerRequest {

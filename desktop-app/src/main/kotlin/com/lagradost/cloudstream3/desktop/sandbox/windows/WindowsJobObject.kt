@@ -11,6 +11,7 @@ import com.sun.jna.win32.StdCallLibrary
 import com.sun.jna.win32.W32APIOptions
 import org.slf4j.LoggerFactory
 import java.io.Closeable
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Windows Job Object wrapper for constraining child worker processes.
@@ -24,6 +25,7 @@ class WindowsJobObject(
 ) : Closeable {
 
     private val logger = LoggerFactory.getLogger(WindowsJobObject::class.java)
+    private val closed = AtomicBoolean(false)
 
     var handle: WinNT.HANDLE? = null
         private set
@@ -156,11 +158,13 @@ class WindowsJobObject(
      * Assigns a process handle directly to this Job Object.
      */
     fun assignProcessHandle(hProcess: WinNT.HANDLE): Boolean {
+        if (closed.get()) return false
         val hJob = handle ?: return false
         return JobKernel32.INSTANCE.AssignProcessToJobObject(hJob, hProcess)
     }
 
     override fun close() {
+        if (!closed.compareAndSet(false, true)) return
         handle?.let {
             if (it != WinNT.INVALID_HANDLE_VALUE) {
                 Kernel32.INSTANCE.CloseHandle(it)

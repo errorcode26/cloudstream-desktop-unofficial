@@ -21,6 +21,7 @@ import java.io.File
 import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Launches child processes constrained strictly within a Windows AppContainer and Win32 Job Object.
@@ -377,20 +378,28 @@ object WindowsAppContainerLauncher {
         val jobObject: WindowsJobObject?
     ) : Closeable {
 
-        fun isAlive(): Boolean {
+        private val closed = AtomicBoolean(false)
+        private val closeLock = Any()
+
+        fun isAlive(): Boolean = synchronized(closeLock) {
+            if (closed.get()) return@synchronized false
             val exitCode = IntByReference()
             if (!Kernel32.INSTANCE.GetExitCodeProcess(processHandle, exitCode)) {
-                return false
+                return@synchronized false
             }
-            return exitCode.value == STILL_ACTIVE
+            exitCode.value == STILL_ACTIVE
         }
 
         fun waitFor(timeoutMs: Long = WinBase.INFINITE.toLong()): Boolean {
+            if (closed.get()) return false
             val result = Kernel32.INSTANCE.WaitForSingleObject(processHandle, timeoutMs.toInt())
             return result == WAIT_OBJECT_0
         }
 
-        fun exitValue(): Int {
+        fun exitValue(): Int = synchronized(closeLock) {
+            if (closed.get()) {
+                throw IOException("Process handle already closed")
+            }
             val exitCode = IntByReference()
             if (!Kernel32.INSTANCE.GetExitCodeProcess(processHandle, exitCode)) {
                 throw IOException("Failed to get process exit code (Win32 error ${Native.getLastError()})")
@@ -398,19 +407,29 @@ object WindowsAppContainerLauncher {
             if (exitCode.value == STILL_ACTIVE) {
                 throw IllegalThreadStateException("Process has not exited yet")
             }
-            return exitCode.value
+            exitCode.value
         }
 
-        fun destroy() {
-            Kernel32.INSTANCE.TerminateProcess(processHandle, 1)
-            close()
-        }
-
-        override fun close() {
+        private fun closeHandlesLocked() {
             try { stdin.close() } catch (t: Throwable) { logger.debug("stdin close error: ${t.message}") }
             try { stdout.close() } catch (t: Throwable) { logger.debug("stdout close error: ${t.message}") }
             try { stderr.close() } catch (t: Throwable) { logger.debug("stderr close error: ${t.message}") }
             Kernel32.INSTANCE.CloseHandle(processHandle)
+        }
+
+        fun destroy() {
+            if (!closed.compareAndSet(false, true)) return
+            synchronized(closeLock) {
+                Kernel32.INSTANCE.TerminateProcess(processHandle, 1)
+                closeHandlesLocked()
+            }
+        }
+
+        override fun close() {
+            if (!closed.compareAndSet(false, true)) return
+            synchronized(closeLock) {
+                closeHandlesLocked()
+            }
         }
 
         companion object {
@@ -420,6 +439,8 @@ object WindowsAppContainerLauncher {
     }
 
     private class Win32HandleInputStream(val handle: WinNT.HANDLE) : InputStream() {
+        private val closed = AtomicBoolean(false)
+
         override fun read(): Int {
             val b = ByteArray(1)
             val count = read(b, 0, 1)
@@ -428,9 +449,11 @@ object WindowsAppContainerLauncher {
 
         override fun read(b: ByteArray, off: Int, len: Int): Int {
             if (len == 0) return 0
+            if (closed.get()) return -1
             val bytesRead = IntByReference()
             val buf = if (off == 0 && len == b.size) b else ByteArray(len)
             while (true) {
+                if (closed.get()) return -1
                 val ok = Kernel32.INSTANCE.ReadFile(handle, buf, len, bytesRead, null)
                 if (!ok) {
                     val err = Native.getLastError()
@@ -453,21 +476,27 @@ object WindowsAppContainerLauncher {
         }
 
         override fun close() {
-            Kernel32.INSTANCE.CloseHandle(handle)
+            if (closed.compareAndSet(false, true)) {
+                Kernel32.INSTANCE.CloseHandle(handle)
+            }
         }
     }
 
     private class Win32HandleOutputStream(val handle: WinNT.HANDLE) : OutputStream() {
+        private val closed = AtomicBoolean(false)
+
         override fun write(b: Int) {
             write(byteArrayOf(b.toByte()), 0, 1)
         }
 
         override fun write(b: ByteArray, off: Int, len: Int) {
             if (len == 0) return
+            if (closed.get()) throw IOException("Pipe handle already closed")
             var remaining = len
             var offset = off
             val bytesWritten = IntByReference()
             while (remaining > 0) {
+                if (closed.get()) throw IOException("Pipe handle already closed")
                 val chunk = if (offset == 0 && remaining == b.size) b else b.copyOfRange(offset, offset + remaining)
                 val ok = Kernel32.INSTANCE.WriteFile(handle, chunk, remaining, bytesWritten, null)
     
@@ -489,7 +518,9 @@ object WindowsAppContainerLauncher {
         }
 
         override fun close() {
-            Kernel32.INSTANCE.CloseHandle(handle)
+            if (closed.compareAndSet(false, true)) {
+                Kernel32.INSTANCE.CloseHandle(handle)
+            }
         }
     }
 }
