@@ -52,6 +52,7 @@ fun EpisodeListItem(
     onToggleWatched: (Episode, Boolean) -> Unit,
     onRemoveEpisodeWatched: (Episode) -> Unit,
     onMarkPreviousWatched: ((Episode) -> Unit)? = null,
+    onSyncEpisodeToTracker: ((String, Episode) -> Unit)? = null,
 ) {
     var isHovered by remember { mutableStateOf(false) }
 
@@ -439,25 +440,30 @@ fun EpisodeListItem(
                 }
             }
 
-            // 3. Right Status Indicator
-            if (isWatched && !isEpisodeLocked) {
-                Box(
-                    modifier = Modifier
-                        .clip(CircleShape)
-                        .background(Color(0xFF4CAF50).copy(alpha = 0.92f))
-                        .pointerInput(ep) {
-                            detectTapGestures {
-                                currentOnRemoveEpisodeWatched(ep)
+            // 4. Right Status Indicator
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                if (isWatched && !isEpisodeLocked) {
+                    Box(
+                        modifier = Modifier
+                            .clip(CircleShape)
+                            .background(Color(0xFF4CAF50).copy(alpha = 0.92f))
+                            .pointerInput(ep) {
+                                detectTapGestures {
+                                    currentOnRemoveEpisodeWatched(ep)
+                                }
                             }
-                        }
-                        .padding(8.dp),
-                ) {
-                    Icon(
-                        Icons.Default.Check,
-                        contentDescription = "Watched",
-                        tint = Color.White,
-                        modifier = Modifier.size(16.dp),
-                    )
+                            .padding(8.dp),
+                    ) {
+                        Icon(
+                            Icons.Default.Check,
+                            contentDescription = "Watched",
+                            tint = Color.White,
+                            modifier = Modifier.size(16.dp),
+                        )
+                    }
                 }
             }
         }

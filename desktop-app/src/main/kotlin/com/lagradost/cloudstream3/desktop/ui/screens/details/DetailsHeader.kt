@@ -20,7 +20,7 @@ import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.MoreHoriz
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -431,13 +431,13 @@ fun DetailsMetadata(
 
                                     if (anilistScore != null && anilistScore > 0.0) {
                                         DesktopBadgeComponents.BrandedRatingBadge(
-                                            logoRes = "badges/rating_mal.png",
+                                            logoRes = "badges/tracker_anilist.svg",
                                             scoreText = "${(anilistScore * 10).toInt()}%",
                                             textColor = Color(0xFF02A9FF),
-                                            logoWidth = 32.dp,
+                                            logoWidth = 21.dp,
                                             tooltipText = "Open in AniList (browser)",
                                             onClick = { ExternalLinkHandler.launchSystemBrowser(RatingBadgeUrlResolver.getAniListUrl(data)) },
-                                            logoHeight = 20.dp,
+                                            logoHeight = 21.dp,
                                         )
                                     }
 
@@ -559,6 +559,8 @@ fun DetailsMetadata(
                             onRemoveBookmark = removeBookmarkAction,
                         )
 
+                        val trackersUiState = uiState?.trackers
+
                         val webButton: @Composable (Modifier) -> Unit = { modifier ->
                             DetailsHeroWebButton(
                                 modifier = modifier,
@@ -583,7 +585,7 @@ fun DetailsMetadata(
                             ) {
                                 Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
                                     Icon(
-                                        imageVector = Icons.Default.MoreHoriz,
+                                        imageVector = Icons.Default.MoreVert,
                                         contentDescription = if (isActionsExpanded) "Hide secondary actions" else "Show more actions",
                                         tint = Color.White,
                                         modifier = Modifier
@@ -600,25 +602,31 @@ fun DetailsMetadata(
                                 enter = fadeIn(spring(stiffness = Spring.StiffnessMediumLow)) +
                                     expandHorizontally(
                                         animationSpec = spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessMediumLow),
-                                        expandFrom = Alignment.Start,
+                                        expandFrom = Alignment.End,
                                     ) +
                                     scaleIn(
-                                        initialScale = 0.82f,
+                                        initialScale = 0.86f,
                                         animationSpec = spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessMediumLow),
                                     ),
                                 exit = fadeOut(tween(140)) +
                                     shrinkHorizontally(
                                         animationSpec = tween(170),
-                                        shrinkTowards = Alignment.Start,
+                                        shrinkTowards = Alignment.End,
                                     ) +
                                     scaleOut(
-                                        targetScale = 0.82f,
+                                        targetScale = 0.86f,
                                         animationSpec = tween(170),
                                     ),
                             ) {
                                 Row(
                                     horizontalArrangement = Arrangement.spacedBy(if (isNarrowBtn) 10.dp else 14.dp),
                                     verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(
+                                        start = 6.dp,
+                                        top = 4.dp,
+                                        bottom = 4.dp,
+                                        end = if (isNarrowBtn) 10.dp else 14.dp,
+                                    ),
                                 ) {
                                     libraryButton(Modifier)
                                     downloadAction?.invoke(Modifier)
@@ -626,6 +634,8 @@ fun DetailsMetadata(
                                 }
                             }
                         }
+
+                        val showTrackerPills = trackersUiState != null && trackersUiState.availableTrackers.isNotEmpty()
 
                         if (isButtonsNarrow) {
                             Row(
@@ -640,8 +650,18 @@ fun DetailsMetadata(
                                     heroAction(Modifier.fillMaxWidth())
                                 }
 
-                                moreActionsToggle(true)
-                                bloomingCluster(true)
+                                if (showTrackerPills) {
+                                    DetailsTrackersHeroCluster(
+                                        trackersState = trackersUiState,
+                                        isButtonsNarrow = true,
+                                        onOpenTracker = { pId -> onEvent(DetailsUiEvent.OnOpenTrackerDrawer(pId)) },
+                                    )
+                                }
+
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    bloomingCluster(true)
+                                    moreActionsToggle(true)
+                                }
                             }
                         } else {
                             Column(
@@ -653,8 +673,17 @@ fun DetailsMetadata(
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
                                     heroAction(Modifier.wrapContentWidth())
-                                    moreActionsToggle(false)
-                                    bloomingCluster(false)
+                                    if (showTrackerPills) {
+                                        DetailsTrackersHeroCluster(
+                                            trackersState = trackersUiState,
+                                            isButtonsNarrow = false,
+                                            onOpenTracker = { pId -> onEvent(DetailsUiEvent.OnOpenTrackerDrawer(pId)) },
+                                        )
+                                    }
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        bloomingCluster(false)
+                                        moreActionsToggle(false)
+                                    }
                                 }
                             }
                         }

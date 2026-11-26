@@ -24,12 +24,14 @@ import androidx.compose.ui.unit.sp
 import com.lagradost.cloudstream3.desktop.debrid.torbox.TorboxApiClient
 import com.lagradost.cloudstream3.desktop.debrid.torbox.TorboxDeviceAuthData
 import com.lagradost.cloudstream3.desktop.debrid.torbox.TorboxUserData
+import com.lagradost.cloudstream3.desktop.ui.badges.DesktopBadgeComponents
 import com.lagradost.cloudstream3.desktop.ui.components.CloudstreamCustomDialog
 import com.lagradost.cloudstream3.desktop.ui.components.DesktopButton
 import com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton
 import com.lagradost.cloudstream3.desktop.ui.components.DesktopOutlinedButton
 import com.lagradost.cloudstream3.desktop.ui.components.DesktopTextButton
 import com.lagradost.cloudstream3.desktop.ui.dialogs.TorboxAuthDialog
+import com.lagradost.cloudstream3.desktop.ui.navigation.Config
 import com.lagradost.cloudstream3.desktop.ui.screens.settings.contract.SettingsUiEvent
 import com.lagradost.cloudstream3.syncproviders.AccountManager
 import com.lagradost.cloudstream3.syncproviders.AuthAPI
@@ -39,7 +41,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 @Composable
-fun SettingsAccounts(viewModel: SettingsViewModel) {
+fun SettingsAccounts(
+    viewModel: SettingsViewModel,
+    onNavigate: (Config) -> Unit = {},
+    onNavigateToSubScreen: (SettingsSubScreen) -> Unit = {},
+) {
     val uiState by viewModel.uiState.collectAsState()
     val scope = rememberCoroutineScope()
     var selectedApiForLogin by remember { mutableStateOf<AuthAPI?>(null) }
@@ -86,55 +92,6 @@ fun SettingsAccounts(viewModel: SettingsViewModel) {
             val profiles by com.lagradost.cloudstream3.desktop.profile.ProfileManager.profiles.collectAsState()
             val activeProfile by com.lagradost.cloudstream3.desktop.profile.ProfileManager.activeProfile.collectAsState()
             val isPickerOnStartup by com.lagradost.cloudstream3.desktop.profile.ProfileManager.isPickerOnStartup.collectAsState()
-            var editingProfile by remember { mutableStateOf<com.lagradost.cloudstream3.desktop.profile.Profile?>(null) }
-            var isCreatingNew by remember { mutableStateOf(false) }
-
-            if (editingProfile != null || isCreatingNew) {
-                com.lagradost.cloudstream3.desktop.ui.screens.profile.ProfileEditDialog(
-                    profile = editingProfile,
-                    canDelete = profiles.size > 1,
-                    onDismiss = {
-                        editingProfile = null
-                        isCreatingNew = false
-                    },
-                    onSave = { name, colorIndex, customAvatar, pin, isKids, autoSignIn ->
-                        val targetProfile = editingProfile
-                        scope.launch(Dispatchers.IO) {
-                            if (isCreatingNew) {
-                                val newP = com.lagradost.cloudstream3.desktop.profile.ProfileManager.createProfile(name, colorIndex, customAvatar, pin, isKids)
-                                if (autoSignIn) {
-                                    com.lagradost.cloudstream3.desktop.profile.ProfileManager.switchProfile(newP.id)
-                                    com.lagradost.cloudstream3.desktop.profile.ProfileManager.setAutoSignIn(true)
-                                }
-
-                            } else if (targetProfile != null) {
-                                com.lagradost.cloudstream3.desktop.profile.ProfileManager.updateProfile(
-                                    targetProfile.copy(
-                                        name = name,
-                                        avatarColorIndex = colorIndex,
-                                        customAvatarPath = customAvatar,
-                                        pinCode = pin,
-                                        isKids = isKids,
-                                    ).also { updated ->
-                                        if (autoSignIn) {
-                                            com.lagradost.cloudstream3.desktop.profile.ProfileManager.switchProfile(updated.id)
-                                            com.lagradost.cloudstream3.desktop.profile.ProfileManager.setAutoSignIn(true)
-                                        } else if (com.lagradost.cloudstream3.desktop.profile.ProfileManager.activeProfileId == updated.id && com.lagradost.cloudstream3.desktop.profile.ProfileManager.autoSignIn.value) {
-                                            com.lagradost.cloudstream3.desktop.profile.ProfileManager.setAutoSignIn(false)
-                                        }
-                                        }
-
-                                )
-                            }
-                        }
-                    },
-                    onDelete = {
-                        scope.launch(Dispatchers.IO) {
-                            editingProfile?.let { com.lagradost.cloudstream3.desktop.profile.ProfileManager.deleteProfile(it.id) }
-                        }
-                    },
-                )
-            }
 
             SettingsGroupCard(title = "User Profiles") {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -205,7 +162,7 @@ fun SettingsAccounts(viewModel: SettingsViewModel) {
                                     }
                                 }
                                 DesktopIconButton(
-                                    onClick = { editingProfile = profile },
+                                    onClick = { onNavigate(Config.ProfileEdit(profileId = profile.id, switchOnCreate = false)) },
                                     modifier = Modifier.size(32.dp),
                                 ) {
                                     Icon(androidx.compose.material.icons.Icons.Default.Edit, contentDescription = "Edit Profile", modifier = Modifier.size(16.dp))
@@ -222,7 +179,7 @@ fun SettingsAccounts(viewModel: SettingsViewModel) {
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
-                        DesktopButton(onClick = { isCreatingNew = true }) {
+                        DesktopButton(onClick = { onNavigate(Config.ProfileEdit(profileId = null, switchOnCreate = false)) }) {
                             Text("+ Create New Profile")
                         }
 
@@ -317,31 +274,169 @@ fun SettingsAccounts(viewModel: SettingsViewModel) {
             }
 
             SettingsGroupCard(title = "Trackers & Integrations") {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Column(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(16.dp),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Info,
-                            contentDescription = "Info",
-                            modifier = Modifier.size(48.dp),
-                            tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
-                        )
-                        Text(
-                            text = "Trackers Are Not Supported Yet",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White,
-                        )
-                        Text(
-                            text = "External tracker and sync logins (MAL, AniList, Simkl) are currently disabled for the Desktop Client.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = Color.Gray,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.padding(horizontal = 32.dp),
-                        )
+                val registeredTrackers = remember { com.lagradost.cloudstream3.desktop.tracking.TrackerRegistry.all() }
+                val plannedTrackers = remember { com.lagradost.cloudstream3.desktop.tracking.TrackerRegistry.plannedTrackers }
+                val trackingRepo = remember { com.lagradost.cloudstream3.desktop.di.AppContainerHolder.container.trackingRepository }
+                val settingsVersion by trackingRepo.settingsVersion.collectAsState()
+                val thresholdPct = remember(settingsVersion) { trackingRepo.getAutoSyncThresholdPercent() }
+
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        text = "Connect tracker accounts and choose individually which ones auto-record completed episodes ($thresholdPct% watched).",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+
+                    registeredTrackers.forEachIndexed { index, tracker ->
+                        val auth = cachedAccounts[tracker.id]?.firstOrNull()
+                        val isConnected = auth?.token?.accessToken?.isNotBlank() == true
+                        val autoSyncOn = remember(settingsVersion, tracker.id) { trackingRepo.isAutoSyncEnabled(tracker.id) }
+                        val bindPolicy = remember(settingsVersion, tracker.id) { trackingRepo.getBindPolicy(tracker.id) }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                        ) {
+                            Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                ) {
+                                    DesktopBadgeComponents.TrackerBrandIcon(
+                                        trackerId = tracker.id,
+                                        size = 18.dp,
+                                    )
+                                    Text(
+                                        text = tracker.descriptor.displayName,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                    )
+                                }
+                                Text(
+                                    text = if (isConnected) {
+                                        val syncMode = if (autoSyncOn) "Auto-Track" else "Manual Sync"
+                                        "Connected as ${auth.user.name ?: "${tracker.descriptor.displayName} User"} • $syncMode • ${bindPolicy.displayName}"
+                                    } else {
+                                        "Not connected for '${activeProfile.name}' • Default: ${bindPolicy.displayName}"
+                                    },
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = if (isConnected) MaterialTheme.colorScheme.primary else Color.Gray,
+                                )
+                            }
+
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                ) {
+                                    Text(
+                                        text = "Auto-Track",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = if (autoSyncOn) Color(0xFF4ADE80) else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                    Switch(
+                                        checked = autoSyncOn,
+                                        onCheckedChange = { enabled ->
+                                            scope.launch(Dispatchers.IO) {
+                                                trackingRepo.setAutoSyncEnabled(enabled, tracker.id)
+                                            }
+                                        },
+                                    )
+                                }
+                                if (isConnected) {
+                                    DesktopOutlinedButton(
+                                        onClick = {
+                                            com.lagradost.cloudstream3.desktop.ui.screens.library.LibraryViewModel.requestSection(
+                                                section = com.lagradost.cloudstream3.desktop.ui.screens.library.contract.LibrarySection.Tracker(tracker.id),
+                                            )
+                                            onNavigate(Config.Library)
+                                        },
+                                        modifier = Modifier.height(40.dp),
+                                    ) {
+                                        Text("View in Library")
+                                    }
+                                }
+                                DesktopButton(
+                                    onClick = {
+                                        when (tracker.id) {
+                                            com.lagradost.cloudstream3.desktop.tracking.TrackerIds.ANILIST ->
+                                                onNavigateToSubScreen(SettingsSubScreen.ACCOUNTS_ANILIST)
+                                            com.lagradost.cloudstream3.desktop.tracking.TrackerIds.MAL ->
+                                                onNavigateToSubScreen(SettingsSubScreen.ACCOUNTS_MAL)
+                                            com.lagradost.cloudstream3.desktop.tracking.TrackerIds.SIMKL ->
+                                                onNavigateToSubScreen(SettingsSubScreen.ACCOUNTS_SIMKL)
+                                        }
+                                    },
+                                    modifier = Modifier.height(40.dp),
+                                ) {
+                                    Text(if (isConnected) "Manage Account" else "Sign In")
+                                }
+                            }
+                        }
+
+                        if (index < registeredTrackers.lastIndex || plannedTrackers.isNotEmpty()) {
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+                        }
+                    }
+
+                    plannedTrackers.forEachIndexed { index, planned ->
+                        val plannedColor = Color(planned.accentColorHex)
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                ) {
+                                    Surface(
+                                        shape = RoundedCornerShape(6.dp),
+                                        color = plannedColor.copy(alpha = 0.14f),
+                                    ) {
+                                        Text(
+                                            text = planned.shortTag,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = plannedColor,
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                        )
+                                    }
+                                    Text(
+                                        text = planned.displayName,
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.Medium,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                    )
+                                }
+                                Text(
+                                    text = planned.subtitle,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                            ) {
+                                Text(
+                                    text = "Queued",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                )
+                            }
+                        }
+                        if (index < plannedTrackers.lastIndex) {
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
+                        }
                     }
                 }
             }

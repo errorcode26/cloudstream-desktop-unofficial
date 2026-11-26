@@ -8,11 +8,16 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.lagradost.cloudstream3.desktop.player.PlayerConfig
 import com.lagradost.common.platform.PlatformPaths
 import com.lagradost.common.storage.DesktopDataStore
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import java.io.File
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -557,6 +562,107 @@ fun SettingsPlayerAutoPlayScreen(viewModel: SettingsViewModel) {
                 checked = antiSpoilerEnabled,
                 onCheckedChange = { com.lagradost.cloudstream3.desktop.ui.theme.AppearanceConfig.setAntiSpoilerEnabled(it) },
             )
+        }
+
+        val trackingRepo = remember { com.lagradost.cloudstream3.desktop.di.AppContainerHolder.container.trackingRepository }
+        val trackerSettingsVersion by trackingRepo.settingsVersion.collectAsState()
+        val trackerAccounts by com.lagradost.cloudstream3.syncproviders.AccountManager.accountsFlow.collectAsState()
+        val trackerScope = rememberCoroutineScope()
+        val registeredTrackers = remember { com.lagradost.cloudstream3.desktop.tracking.TrackerRegistry.all() }
+        val anyAutoTrackEnabled = remember(trackerSettingsVersion) {
+            registeredTrackers.any { trackingRepo.isAutoSyncEnabled(it.id) }
+        }
+        val thresholdPct = remember(trackerSettingsVersion) {
+            trackingRepo.getAutoSyncThresholdPercent()
+        }
+
+        SettingsGroupCard(title = "Tracker Progress Auto-Sync") {
+            Text(
+                text = "Choose which trackers automatically record watched episodes & movies once continuous playback passes the completion threshold.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp),
+            )
+
+            registeredTrackers.forEach { tracker ->
+                val isConnected = trackerAccounts[tracker.id]?.firstOrNull()?.token?.accessToken?.isNotBlank() == true
+                val isEnabled = remember(trackerSettingsVersion, tracker.id) {
+                    trackingRepo.isAutoSyncEnabled(tracker.id)
+                }
+                HorizontalDivider(
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.28f),
+                    modifier = Modifier.padding(vertical = 4.dp),
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp, horizontal = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        modifier = Modifier.weight(1f).padding(end = 12.dp),
+                    ) {
+                        com.lagradost.cloudstream3.desktop.ui.badges.DesktopBadgeComponents.TrackerBrandIcon(
+                            trackerId = tracker.id,
+                            size = 18.dp,
+                        )
+                        Column {
+                            Text(
+                                text = "Auto-Track ${tracker.descriptor.displayName}",
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onSurface,
+                            )
+                            Text(
+                                text = when {
+                                    isConnected && isEnabled -> "Connected • Auto-syncing at $thresholdPct%"
+                                    isConnected -> "Connected • Manual sync only"
+                                    else -> "Not signed in (Manage in Settings -> Accounts)"
+                                },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (isConnected && isEnabled) Color(0xFF4ADE80) else MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                    Switch(
+                        checked = isEnabled,
+                        onCheckedChange = { enabled ->
+                            trackerScope.launch(Dispatchers.IO) {
+                                trackingRepo.setAutoSyncEnabled(enabled, tracker.id)
+                            }
+                        },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = MaterialTheme.colorScheme.primary,
+                            checkedTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
+                        ),
+                    )
+                }
+            }
+
+            if (anyAutoTrackEnabled) {
+                HorizontalDivider(
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
+                    modifier = Modifier.padding(vertical = 4.dp),
+                )
+                SettingsDropdownItem(
+                    label = "Auto-Sync Completion Threshold",
+                    subtitle = "Minimum watch percentage before recording remote tracker progress",
+                    options = listOf(
+                        "80" to "80% Watched (Recommended)",
+                        "85" to "85% Watched (Balanced)",
+                        "90" to "90% Watched (Near Credits)",
+                    ),
+                    currentValue = thresholdPct.toString(),
+                    onSelectionChanged = { valStr ->
+                        valStr.toIntOrNull()?.let { pct ->
+                            trackerScope.launch(Dispatchers.IO) {
+                                trackingRepo.setAutoSyncThresholdPercent(pct)
+                            }
+                        }
+                    },
+                )
+            }
         }
     }
 }

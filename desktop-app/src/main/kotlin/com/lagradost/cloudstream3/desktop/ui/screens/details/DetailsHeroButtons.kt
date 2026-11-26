@@ -5,6 +5,8 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.TooltipArea
 import androidx.compose.foundation.TooltipPlacement
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
@@ -27,6 +29,8 @@ import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lagradost.cloudstream3.MainAPI
+import com.lagradost.cloudstream3.desktop.tracking.MatchResolution
+import com.lagradost.cloudstream3.desktop.ui.badges.DesktopBadgeComponents
 import com.lagradost.cloudstream3.desktop.ui.components.CloudstreamAlertDialog
 import com.lagradost.cloudstream3.desktop.ui.components.LocalDesktopTheme
 import com.lagradost.cloudstream3.desktop.utils.ExternalLinkHandler
@@ -193,33 +197,12 @@ fun DetailsHeroLibraryButton(
         Icons.Outlined.BookmarkAdd
     }
     val tooltipText = if (isInLibrary) "Change Library Status" else "Add to Library"
-    val theme = LocalDesktopTheme.current
-    TooltipArea(
-        tooltip = {
-            Surface(
-                shape = RoundedCornerShape(6.dp),
-                color = theme.SurfaceElevated,
-                border = BorderStroke(1.dp, theme.Divider),
-                shadowElevation = 6.dp,
-            ) {
-                Text(
-                    text = tooltipText,
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = theme.TextPrimary,
-                    fontWeight = FontWeight.Medium,
-                )
-            }
-        },
-        delayMillis = 400,
-        tooltipPlacement = TooltipPlacement.CursorPoint(offset = DpOffset(0.dp, 16.dp)),
-    ) {
+    HeroActionTooltip(tooltipText = tooltipText) {
         com.lagradost.cloudstream3.desktop.ui.components.HeroSecondaryButton(
             onClick = onEditStatus,
-            modifier = if (isInLibrary) {
-                modifier.height(if (isButtonsNarrow) 44.dp else 52.dp).animateContentSize()
-            } else {
-                modifier.size(if (isButtonsNarrow) 44.dp else 52.dp)
+            modifier = modifier.let { mod ->
+                if (isInLibrary) mod.height(if (isButtonsNarrow) 44.dp else 52.dp)
+                else mod.size(if (isButtonsNarrow) 44.dp else 52.dp)
             },
             isActive = isInLibrary,
         ) {
@@ -229,6 +212,7 @@ fun DetailsHeroLibraryButton(
                     horizontalArrangement = Arrangement.Center,
                     modifier = Modifier
                         .fillMaxHeight()
+                        .animateContentSize()
                         .padding(horizontal = if (isButtonsNarrow) 12.dp else 16.dp),
                 ) {
                     Icon(
@@ -286,28 +270,7 @@ fun DetailsHeroWebButton(
         }
     } ?: return
 
-    val theme = LocalDesktopTheme.current
-
-    TooltipArea(
-        tooltip = {
-            Surface(
-                shape = RoundedCornerShape(6.dp),
-                color = theme.SurfaceElevated,
-                border = BorderStroke(1.dp, theme.Divider),
-                shadowElevation = 6.dp,
-            ) {
-                Text(
-                    text = "Open source page in browser",
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = theme.TextPrimary,
-                    fontWeight = FontWeight.Medium,
-                )
-            }
-        },
-        delayMillis = 400,
-        tooltipPlacement = TooltipPlacement.CursorPoint(offset = DpOffset(0.dp, 16.dp)),
-    ) {
+    HeroActionTooltip(tooltipText = "Open source page in browser") {
         com.lagradost.cloudstream3.desktop.ui.components.HeroSecondaryButton(
             onClick = { ExternalLinkHandler.launchSystemBrowser(fullWebUrl) },
             modifier = modifier.size(if (isButtonsNarrow) 44.dp else 52.dp),
@@ -356,4 +319,193 @@ fun DetailsHeroTrailerButton(
             )
         }
     }
+}
+
+@Composable
+fun DetailsTrackersHeroCluster(
+    trackersState: com.lagradost.cloudstream3.desktop.ui.screens.details.contract.DetailsTrackersUiState,
+    isButtonsNarrow: Boolean,
+    onOpenTracker: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val available = trackersState.availableTrackers
+    if (available.isEmpty()) return
+
+    val needsConfirmEntries = available.filter {
+        it.resolution is MatchResolution.NeedsConfirmation
+    }
+    val boundEntries = available.filter { it.boundEntry != null }
+    val blockedEntries = available.filter {
+        it.resolution is MatchResolution.BlockedByUser
+    }
+
+    val primaryTarget = needsConfirmEntries.firstOrNull()
+        ?: boundEntries.firstOrNull()
+        ?: available.firstOrNull { it !in blockedEntries }
+        ?: available.first()
+
+    val isAllBlocked = blockedEntries.size == available.size && boundEntries.isEmpty()
+    val hasNeedsConfirm = needsConfirmEntries.isNotEmpty()
+    val firstBound = boundEntries.firstOrNull()
+    val hasCandidatesReady = needsConfirmEntries.any { it.searchResults.isNotEmpty() }
+
+    val stackedIds = remember(boundEntries, needsConfirmEntries, available) {
+        (boundEntries + needsConfirmEntries).ifEmpty { available }
+            .map { it.descriptor.id }
+            .distinct()
+            .take(3)
+    }
+
+    val pillLabel = when {
+        firstBound != null -> {
+            val remote = firstBound.remoteStatus
+            val bound = firstBound.boundEntry
+            val total = remote?.totalEpisodes ?: bound?.expectedTotalEpisodes?.toInt()
+            val prog = remote?.progress ?: firstBound.editProgress
+            val tag = firstBound.descriptor.shortTag
+            if (boundEntries.size > 1) {
+                if (total != null && total > 0) "${boundEntries.size} Trackers · $prog/$total" else "${boundEntries.size} Trackers · Ep $prog"
+            } else {
+                when {
+                    total != null && total > 0 -> "$tag $prog/$total"
+                    prog > 0 -> "$tag Ep $prog"
+                    else -> firstBound.descriptor.displayName
+                }
+            }
+        }
+        hasCandidatesReady -> "Match Found"
+        hasNeedsConfirm -> if (available.size == 1) "Link ${available.first().descriptor.displayName}" else "Track Title"
+        isAllBlocked -> "Tracking Off"
+        else -> "Track Title"
+    }
+
+    val autoTrackedEntries = boundEntries.filter { it.isAutoSyncEnabled }
+    val statusBadgeText = when {
+        firstBound != null && hasCandidatesReady -> "Match Found"
+        autoTrackedEntries.size == 1 && boundEntries.size > 1 -> "Auto: ${autoTrackedEntries.first().descriptor.shortTag}"
+        autoTrackedEntries.size in 2 until boundEntries.size -> "Auto: ${autoTrackedEntries.joinToString(", ") { it.descriptor.shortTag }}"
+        autoTrackedEntries.isNotEmpty() -> "Auto-Track"
+        hasCandidatesReady && needsConfirmEntries.size == 1 -> needsConfirmEntries.first().descriptor.shortTag
+        else -> null
+    }
+    val statusBadgeColor = when {
+        statusBadgeText?.startsWith("Auto") == true -> Color(0xFF4ADE80)
+        statusBadgeText != null -> Color(0xFF38BDF8)
+        else -> Color.White
+    }
+
+    val tooltipText = buildList {
+        boundEntries.forEach { entry ->
+            val bound = entry.boundEntry ?: return@forEach
+            val remote = entry.remoteStatus
+            val total = remote?.totalEpisodes ?: bound.expectedTotalEpisodes?.toInt()
+            val prog = remote?.progress ?: entry.editProgress
+            val progText = if (total != null && total > 0) "$prog/$total" else "Ep $prog"
+            val autoTag = if (entry.isAutoSyncEnabled) "Auto-Track" else "Manual"
+            add("${entry.descriptor.displayName}: ${bound.remoteTitle} ($progText · $autoTag)")
+        }
+        needsConfirmEntries.forEach { entry ->
+            val topCand = entry.searchResults.firstOrNull()
+            if (topCand != null) {
+                add("${entry.descriptor.displayName}: Match found — '${topCand.title}'")
+            } else {
+                add("${entry.descriptor.displayName}: Open drawer to link entry")
+            }
+        }
+        if (isEmpty()) {
+            add(
+                if (isAllBlocked) "Tracking disabled for this show"
+                else "Manage trackers (${available.joinToString(", ") { it.descriptor.displayName }})",
+            )
+        }
+    }.joinToString("\n")
+
+    Box(modifier = modifier) {
+        HeroActionTooltip(tooltipText = tooltipText) {
+            com.lagradost.cloudstream3.desktop.ui.components.HeroSecondaryButton(
+                onClick = { onOpenTracker(primaryTarget.descriptor.id) },
+                modifier = Modifier.height(if (isButtonsNarrow) 44.dp else 52.dp),
+                isActive = boundEntries.isNotEmpty() || hasCandidatesReady,
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(if (isButtonsNarrow) 7.dp else 9.dp),
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .animateContentSize()
+                        .padding(horizontal = if (isButtonsNarrow) 12.dp else 15.dp),
+                ) {
+                    if (isAllBlocked) {
+                        Icon(
+                            imageVector = Icons.Default.Block,
+                            contentDescription = pillLabel,
+                            tint = Color.White.copy(alpha = 0.65f),
+                            modifier = Modifier.size(if (isButtonsNarrow) 16.dp else 18.dp),
+                        )
+                    } else {
+                        DesktopBadgeComponents.TrackerStackedIcons(
+                            trackerIds = stackedIds,
+                            iconSize = if (isButtonsNarrow) 14.dp else 16.dp,
+                        )
+                    }
+                    Text(
+                        text = pillLabel,
+                        color = Color.White,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = if (isButtonsNarrow) 13.sp else 14.sp,
+                        maxLines = 1,
+                    )
+                    if (!isButtonsNarrow && statusBadgeText != null) {
+                        Box(
+                            modifier = Modifier
+                                .background(statusBadgeColor.copy(alpha = 0.16f), CircleShape)
+                                .border(0.8.dp, statusBadgeColor.copy(alpha = 0.45f), CircleShape)
+                                .padding(horizontal = 8.dp, vertical = 2.dp),
+                        ) {
+                            Text(
+                                text = statusBadgeText,
+                                color = statusBadgeColor,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun HeroActionTooltip(
+    tooltipText: String,
+    content: @Composable () -> Unit,
+) {
+    val theme = LocalDesktopTheme.current
+    TooltipArea(
+        tooltip = {
+            Surface(
+                modifier = Modifier.widthIn(max = 220.dp),
+                shape = RoundedCornerShape(6.dp),
+                color = theme.SurfaceElevated,
+                border = BorderStroke(1.dp, theme.Divider),
+                shadowElevation = 6.dp,
+            ) {
+                Text(
+                    text = tooltipText,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = theme.TextPrimary,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        },
+        delayMillis = 400,
+        tooltipPlacement = TooltipPlacement.CursorPoint(offset = DpOffset(0.dp, 16.dp)),
+        content = content,
+    )
 }

@@ -8,6 +8,7 @@ import com.lagradost.cloudstream3.desktop.domain.bookmarks.repository.BookmarksR
 import com.lagradost.cloudstream3.desktop.domain.history.interactor.GetWatchHistory
 import com.lagradost.cloudstream3.desktop.domain.history.interactor.RemoveWatchHistory
 import com.lagradost.cloudstream3.desktop.domain.history.interactor.UpsertWatchHistory
+import com.lagradost.cloudstream3.desktop.domain.tracking.repository.TrackingRepository
 import com.lagradost.cloudstream3.desktop.ui.base.BaseMviViewModel
 import com.lagradost.cloudstream3.desktop.ui.navigation.Config
 import com.lagradost.cloudstream3.desktop.ui.screens.details.contract.DetailsUiEffect
@@ -17,6 +18,8 @@ import com.lagradost.common.logging.AppLogger
 import com.lagradost.common.storage.DesktopDataStore
 import com.lagradost.common.storage.WatchHistory
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 
 class DetailsViewModel(
@@ -27,6 +30,7 @@ class DetailsViewModel(
     val preloadedBg: String? = null,
     val initialSeason: Int? = null,
     val targetEpisodeId: String? = null,
+    val canonicalSeed: com.lagradost.cloudstream3.desktop.metadata.CanonicalMediaSeed? = null,
     cachedResponse: LoadResponse? = DetailsCache.get(url),
     cachedUiState: DetailsUiState? = EnrichedDetailsCache.get(url),
     private val getWatchHistory: GetWatchHistory = AppContainerHolder.container.getWatchHistory,
@@ -34,15 +38,29 @@ class DetailsViewModel(
     private val removeWatchHistory: RemoveWatchHistory = AppContainerHolder.container.removeWatchHistory,
     private val getBookmarks: GetBookmarks = AppContainerHolder.container.getBookmarks,
     private val bookmarksRepository: BookmarksRepository = AppContainerHolder.container.bookmarksRepository,
+    private val trackingRepository: TrackingRepository = AppContainerHolder.container.trackingRepository,
+    private val trackerSyncEngine: com.lagradost.cloudstream3.desktop.tracking.TrackerSyncEngine? = runCatching {
+        AppContainerHolder.container.trackerSyncEngine
+    }.getOrNull(),
 ) : BaseMviViewModel<DetailsUiState, DetailsUiEvent, DetailsUiEffect>(
     initialState = cachedUiState?.copy(
         fetchFailed = false,
         error = null,
         selectedSeason = initialSeason ?: cachedUiState.selectedSeason,
         hasUserSelectedSeason = initialSeason != null,
+        canonicalSeed = canonicalSeed ?: cachedUiState.canonicalSeed,
+        tmdbId = canonicalSeed?.tmdbId ?: cachedUiState.tmdbId,
+        imdbId = canonicalSeed?.imdbId ?: cachedUiState.imdbId,
+        anilistId = canonicalSeed?.anilistId ?: cachedUiState.anilistId,
+        malId = canonicalSeed?.malId ?: cachedUiState.malId,
     ) ?: DetailsUiState(
         preloadedName = preloadedName,
         response = cachedResponse,
+        tmdbId = canonicalSeed?.tmdbId,
+        imdbId = canonicalSeed?.imdbId,
+        anilistId = canonicalSeed?.anilistId,
+        malId = canonicalSeed?.malId,
+        canonicalSeed = canonicalSeed,
         selectedSeason = initialSeason,
         hasUserSelectedSeason = initialSeason != null,
         enrichedLogoUrl = cachedResponse?.logoUrl,
@@ -65,6 +83,17 @@ class DetailsViewModel(
         },
     ),
 ) {
+
+    private val trackerCoordinator = DetailsTrackerCoordinator(
+        scope = viewModelScope,
+        provider = provider,
+        fallbackUrl = url,
+        preloadedName = preloadedName,
+        trackingRepository = trackingRepository,
+        getState = { uiState.value },
+        updateState = ::updateState,
+        sendEffect = ::sendEffect,
+    )
 
     init {
         viewModelScope.launch(Dispatchers.IO) {
@@ -127,6 +156,22 @@ class DetailsViewModel(
                 updateState { copy(bookmarks = bookmarks) }
             }
         }
+        viewModelScope.launch {
+            trackingRepository.accounts.drop(1).collect { trackerCoordinator.refreshAll() }
+        }
+        viewModelScope.launch {
+            trackingRepository.bindingsVersion.drop(1).collect { trackerCoordinator.refreshAll() }
+        }
+        viewModelScope.launch {
+            trackingRepository.settingsVersion.drop(1).collect { trackerCoordinator.refreshAll() }
+        }
+        viewModelScope.launch {
+            trackingRepository.auditVersion.drop(1).collect { version ->
+                if (version > 0L) {
+                    trackerCoordinator.refreshAll(forceRemoteFetch = true)
+                }
+            }
+        }
     }
 
     override fun handleEvent(event: DetailsUiEvent) {
@@ -161,6 +206,27 @@ class DetailsViewModel(
             is DetailsUiEvent.OnSelectTrailer -> updateState { copy(activeTrailer = event.trailer) }
             is DetailsUiEvent.OnSetPendingExternalUrl -> updateState { copy(pendingExternalUrl = event.url) }
             is DetailsUiEvent.OnTogglePinRightColumn -> handleTogglePinRightColumn()
+            is DetailsUiEvent.OnOpenTrackerDrawer -> trackerCoordinator.openDrawer(event.providerId)
+            is DetailsUiEvent.OnDismissTrackerDrawer -> trackerCoordinator.dismissDrawer()
+            is DetailsUiEvent.OnSelectTrackerTab -> trackerCoordinator.selectTab(event.providerId)
+            is DetailsUiEvent.OnRefreshTrackerState -> trackerCoordinator.refreshAll(forceRemoteFetch = true, targetProviderId = event.providerId)
+            is DetailsUiEvent.OnTrackerSearchQueryChange -> trackerCoordinator.updateSearchQuery(event.providerId, event.query)
+            is DetailsUiEvent.OnSearchTrackerCandidates -> trackerCoordinator.searchCandidates(event.providerId)
+            is DetailsUiEvent.OnPinTrackerCandidate -> trackerCoordinator.pinCandidate(event.providerId, event.candidate)
+            is DetailsUiEvent.OnSetTrackerOffset -> trackerCoordinator.updateOffset(event.providerId, event.offset)
+            is DetailsUiEvent.OnSetTrackerRemoteStatus -> trackerCoordinator.updateRemoteStatus(event.providerId, event.status)
+            is DetailsUiEvent.OnSetTrackerRemoteProgress -> trackerCoordinator.updateRemoteProgress(event.providerId, event.progress)
+            is DetailsUiEvent.OnSetTrackerScore -> trackerCoordinator.updateScore(event.providerId, event.score100)
+            is DetailsUiEvent.OnToggleTrackerFavorite -> trackerCoordinator.toggleFavorite(event.providerId)
+            is DetailsUiEvent.OnToggleTrackerSearch -> trackerCoordinator.toggleSearch(event.providerId)
+            is DetailsUiEvent.OnPushTrackerRemoteUpdate -> trackerCoordinator.pushRemoteUpdate(event.providerId)
+            is DetailsUiEvent.OnRemoveFromTracker -> trackerCoordinator.removeEntry(event.providerId)
+            is DetailsUiEvent.OnSyncEpisodeToTracker -> trackerCoordinator.syncEpisode(event.providerId, event.ep)
+            is DetailsUiEvent.OnSyncReleasedEpisodesToTracker -> trackerCoordinator.syncReleasedEpisodes(event.providerId, event.episodes)
+            is DetailsUiEvent.OnBlockTrackerShow -> trackerCoordinator.blockShow(event.providerId)
+            is DetailsUiEvent.OnUnbindTrackerSeason -> trackerCoordinator.unbindSeason(event.providerId)
+            is DetailsUiEvent.OnSetTrackerAutoSync -> trackerCoordinator.setAutoSync(event.providerId, event.enabled)
+            is DetailsUiEvent.OnSetTrackerBindPolicy -> trackerCoordinator.setBindPolicy(event.providerId, event.policy)
         }
     }
 
@@ -187,7 +253,14 @@ class DetailsViewModel(
                 updateState { copy(fakeData = fake) }
             }
 
-            GetEnrichedDetailsUseCase(provider, url, preloadedName, preloadedPoster, preloadedBg).collect { update ->
+            GetEnrichedDetailsUseCase(
+                provider = provider,
+                url = url,
+                preloadedName = preloadedName,
+                preloadedPoster = preloadedPoster,
+                preloadedBg = preloadedBg,
+                canonicalSeed = uiState.value.canonicalSeed ?: canonicalSeed,
+            ).collect { update ->
                 when (update) {
                     is EnrichmentUpdate.RawData -> {
                         val rawTmdbId = update.response.syncData["tmdb"]?.toIntOrNull()
@@ -232,6 +305,7 @@ class DetailsViewModel(
                         if (targetSeason != null && targetSeason > 0 && currentTmdb != null) {
                             loadSeasonCredits(targetSeason)
                         }
+                        trackerCoordinator.refreshAll()
                     }
                     is EnrichmentUpdate.LogoLoaded -> {
                         updateState { copy(enrichedLogoUrl = update.url) }
@@ -276,6 +350,18 @@ class DetailsViewModel(
                                 enrichedAniListRating = update.anilist ?: enrichedAniListRating,
                             )
                         }
+                    }
+                    is EnrichmentUpdate.IdentityResolved -> {
+                        updateState {
+                            copy(
+                                tmdbId = update.tmdbId ?: tmdbId,
+                                imdbId = update.imdbId ?: imdbId,
+                                anilistId = update.anilistId ?: anilistId,
+                                malId = update.malId ?: malId,
+                            )
+                        }
+                        cacheEnrichedState(uiState.value)
+                        trackerCoordinator.refreshAll()
                     }
                     is EnrichmentUpdate.MetadataLoaded -> {
                         val currentProd = uiState.value.enrichedProductionCompanies
@@ -383,6 +469,7 @@ class DetailsViewModel(
                             }
                             loadSeasonCredits(currentSeason)
                         }
+                        trackerCoordinator.refreshAll()
                     }
                     is EnrichmentUpdate.Error -> {
                         AppLogger.e("DetailsViewModel", "Error loading details: ${update.message}")
@@ -404,6 +491,7 @@ class DetailsViewModel(
         if (season != null && season > 0) {
             loadSeasonCredits(season)
         }
+        trackerCoordinator.refreshAll()
     }
 
     private fun loadSeasonCredits(season: Int) {
@@ -494,6 +582,15 @@ class DetailsViewModel(
 
     private fun handleToggleEpisodeWatched(ep: Episode, isWatched: Boolean) {
         val data = uiState.value.response ?: return
+        if (isWatched) {
+            val localStatus = parseEpisodeReleaseStatus(ep, provider.name)
+            val hasCachedLinks = com.lagradost.cloudstream3.desktop.ui.screens.player.LinkCache.get(ep.data) != null
+            val allowedByTrackers = trackerCoordinator.isEpisodeReleasedForAllTrackers(ep, hasCachedLinks)
+            if ((!hasCachedLinks && (localStatus.isUnreleased || localStatus.isMissingFromProvider)) || !allowedByTrackers) {
+                sendEffect(DetailsUiEffect.ShowToast("Cannot mark unreleased episode as watched yet."))
+                return
+            }
+        }
 
         // Optimistic in-memory update for instant UI feedback
         val updatedMap = uiState.value.watchHistory.toMutableMap()
@@ -531,6 +628,7 @@ class DetailsViewModel(
                     isWatched = true,
                 )
             }
+            enqueueAutoTrackersForEpisode(data, ep)
         } else {
             val matchingHistories = uiState.value.watchHistory.values.filter { ep.matchesHistory(it) || it.episodeId == ep.data }
             val candidateIds = (matchingHistories.mapNotNull { it.episodeId } + listOf(ep.data, DetailsWatchCoordinator.patchEpisodeData(ep, data))).distinct()
@@ -552,13 +650,36 @@ class DetailsViewModel(
 
     private fun handleToggleSeasonWatched(episodes: List<Episode>, isWatched: Boolean) {
         val data = uiState.value.response ?: return
+        val ceiling = uiState.value.trackers.strictLocalReleaseCeiling
+        val targetEpisodes = if (isWatched) {
+            val released = EpisodeSectionState.filterReleasedEpisodes(
+                episodes = episodes,
+                providerName = provider.name,
+                aniListCeilingEpisode = ceiling,
+                episodeOffset = 0,
+            )
+            if (released.isEmpty()) {
+                sendEffect(DetailsUiEffect.ShowToast("No released episodes in this season to mark watched yet."))
+                return
+            }
+            if (released.size < episodes.size) {
+                sendEffect(
+                    DetailsUiEffect.ShowToast(
+                        "Marked ${released.size} released episode${if (released.size == 1) "" else "s"} watched (skipped ${episodes.size - released.size} unreleased).",
+                    ),
+                )
+            }
+            released
+        } else {
+            episodes
+        }
 
         // Optimistic in-memory update for instant UI feedback
         val updatedMap = uiState.value.watchHistory.toMutableMap()
         if (isWatched) {
             val currentParentId = DesktopDataStore.watchHistoryId(provider.name, data.url)
             val isMovie = data is MovieLoadResponse
-            episodes.forEach { ep ->
+            targetEpisodes.forEach { ep ->
                 val saved = updatedMap[ep.data] ?: updatedMap.values.find { ep.matchesHistory(it) }
                 val dur = if (saved != null && saved.duration > 0L) saved.duration else 60L
                 updatedMap[ep.data] = WatchHistory(
@@ -580,7 +701,7 @@ class DetailsViewModel(
                 )
             }
         } else {
-            episodes.forEach { ep ->
+            targetEpisodes.forEach { ep ->
                 updatedMap.entries.removeAll { it.key == ep.data || ep.matchesHistory(it.value) }
             }
         }
@@ -591,13 +712,60 @@ class DetailsViewModel(
                 providerName = provider.name,
                 data = data,
                 fallbackUrl = url,
-                episodes = episodes,
+                episodes = targetEpisodes,
                 isWatched = isWatched,
                 currentWatchHistory = uiState.value.watchHistory,
                 backupSeasonHistory = uiState.value.backupSeasonHistory,
             )
             updateState { copy(backupSeasonHistory = newBackup) }
         }
+        if (isWatched) {
+            val highestEp = targetEpisodes.maxByOrNull { it.episode ?: 0 } ?: targetEpisodes.lastOrNull()
+            if (highestEp != null) {
+                enqueueAutoTrackersForEpisode(data, highestEp)
+            }
+        }
+    }
+
+    private fun enqueueAutoTrackersForEpisode(
+        data: LoadResponse,
+        ep: Episode,
+    ) {
+        val engine = trackerSyncEngine ?: return
+        val stateSnapshot = uiState.value
+        val isMovieType = data is MovieLoadResponse || data.type in setOf(TvType.Movie, TvType.AnimeMovie)
+        val epNum = ep.episode ?: if (isMovieType) 1 else return
+        if (epNum <= 0) return
+
+        val seasonNum = (ep.season ?: stateSnapshot.selectedSeason ?: 1).coerceAtLeast(1)
+        val hasMultiSeasons = (stateSnapshot.enrichedSeasonsCount ?: 0) > 1 ||
+            stateSnapshot.enrichedSeasonsMetadata.size > 1 ||
+            when (data) {
+                is TvSeriesLoadResponse -> data.episodes.mapNotNull { it.season }.distinct().size > 1
+                is AnimeLoadResponse -> data.episodes.keys.size > 1
+                else -> false
+            }
+        val effectiveUrl = data.url.takeIf { it.isNotBlank() } ?: url
+        val effectiveApiName = data.apiName.takeIf { it.isNotBlank() } ?: provider.name
+
+        engine.enqueueCompletionForConnectedTrackers(
+            com.lagradost.cloudstream3.desktop.tracking.SyncCompletionRequest(
+                apiName = effectiveApiName,
+                showUrl = effectiveUrl,
+                showTitle = data.name.takeIf { it.isNotBlank() } ?: preloadedName.orEmpty(),
+                mappedSeason = seasonNum,
+                episodeNum = epNum,
+                year = stateSnapshot.enrichedYear ?: data.year,
+                tvType = data.type,
+                completionVerified = true,
+                canonicalSeed = stateSnapshot.canonicalSeed,
+                resolvedAnilistId = stateSnapshot.anilistId,
+                resolvedMalId = stateSnapshot.malId,
+                resolvedTmdbId = stateSnapshot.tmdbId,
+                resolvedImdbId = stateSnapshot.imdbId,
+                hasMultipleSeasons = hasMultiSeasons,
+            ),
+        )
     }
 
     private fun handleToggleEpisodesStackedView(isStacked: Boolean) {
@@ -658,6 +826,15 @@ class DetailsViewModel(
             val linksToPass = cached?.links ?: emptyList()
             val subsToPass = cached?.subtitles ?: emptyList()
 
+            val stateSnapshot = uiState.value
+            val hasMultipleSeasons = (stateSnapshot.enrichedSeasonsCount ?: 0) > 1 ||
+                stateSnapshot.enrichedSeasonsMetadata.size > 1 ||
+                when (response) {
+                    is TvSeriesLoadResponse -> response.episodes.mapNotNull { it.season }.distinct().size > 1
+                    is AnimeLoadResponse -> response.episodes.keys.size > 1
+                    else -> false
+                }
+
             sendEffect(
                 DetailsUiEffect.NavigateToPlayer(
                     com.lagradost.cloudstream3.desktop.ui.VideoLaunchData(
@@ -668,9 +845,14 @@ class DetailsViewModel(
                         startPositionMs = resumeMs,
                         history = linkHistory,
                         loadResponse = response,
-                        enrichedLogoUrl = uiState.value.enrichedLogoUrl,
-                        enrichedBackdropUrl = uiState.value.enrichedBackdropUrl,
+                        enrichedLogoUrl = stateSnapshot.enrichedLogoUrl,
+                        enrichedBackdropUrl = stateSnapshot.enrichedBackdropUrl,
                         enrichedActors = effectiveActors,
+                        canonicalSeed = stateSnapshot.canonicalSeed,
+                        resolvedAnilistId = stateSnapshot.anilistId,
+                        resolvedMalId = stateSnapshot.malId,
+                        resolvedYear = stateSnapshot.enrichedYear ?: response?.year,
+                        hasMultipleSeasons = hasMultipleSeasons,
                     ),
                 ),
             )
@@ -733,7 +915,10 @@ class DetailsViewModel(
                 enrichedTrailers = emptyList(),
                 enrichedTrailerUrl = null,
                 screenshots = null,
-                tmdbId = null,
+                tmdbId = canonicalSeed?.tmdbId,
+                imdbId = canonicalSeed?.imdbId,
+                anilistId = canonicalSeed?.anilistId,
+                malId = canonicalSeed?.malId,
                 seasonCredits = emptyMap(),
                 episodeThumbnailVersion = 0,
             )
@@ -751,16 +936,30 @@ class DetailsViewModel(
         val hasAnimeDualCast = uiState.value.enrichedActors?.any { it.voiceActor != null } == true
         val effectiveActors = if (hasAnimeDualCast) uiState.value.enrichedActors else (seasonCast ?: uiState.value.enrichedActors ?: uiState.value.response?.actors)
 
+        val snapshot = uiState.value
+        val hasMultipleSeasons = (snapshot.enrichedSeasonsCount ?: 0) > 1 ||
+            snapshot.enrichedSeasonsMetadata.size > 1 ||
+            when (val resp = snapshot.response) {
+                is TvSeriesLoadResponse -> resp.episodes.mapNotNull { it.season }.distinct().size > 1
+                is AnimeLoadResponse -> resp.episodes.keys.size > 1
+                else -> false
+            }
+
         sendEffect(
             DetailsUiEffect.OpenLinks(
                 Config.Links(
                     providerName = data.first.name,
                     dataUrl = data.second,
                     history = data.third,
-                    loadResponse = uiState.value.response,
+                    loadResponse = snapshot.response,
                     enrichedActors = effectiveActors,
-                    enrichedLogoUrl = uiState.value.enrichedLogoUrl,
-                    enrichedBackdropUrl = uiState.value.enrichedBackdropUrl,
+                    enrichedLogoUrl = snapshot.enrichedLogoUrl,
+                    enrichedBackdropUrl = snapshot.enrichedBackdropUrl,
+                    canonicalSeed = snapshot.canonicalSeed,
+                    resolvedAnilistId = snapshot.anilistId,
+                    resolvedMalId = snapshot.malId,
+                    resolvedYear = snapshot.enrichedYear ?: snapshot.response?.year,
+                    hasMultipleSeasons = hasMultipleSeasons,
                 ),
             ),
         )
@@ -781,5 +980,10 @@ class DetailsViewModel(
     private fun cacheEnrichedState(state: DetailsUiState) {
         EnrichedDetailsCache.put(url, state)
         state.response?.url?.let { rUrl -> if (rUrl != url) EnrichedDetailsCache.put(rUrl, state) }
+    }
+
+    override fun dispose() {
+        trackerCoordinator.dispose()
+        super.dispose()
     }
 }

@@ -3,11 +3,17 @@ package com.lagradost.cloudstream3.desktop.ui.screens.player
 import com.lagradost.cloudstream3.APIHolder
 import com.lagradost.cloudstream3.Episode
 import com.lagradost.cloudstream3.LoadResponse
+import com.lagradost.cloudstream3.TvType
+import com.lagradost.cloudstream3.desktop.di.AppContainerHolder
 import com.lagradost.cloudstream3.desktop.domain.player.interactor.SavePlaybackProgress
+import com.lagradost.cloudstream3.desktop.player.PlaybackCompletionGuard
 import com.lagradost.cloudstream3.desktop.player.PlayerConfig
 import com.lagradost.cloudstream3.desktop.player.QualityDataHelper
 import com.lagradost.cloudstream3.desktop.player.webview.NativePlayerBridge
 import com.lagradost.cloudstream3.desktop.torrent.DesktopTorrentEngine
+import com.lagradost.cloudstream3.desktop.domain.tracking.repository.TrackingRepository
+import com.lagradost.cloudstream3.desktop.tracking.SyncCompletionRequest
+import com.lagradost.cloudstream3.desktop.tracking.TrackerSyncEngine
 import com.lagradost.cloudstream3.desktop.ui.VideoLaunchData
 import com.lagradost.cloudstream3.desktop.ui.base.BaseMviViewModel
 import com.lagradost.cloudstream3.desktop.ui.screens.details.EnrichedDetailsCache
@@ -31,10 +37,13 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import java.io.File
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 
 class EmbeddedPlayerViewModel(
     private val savePlaybackProgress: SavePlaybackProgress = SavePlaybackProgress(),
+    private val trackerSyncEngine: TrackerSyncEngine? = runCatching { AppContainerHolder.container.trackerSyncEngine }.getOrNull(),
+    private val trackingRepository: TrackingRepository? = runCatching { AppContainerHolder.container.trackingRepository }.getOrNull(),
 ) : BaseMviViewModel<PlayerUiState, PlayerUiEvent, PlayerUiEffect>(
     initialState = PlayerUiState(),
 ) {
@@ -45,6 +54,8 @@ class EmbeddedPlayerViewModel(
     private val scraper = PlayerStreamScraper(viewModelScope)
 
     private val linkRetries = mutableMapOf<String, Int>()
+    private val completionGuard = PlaybackCompletionGuard()
+    private val autoSyncedEpisodeKeys = ConcurrentHashMap.newKeySet<String>()
     private val hasShownNowPlayingToast = AtomicBoolean(false)
     private var lastSavedPositionSec = 0L
     private var autoPlayTimeoutMs: Long = 20_000L
@@ -80,6 +91,14 @@ class EmbeddedPlayerViewModel(
     init {
         PlayerDiagnosticsHolder.register(playerState)
 
+        trackerSyncEngine?.let { engine ->
+            viewModelScope.launch {
+                engine.playerNotices.collect { msg ->
+                    sendEffect(PlayerUiEffect.ShowToast(msg))
+                }
+            }
+        }
+
         viewModelScope.launch(Dispatchers.IO) {
             val autoPlay = DesktopDataStore.getKey<Boolean>(PlayerConfig.PREF_AUTO_PLAY) ?: true
             val timeoutStr = DesktopDataStore.getKey<String>(PlayerConfig.PREF_AUTO_PLAY_TIMEOUT) ?: "20000"
@@ -102,21 +121,37 @@ class EmbeddedPlayerViewModel(
                     return@collect
                 }
 
+                completionGuard.recordTick(
+                    posSec = currentPosSec,
+                    durSec = durSec,
+                    isPaused = isPaused,
+                    isBuffering = playerState.isBuffering.value,
+                    isPlayingPhase = uiState.value.phase is PlayerPhase.Playing,
+                )
+
                 if (kotlin.math.abs(currentPosSec - lastSavedPositionSec) >= 5) {
                     lastSavedPositionSec = currentPosSec
                     if (currentData != null && durSec > 0L) {
-                        val pct = currentPosSec.toFloat() / durSec.toFloat()
-                        val updatedHistory = currentData.history.copy(
-                            position = if (pct >= 0.85f) durSec else currentPosSec,
-                            duration = durSec,
-                            updateTime = System.currentTimeMillis(),
-                        )
-                        savePosition(updatedHistory, forceNotify = pct >= 0.85f)
+                        buildSafeProgressUpdate(
+                            baseHistory = currentData.history,
+                            posSec = currentPosSec,
+                            durSec = durSec,
+                            completionThreshold = 0.85f,
+                        )?.let { (safeHistory, allowCompletion) ->
+                            savePosition(safeHistory, forceNotify = allowCompletion, allowCompletion = allowCompletion)
+                        }
+                        dispatchAutoTrackerCompletionIfEligible(currentData, currentPosSec, durSec)
                     }
                 }
 
                 val percentage = if (durSec > 0) currentPosSec.toFloat() / durSec.toFloat() else 0f
-                if (percentage >= 0.88f && uiState.value.hasNextEpisode && uiState.value.autoPlayEnabled) {
+                if (
+                    percentage >= 0.88f &&
+                    completionGuard.isDurationValidForCompletion(durSec) &&
+                    completionGuard.hasMinimumActivePlayback(durSec) &&
+                    uiState.value.hasNextEpisode &&
+                    uiState.value.autoPlayEnabled
+                ) {
                     triggerBackgroundPreScrape()
                 } else if (percentage < 0.85f && scraper.isPreScrapeActive) {
                     scraper.cancelPreScrape()
@@ -144,16 +179,16 @@ class EmbeddedPlayerViewModel(
                     val currentData = uiState.value.launchData ?: return@collect
                     val currentPosSec = playerState.positionMs.value / 1000L
                     val durSec = playerState.durationMs.value / 1000L
-                    if (currentPosSec > 0 && durSec > 0) {
-                        val pct = currentPosSec.toFloat() / durSec.toFloat()
-                        savePosition(
-                            currentData.history.copy(
-                                position = if (pct >= 0.85f) durSec else currentPosSec,
-                                duration = durSec,
-                                updateTime = System.currentTimeMillis(),
-                            ),
-                            forceNotify = true,
-                        )
+                    buildSafeProgressUpdate(
+                        baseHistory = currentData.history,
+                        posSec = currentPosSec,
+                        durSec = durSec,
+                        completionThreshold = 0.85f,
+                    )?.let { (safeHistory, allowCompletion) ->
+                        savePosition(safeHistory, forceNotify = true, allowCompletion = allowCompletion)
+                    }
+                    if (durSec > 0L) {
+                        dispatchAutoTrackerCompletionIfEligible(currentData, currentPosSec, durSec)
                     }
                 }
             }
@@ -172,28 +207,34 @@ class EmbeddedPlayerViewModel(
         val showName = currentData?.history?.showName?.trim().orEmpty()
         val isValidName = showName.isNotBlank() && !showName.equals("Unknown Channel", ignoreCase = true) && !showName.equals("Unknown", ignoreCase = true)
         if (currentData != null && isValidName && currentDurSec > 0 && currentPosSec > 0) {
+            dispatchAutoTrackerCompletionIfEligible(currentData, currentPosSec, currentDurSec)
             val screenshotPath = "${com.lagradost.common.platform.PlatformPaths.appDataDir.absolutePath}/screenshots/history_${currentData.history.parentId}.jpg"
             val hasNextEpisode = uiState.value.hasNextEpisode
             val nextEpisodeData = uiState.value.nextEpisodeData
-            val updatedHistory = currentData.history.copy(
-                position = currentPosSec,
-                duration = currentDurSec,
+            val safeUpdate = buildSafeProgressUpdate(
+                baseHistory = currentData.history,
+                posSec = currentPosSec,
+                durSec = currentDurSec,
+                completionThreshold = 0.85f,
                 screenshotUrl = "file:///$screenshotPath",
-                updateTime = System.currentTimeMillis(),
             )
-            com.lagradost.cloudstream3.desktop.utils.appScope.launch(Dispatchers.IO) {
-                try {
-                    File(screenshotPath).parentFile?.mkdirs()
-                    playerState.takeScreenshot(screenshotPath)
-                    WatchHistoryCoordinator.saveWithNextEpisodeQueue(
-                        history = updatedHistory,
-                        hasNextEpisode = hasNextEpisode,
-                        nextEpisode = nextEpisodeData,
-                        saveProgress = savePlaybackProgress,
-                        forceNotify = true,
-                    )
-                } catch (e: Exception) {
-                    AppLogger.e("EmbeddedPlayerViewModel", "Failed to save history or screenshot on dispose", e)
+            if (safeUpdate != null) {
+                val (updatedHistory, allowCompletion) = safeUpdate
+                com.lagradost.cloudstream3.desktop.utils.appScope.launch(Dispatchers.IO) {
+                    try {
+                        File(screenshotPath).parentFile?.mkdirs()
+                        playerState.takeScreenshot(screenshotPath)
+                        WatchHistoryCoordinator.saveWithNextEpisodeQueue(
+                            history = updatedHistory,
+                            hasNextEpisode = hasNextEpisode,
+                            nextEpisode = nextEpisodeData,
+                            saveProgress = savePlaybackProgress,
+                            forceNotify = true,
+                            allowCompletion = allowCompletion,
+                        )
+                    } catch (e: Exception) {
+                        AppLogger.e("EmbeddedPlayerViewModel", "Failed to save history or screenshot on dispose", e)
+                    }
                 }
             }
         }
@@ -375,13 +416,15 @@ class EmbeddedPlayerViewModel(
             else -> null
         }
 
-        val isPremature = durSec <= 0L || (durSec > 0L && posSec < (durSec * 0.85f).toLong())
+        val effectiveThreshold = minOf(0.85f, autoSyncThresholdRatio())
+        val isPremature = !completionGuard.isDurationValidForCompletion(durSec) ||
+            (durSec > 0L && posSec < (durSec * effectiveThreshold).toLong())
         if (isPremature) {
             if (currentUrl != null) {
                 val candidateLinks = state.nextEpisodeLinks.ifEmpty { state.launchData?.links ?: emptyList() }
                 val remainingCandidates = candidateLinks.filter { it.url != currentUrl && it.url !in state.failedLinks }
                 if (remainingCandidates.isNotEmpty()) {
-                    AppLogger.w("EmbeddedPlayerViewModel", "Premature stream termination at ${posSec}s (dur=${durSec}s). Failing over to remaining candidate streams...")
+                    AppLogger.w("EmbeddedPlayerViewModel", "Premature or invalid stream termination at ${posSec}s (dur=${durSec}s). Failing over to remaining candidate streams...")
                     handlePlaybackError(currentUrl, "Stream ended prematurely at ${posSec}s")
                     return
                 } else {
@@ -392,7 +435,18 @@ class EmbeddedPlayerViewModel(
             }
         }
 
-        flushCurrentEpisodeProgress(markCompletedIfNearEnd = true)
+        val isVerifiedCompletion = completionGuard.canMarkCompleted(posSec, durSec, 0.85f)
+        flushCurrentEpisodeProgress(markCompletedIfNearEnd = isVerifiedCompletion)
+        state.launchData?.let { data ->
+            dispatchAutoTrackerCompletionIfEligible(data, posSec, durSec)
+        }
+        if (!isVerifiedCompletion) {
+            AppLogger.i(
+                "EmbeddedPlayerViewModel",
+                "EOF reached at ${posSec}s/${durSec}s without verified watch coverage (watched=${completionGuard.uniqueWatchedSeconds()}s); suppressing auto-completion and auto-next.",
+            )
+            return
+        }
         if (state.sleepTimerMode == "END_OF_EPISODE") {
             playerState.pause()
             updateState { copy(sleepTimerMode = "OFF", sleepTimerRemainingSec = null) }
@@ -462,6 +516,7 @@ class EmbeddedPlayerViewModel(
             AppLogger.d("EmbeddedPlayerViewModel", "Ignoring error for stale link: $failedUrl (current is ${currentLink.url})")
             return
         }
+        completionGuard.markError()
 
         val isFatal = PlayerErrorDiagnostics.isFatalPlaybackError(reason)
         val isProbing = currentPhase is PlayerPhase.Probing
@@ -573,12 +628,49 @@ class EmbeddedPlayerViewModel(
         }
     }
 
-    private fun savePosition(history: WatchHistory, forceNotify: Boolean = false) {
+    private fun resetCompletionGuard(data: VideoLaunchData) {
+        val isMovie = data.loadResponse is com.lagradost.cloudstream3.MovieLoadResponse ||
+            data.loadResponse?.type == com.lagradost.cloudstream3.TvType.Movie ||
+            data.loadResponse?.type == com.lagradost.cloudstream3.TvType.AnimeMovie ||
+            data.history.episode == null
+        completionGuard.reset(
+            isMovie = isMovie,
+            expectedDurationMinutes = data.loadResponse?.duration,
+            priorPositionSec = data.startPositionMs / 1000L,
+            priorDurationSec = data.history.duration,
+        )
+    }
+
+    private fun buildSafeProgressUpdate(
+        baseHistory: WatchHistory,
+        posSec: Long,
+        durSec: Long,
+        completionThreshold: Float,
+        screenshotUrl: String? = baseHistory.screenshotUrl,
+    ): Pair<WatchHistory, Boolean>? {
+        if (!completionGuard.isDurationValidForPersistence(durSec)) return null
+        if (!completionGuard.hasMinimumActivePlayback(durSec)) return null
+        val canComplete = completionGuard.canMarkCompleted(posSec, durSec, completionThreshold)
+        val safePosSec = if (canComplete) {
+            durSec
+        } else {
+            completionGuard.clampPersistablePosition(posSec, durSec, completionThreshold)
+        }
+        if (safePosSec <= 0L) return null
+        return baseHistory.copy(
+            position = safePosSec,
+            duration = durSec,
+            screenshotUrl = screenshotUrl,
+            updateTime = System.currentTimeMillis(),
+        ) to canComplete
+    }
+
+    private fun savePosition(history: WatchHistory, forceNotify: Boolean = false, allowCompletion: Boolean = false) {
         val name = history.showName.trim()
         if (name.isBlank() || name.equals("Unknown Channel", ignoreCase = true) || name.equals("Unknown", ignoreCase = true)) {
             return
         }
-        if (history.duration <= 0 && history.position <= 0) {
+        if (!completionGuard.isDurationValidForPersistence(history.duration) || history.position <= 0L) {
             return
         }
         saveJob?.cancel()
@@ -589,6 +681,7 @@ class EmbeddedPlayerViewModel(
                 nextEpisode = uiState.value.nextEpisodeData,
                 saveProgress = savePlaybackProgress,
                 forceNotify = forceNotify,
+                allowCompletion = allowCompletion,
             )
         }
     }
@@ -601,16 +694,13 @@ class EmbeddedPlayerViewModel(
 
         val durSec = if (currentDurSec > 0) currentDurSec else currentData.history.duration
         val posSec = if (currentPosSec > 0) currentPosSec else currentData.history.position
-
-        val pct = if (durSec > 0) posSec.toFloat() / durSec.toFloat() else 0f
-        val shouldMarkCompleted = (markCompletedIfNearEnd && pct >= 0.80f) || pct >= 0.85f
-        val finalPosSec = if (shouldMarkCompleted && durSec > 0) durSec else posSec
-
-        val updatedHistory = currentData.history.copy(
-            position = finalPosSec,
-            duration = durSec,
-            updateTime = System.currentTimeMillis(),
-        )
+        val threshold = if (markCompletedIfNearEnd) 0.80f else 0.85f
+        val (updatedHistory, allowCompletion) = buildSafeProgressUpdate(
+            baseHistory = currentData.history,
+            posSec = posSec,
+            durSec = durSec,
+            completionThreshold = threshold,
+        ) ?: return
 
         viewModelScope.launch(Dispatchers.IO + NonCancellable) {
             WatchHistoryCoordinator.saveWithNextEpisodeQueue(
@@ -619,8 +709,57 @@ class EmbeddedPlayerViewModel(
                 nextEpisode = uiState.value.nextEpisodeData,
                 saveProgress = savePlaybackProgress,
                 forceNotify = true,
+                allowCompletion = allowCompletion,
             )
         }
+        dispatchAutoTrackerCompletionIfEligible(currentData, posSec, durSec)
+    }
+
+    private fun autoSyncThresholdRatio(): Float =
+        ((trackingRepository?.getAutoSyncThresholdPercent() ?: 80).coerceIn(80, 90)) / 100f
+
+    private fun dispatchAutoTrackerCompletionIfEligible(
+        data: VideoLaunchData,
+        posSec: Long,
+        durSec: Long,
+    ) {
+        val engine = trackerSyncEngine ?: return
+        val thresholdPct = autoSyncThresholdRatio()
+        if (!completionGuard.canAutoTrackCompleted(posSec, durSec, thresholdPct)) return
+
+        val showUrl = data.loadResponse?.url?.takeIf { it.isNotBlank() } ?: data.history.showUrl
+        val cachedState = if (showUrl.isNotBlank()) EnrichedDetailsCache.get(showUrl) else null
+        val isMovieType = data.loadResponse is com.lagradost.cloudstream3.MovieLoadResponse ||
+            data.loadResponse?.type in setOf(TvType.Movie, TvType.AnimeMovie)
+        val epNum = data.history.episode ?: if (isMovieType) 1 else null
+        if (epNum == null || epNum <= 0) return
+
+        val seasonNum = (data.history.season ?: cachedState?.selectedSeason ?: 1).coerceAtLeast(1)
+        val sessionKey = "${data.history.parentId}:$seasonNum:$epNum"
+        if (!autoSyncedEpisodeKeys.add(sessionKey)) return
+
+        val tvType = data.loadResponse?.type
+            ?: cachedState?.response?.type
+            ?: if (isMovieType) TvType.Movie else TvType.Anime
+
+        engine.enqueueCompletionForConnectedTrackers(
+            SyncCompletionRequest(
+                apiName = data.loadResponse?.apiName?.takeIf { it.isNotBlank() } ?: data.history.apiName,
+                showUrl = showUrl,
+                showTitle = data.loadResponse?.name?.takeIf { it.isNotBlank() } ?: data.history.showName,
+                mappedSeason = seasonNum,
+                episodeNum = epNum,
+                year = data.resolvedYear ?: cachedState?.enrichedYear ?: data.loadResponse?.year,
+                tvType = tvType,
+                completionVerified = true,
+                canonicalSeed = data.canonicalSeed ?: cachedState?.canonicalSeed,
+                resolvedAnilistId = data.resolvedAnilistId ?: cachedState?.anilistId,
+                resolvedMalId = data.resolvedMalId ?: cachedState?.malId,
+                resolvedTmdbId = cachedState?.tmdbId,
+                resolvedImdbId = cachedState?.imdbId,
+                hasMultipleSeasons = data.hasMultipleSeasons,
+            ),
+        )
     }
 
     private fun init(initialData: VideoLaunchData) {
@@ -640,6 +779,7 @@ class EmbeddedPlayerViewModel(
         } else {
             initialData
         }
+        resetCompletionGuard(adjustedData)
 
         val showUrl = adjustedData.loadResponse?.url ?: adjustedData.history.showUrl
         val cachedState = if (showUrl.isNotBlank()) EnrichedDetailsCache.get(showUrl) else null
@@ -732,7 +872,10 @@ class EmbeddedPlayerViewModel(
                                         }
                                     }
                                 },
-                                onMetadataLoaded = { _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, actors, _, _ ->
+                                onMetadataLoaded = { _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, duration, _, actors, _, _ ->
+                                    if (duration != null && duration > 0) {
+                                        completionGuard.updateExpectedDurationMinutes(duration)
+                                    }
                                     if (!actors.isNullOrEmpty()) {
                                         updateState {
                                             val curr = launchData
@@ -855,6 +998,7 @@ class EmbeddedPlayerViewModel(
                             episodeName = episode.name,
                         ),
                     )
+                    resetCompletionGuard(newLaunchData)
                     updateState {
                         copy(
                             launchData = newLaunchData,
@@ -941,6 +1085,7 @@ class EmbeddedPlayerViewModel(
                 startPositionMs = startPos,
                 history = newHistory,
             )
+            resetCompletionGuard(newLaunchData)
             updateState {
                 copy(
                     launchData = newLaunchData,
@@ -1016,6 +1161,7 @@ class EmbeddedPlayerViewModel(
                     }
                 },
             )
+            resetCompletionGuard(newLaunchData)
 
             val best = PlayerStreamSelector.pickBestActiveLink(currentLinks, uiState.value.failedLinks.keys, startPos)
 

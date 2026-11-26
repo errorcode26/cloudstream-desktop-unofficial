@@ -63,6 +63,7 @@ fun EpisodeCard(
     onToggleWatched: (Episode, Boolean) -> Unit,
     onRemoveEpisodeWatched: (Episode) -> Unit,
     onMarkPreviousWatched: ((Episode) -> Unit)? = null,
+    onSyncEpisodeToTracker: ((String, Episode) -> Unit)? = null,
 ) {
     var isHovered by remember { mutableStateOf(false) }
 
@@ -461,58 +462,64 @@ fun EpisodeCard(
                 }
             }
 
-            // Top-Right: Active episode badge, Watched completion indicator or Unreleased indicator
-            if (isWatched && !isEpisodeLocked) {
-                Box(
+            // Top-Right: Watched completion indicator or Unreleased indicator
+            if ((isWatched && !isEpisodeLocked) || (releaseStatus.isUnreleased && !lockUnreleasedEpisodes)) {
+                Row(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .padding(if (isNarrow) 8.dp else 12.dp)
-                        .size(if (isNarrow) 22.dp else 26.dp)
-                        .clip(androidx.compose.foundation.shape.CircleShape)
-                        .background(MaterialTheme.colorScheme.primary)
-                        .border(1.dp, Color.White.copy(alpha = 0.30f), androidx.compose.foundation.shape.CircleShape)
-                        .pointerInput(ep) {
-                            detectTapGestures {
-                                currentOnRemoveEpisodeWatched(ep)
+                        .padding(if (isNarrow) 8.dp else 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    if (isWatched && !isEpisodeLocked) {
+                        Box(
+                            modifier = Modifier
+                                .size(if (isNarrow) 22.dp else 26.dp)
+                                .clip(androidx.compose.foundation.shape.CircleShape)
+                                .background(MaterialTheme.colorScheme.primary)
+                                .border(1.dp, Color.White.copy(alpha = 0.30f), androidx.compose.foundation.shape.CircleShape)
+                                .pointerInput(ep) {
+                                    detectTapGestures {
+                                        currentOnRemoveEpisodeWatched(ep)
+                                    }
+                                },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                Icons.Default.Check,
+                                contentDescription = "Watched",
+                                tint = MaterialTheme.colorScheme.onPrimary,
+                                modifier = Modifier.size(if (isNarrow) 13.dp else 16.dp),
+                            )
+                        }
+                    } else if (releaseStatus.isUnreleased && !lockUnreleasedEpisodes) {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(Color(0xFF1C1914).copy(alpha = 0.90f))
+                                .border(0.5.dp, Color(0xFFFFB74D).copy(alpha = 0.60f), RoundedCornerShape(6.dp))
+                                .padding(horizontal = if (isNarrow) 5.dp else 7.dp, vertical = 2.dp),
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(3.dp),
+                            ) {
+                                Icon(
+                                    Icons.Default.Lock,
+                                    contentDescription = "Locked",
+                                    tint = Color(0xFFFFB74D),
+                                    modifier = Modifier.size(if (isNarrow) 9.dp else 11.dp),
+                                )
+                                Text(
+                                    text = "Upcoming",
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontSize = if (isNarrow) 9.5.sp else 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                    ),
+                                    color = Color(0xFFFFB74D),
+                                )
                             }
-                        },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        Icons.Default.Check,
-                        contentDescription = "Watched",
-                        tint = MaterialTheme.colorScheme.onPrimary,
-                        modifier = Modifier.size(if (isNarrow) 13.dp else 16.dp),
-                    )
-                }
-            } else if (releaseStatus.isUnreleased && !lockUnreleasedEpisodes) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(if (isNarrow) 8.dp else 12.dp)
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(Color(0xFF1C1914).copy(alpha = 0.90f))
-                        .border(0.5.dp, Color(0xFFFFB74D).copy(alpha = 0.60f), RoundedCornerShape(6.dp))
-                        .padding(horizontal = if (isNarrow) 5.dp else 7.dp, vertical = 2.dp),
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(3.dp),
-                    ) {
-                        Icon(
-                            Icons.Default.Lock,
-                            contentDescription = "Locked",
-                            tint = Color(0xFFFFB74D),
-                            modifier = Modifier.size(if (isNarrow) 9.dp else 11.dp),
-                        )
-                        Text(
-                            text = "Upcoming",
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                fontSize = if (isNarrow) 9.5.sp else 11.sp,
-                                fontWeight = FontWeight.Bold,
-                            ),
-                            color = Color(0xFFFFB74D),
-                        )
+                        }
                     }
                 }
             }
