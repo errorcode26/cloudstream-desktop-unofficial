@@ -9,6 +9,7 @@ import com.lagradost.cloudstream3.desktop.explore.models.ManifestCatalogDescript
 import com.lagradost.cloudstream3.desktop.explore.models.ProviderMatch
 import com.lagradost.cloudstream3.desktop.explore.models.StreamingPlatform
 import com.lagradost.cloudstream3.desktop.explore.search.ExploreSearchResults
+import com.lagradost.cloudstream3.desktop.metadata.CanonicalMediaSeed
 import com.lagradost.cloudstream3.desktop.ui.base.UiEffect
 import com.lagradost.cloudstream3.desktop.ui.base.UiEvent
 import com.lagradost.cloudstream3.desktop.ui.base.UiState
@@ -95,5 +96,10 @@ sealed interface ExploreUiEvent : UiEvent {
 }
 
 sealed interface ExploreUiEffect : UiEffect {
-    data class OpenDetails(val providerName: String, val url: String, val title: String) : ExploreUiEffect
+    data class OpenDetails(
+        val providerName: String,
+        val url: String,
+        val title: String,
+        val canonicalSeed: CanonicalMediaSeed? = null,
+    ) : ExploreUiEffect
 }

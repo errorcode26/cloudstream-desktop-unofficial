@@ -23,6 +23,9 @@ object DesktopDownloadManager {
     private val mapper = jacksonObjectMapper()
     private val activeProcesses = ConcurrentHashMap<String, Process>()
 
+    @Volatile
+    internal var allowYtdlAutoInstall: Boolean = true
+
     private fun getDirectDownloader(): DirectStreamDownloader {
         val threads = com.lagradost.common.storage.DesktopDataStore.getKey<Float>(com.lagradost.common.storage.DesktopDataStore.PREF_DOWNLOAD_THREADS)?.toInt() ?: 8
         return DirectStreamDownloader(maxWorkers = threads.coerceIn(1, 16))
@@ -330,7 +333,7 @@ object DesktopDownloadManager {
                     )
                 } else {
                     val ytdlBinary = DesktopYtDlpBinary()
-                    if (!ytdlBinary.isInstalled()) {
+                    if (!ytdlBinary.isInstalled() && allowYtdlAutoInstall) {
                         AppLogger.i("DesktopDownloadManager: yt-dlp binary missing, auto-downloading before starting download...")
                         val ytdlJob = ytdlBinary.downloadWithManager()
                         ytdlJob.join()
@@ -497,7 +500,8 @@ object DesktopDownloadManager {
     }
 
     suspend fun delete(taskId: String, deleteFile: Boolean = true): Boolean = withContext(Dispatchers.IO) {
-        cancel(taskId)
+        // Disambiguate against CoroutineScope.cancel(message) on the withContext receiver.
+        this@DesktopDownloadManager.cancel(taskId)
         val task = _tasks.value.find { it.id == taskId }
         var fileDeleted = true
         if (task != null && deleteFile) {

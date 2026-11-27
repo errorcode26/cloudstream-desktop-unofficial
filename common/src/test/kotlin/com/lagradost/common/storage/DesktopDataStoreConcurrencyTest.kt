@@ -16,16 +16,26 @@ import kotlin.test.assertTrue
 class DesktopDataStoreConcurrencyTest {
 
     private lateinit var tempDir: File
+    private var prevDataDir: String? = null
 
     @BeforeTest
     fun setUp() {
+        prevDataDir = System.getProperty("cloudstream.data.dir")
+        DesktopDataStore.resetForTesting()
         tempDir = Files.createTempDirectory("cloudstream_test_db_").toFile()
         System.setProperty("cloudstream.data.dir", tempDir.absolutePath)
+        DesktopDataStore.resetForTesting()
         DesktopDataStore.init()
     }
 
     @AfterTest
     fun tearDown() {
+        DesktopDataStore.resetForTesting()
+        if (prevDataDir != null) {
+            System.setProperty("cloudstream.data.dir", prevDataDir)
+        } else {
+            System.clearProperty("cloudstream.data.dir")
+        }
         tempDir.deleteRecursively()
     }
 

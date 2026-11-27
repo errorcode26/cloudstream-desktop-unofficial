@@ -18,12 +18,21 @@ object DesktopDataStore {
         jacksonObjectMapper()
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
 
-    private val dataFile = File(PlatformPaths.dataDir, "datastore.json")
+    private val dataFile: File
+        get() = File(PlatformPaths.dataDir, "datastore.json")
 
     val rawKeyCache = java.util.concurrent.ConcurrentHashMap<String, String>()
 
     @Volatile
     var isPreCacheLoaded = false
+
+    fun resetForTesting() {
+        rawKeyCache.clear()
+        isPreCacheLoaded = false
+        activeProfileProvider = { 0 }
+        sessionIgnoredCfDomains.clear()
+        DatabaseFactory.resetForTesting()
+    }
 
     @Volatile
     var isWorkerMode = System.getProperty("cloudstream.sandbox.worker") == "true"
@@ -128,8 +137,65 @@ object DesktopDataStore {
         }
     }
 
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     private val dbWriteDispatcher = kotlinx.coroutines.Dispatchers.IO.limitedParallelism(1)
     private val ioScope = kotlinx.coroutines.CoroutineScope(dbWriteDispatcher + kotlinx.coroutines.SupervisorJob())
+
+    suspend fun awaitPendingIo() {
+        ioScope.coroutineContext[kotlinx.coroutines.Job]?.children?.toList()?.forEach { it.join() }
+    }
+
+    suspend fun awaitPendingIoForTesting() = awaitPendingIo()
+
+    suspend fun createConsistentSnapshot(targetFile: File) {
+        awaitPendingIo()
+        withDbLock {
+            DatabaseFactory.createConsistentSnapshot(targetFile)
+        }
+    }
+
+    fun vacuumDatabase() {
+        withDbLock {
+            DatabaseFactory.vacuumDatabase()
+        }
+    }
+
+    fun clearAllSettings() {
+        withDbLock {
+            DatabaseFactory.clearAllKeyValues()
+            rawKeyCache.clear()
+        }
+    }
+
+    suspend fun replaceDatabaseFromPreparedFile(preparedDb: File) {
+        awaitPendingIo()
+        withDbLock {
+            DatabaseFactory.closeForRestore()
+            val liveDir = PlatformPaths.dataDir
+            val liveDb = File(liveDir, "cloudstream.db")
+            File(liveDir, "cloudstream.db-wal").delete()
+            File(liveDir, "cloudstream.db-shm").delete()
+            try {
+                java.nio.file.Files.move(
+                    preparedDb.toPath(),
+                    liveDb.toPath(),
+                    java.nio.file.StandardCopyOption.REPLACE_EXISTING,
+                    java.nio.file.StandardCopyOption.ATOMIC_MOVE,
+                )
+            } catch (_: java.nio.file.AtomicMoveNotSupportedException) {
+                java.nio.file.Files.move(
+                    preparedDb.toPath(),
+                    liveDb.toPath(),
+                    java.nio.file.StandardCopyOption.REPLACE_EXISTING,
+                )
+            }
+
+            rawKeyCache.clear()
+            isPreCacheLoaded = false
+            DatabaseFactory.reopenAfterRestore()
+            init()
+        }
+    }
 
     @Volatile
     var onPersistKeyOverride: ((key: String, json: String) -> Unit)? = null

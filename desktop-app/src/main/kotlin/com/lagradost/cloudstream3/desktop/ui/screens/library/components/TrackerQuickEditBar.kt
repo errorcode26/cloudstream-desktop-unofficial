@@ -120,7 +120,7 @@ fun TrackerQuickEditBar(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                UnifiedWatchStatus.editableStatuses.forEach { statusEnum ->
+                UnifiedWatchStatus.supportedStatusesFor(entry.providerId, entry.isMovie).forEach { statusEnum ->
                     val selected = quickEdit.status == statusEnum
                     val lockedCompleted = statusEnum == UnifiedWatchStatus.COMPLETED && !bounds.canMarkCompleted
                     Surface(
@@ -154,29 +154,70 @@ fun TrackerQuickEditBar(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    DesktopOutlinedButton(
-                        onClick = { onEvent(LibraryUiEvent.OnEditQuickProgress(quickEdit.progress - 1)) },
-                        enabled = quickEdit.progress > 0 && !quickEdit.isSaving,
-                        contentPadding = PaddingValues(horizontal = 8.dp),
+                if (entry.isMovie) {
+                    val isMovieWatched = quickEdit.progress >= 1
+                    Surface(
+                        onClick = {
+                            val nextWatched = !isMovieWatched
+                            if (nextWatched) {
+                                if (quickEdit.status == UnifiedWatchStatus.PLAN_TO_WATCH) {
+                                    onEvent(LibraryUiEvent.OnEditQuickStatus(UnifiedWatchStatus.COMPLETED))
+                                } else {
+                                    onEvent(LibraryUiEvent.OnEditQuickProgress(1))
+                                }
+                            } else {
+                                if (quickEdit.status == UnifiedWatchStatus.COMPLETED) {
+                                    onEvent(LibraryUiEvent.OnEditQuickStatus(UnifiedWatchStatus.PLAN_TO_WATCH))
+                                } else {
+                                    onEvent(LibraryUiEvent.OnEditQuickProgress(0))
+                                }
+                            }
+                        },
+                        enabled = !quickEdit.isSaving && (!bounds.isNotYetReleased || isMovieWatched),
+                        shape = chipShape,
+                        color = if (isMovieWatched) brandColor.copy(alpha = 0.18f) else theme.SurfaceElevated.copy(alpha = 0.6f),
+                        border = BorderStroke(1.dp, if (isMovieWatched) brandColor else theme.Divider.copy(alpha = 0.45f)),
                         modifier = Modifier.height(34.dp),
                     ) {
-                        Icon(Icons.Default.Remove, contentDescription = null, modifier = Modifier.size(14.dp))
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            modifier = Modifier.padding(horizontal = 12.dp),
+                        ) {
+                            Icon(Icons.Default.Check, contentDescription = null, tint = if (isMovieWatched) brandColor else theme.TextMuted, modifier = Modifier.size(15.dp))
+                            Text(
+                                text = if (isMovieWatched) "Watched" else "Unwatched",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = if (isMovieWatched) brandColor else theme.TextPrimary,
+                            )
+                        }
                     }
-                    val totalTxt = entry.totalEpisodes?.let { " / $it" } ?: ""
-                    Text(
-                        text = "Ep ${quickEdit.progress}$totalTxt",
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = theme.TextPrimary,
-                    )
-                    DesktopOutlinedButton(
-                        onClick = { onEvent(LibraryUiEvent.OnEditQuickProgress(quickEdit.progress + 1)) },
-                        enabled = !bounds.isNotYetReleased && (ceiling == null || quickEdit.progress < ceiling) && !quickEdit.isSaving,
-                        contentPadding = PaddingValues(horizontal = 8.dp),
-                        modifier = Modifier.height(34.dp),
-                    ) {
-                        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(14.dp))
+                } else {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        DesktopOutlinedButton(
+                            onClick = { onEvent(LibraryUiEvent.OnEditQuickProgress(quickEdit.progress - 1)) },
+                            enabled = quickEdit.progress > 0 && !quickEdit.isSaving,
+                            contentPadding = PaddingValues(horizontal = 8.dp),
+                            modifier = Modifier.height(34.dp),
+                        ) {
+                            Icon(Icons.Default.Remove, contentDescription = null, modifier = Modifier.size(14.dp))
+                        }
+                        val totalTxt = entry.totalEpisodes?.let { " / $it" } ?: ""
+                        Text(
+                            text = "Ep ${quickEdit.progress}$totalTxt",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = theme.TextPrimary,
+                        )
+                        DesktopOutlinedButton(
+                            onClick = { onEvent(LibraryUiEvent.OnEditQuickProgress(quickEdit.progress + 1)) },
+                            enabled = !bounds.isNotYetReleased && (ceiling == null || quickEdit.progress < ceiling) && !quickEdit.isSaving,
+                            contentPadding = PaddingValues(horizontal = 8.dp),
+                            modifier = Modifier.height(34.dp),
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(14.dp))
+                        }
                     }
                 }
 

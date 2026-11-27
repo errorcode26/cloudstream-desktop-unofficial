@@ -20,6 +20,7 @@ import com.lagradost.cloudstream3.desktop.domain.plugins.repository.PluginReposi
 import com.lagradost.cloudstream3.desktop.domain.providers.repository.ActiveProviderRepository
 import com.lagradost.cloudstream3.desktop.domain.tracking.interactor.GetTrackingAccounts
 import com.lagradost.cloudstream3.desktop.domain.tracking.repository.TrackingRepository
+import com.lagradost.cloudstream3.desktop.tracking.TrackerSyncEngine
 
 /**
  * Clean Architecture Dependency Injection Container.
@@ -65,6 +66,7 @@ interface AppContainer {
 
     // Tracking Interactors
     val getTrackingAccounts: GetTrackingAccounts
+    val trackerSyncEngine: TrackerSyncEngine
 }
 
 class DefaultAppContainer : AppContainer {
@@ -101,6 +103,7 @@ class DefaultAppContainer : AppContainer {
     override val syncPluginRepositories by lazy { SyncPluginRepositories(pluginRepository) }
 
     override val getTrackingAccounts by lazy { GetTrackingAccounts(trackingRepository) }
+    override val trackerSyncEngine by lazy { TrackerSyncEngine(repository = trackingRepository) }
 }
 
 /** Global thread-safe holder for non-Composable instantiation contexts (e.g. Decompose ComponentContext) */

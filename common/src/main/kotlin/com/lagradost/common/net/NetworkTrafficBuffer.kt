@@ -17,6 +17,8 @@ object NetworkTrafficBuffer {
     private val idCounter = AtomicLong(1)
     private val buffer = ConcurrentLinkedDeque<NetworkRequestEntry>()
     private val activeRequests = ConcurrentHashMap<Long, NetworkRequestEntry>()
+    // Compound check/clear/rebuild operations in recordComplete must stay atomic against concurrent writers.
+    private val bufferLock = Any()
 
     private val _networkFlow = MutableSharedFlow<NetworkRequestEntry>(
         replay = 0,
@@ -45,10 +47,12 @@ object NetworkTrafficBuffer {
             requestBody = requestBody,
         )
 
-        activeRequests[id] = entry
-        buffer.addLast(entry)
-        while (buffer.size > DEFAULT_MAX_CAPACITY) {
-            buffer.pollFirst()
+        synchronized(bufferLock) {
+            activeRequests[id] = entry
+            buffer.addLast(entry)
+            while (buffer.size > DEFAULT_MAX_CAPACITY) {
+                buffer.pollFirst()
+            }
         }
 
         _networkFlow.tryEmit(entry)
@@ -66,55 +70,61 @@ object NetworkTrafficBuffer {
         contentType: String? = null,
         error: String? = null,
     ) {
-        val original = activeRequests.remove(id)
-        val updated = (
-            original ?: NetworkRequestEntry(
-                id = id,
-                method = "GET",
-                url = "",
-                host = "",
-                path = "",
+        val updated = synchronized(bufferLock) {
+            val original = activeRequests.remove(id)
+            val entry = (
+                original ?: NetworkRequestEntry(
+                    id = id,
+                    method = "GET",
+                    url = "",
+                    host = "",
+                    path = "",
+                )
+                ).copy(
+                statusCode = statusCode,
+                statusMessage = statusMessage,
+                durationMs = durationMs,
+                responseHeaders = responseHeaders,
+                responseBody = responseBody,
+                responseSize = responseSize,
+                contentType = contentType,
+                error = error,
             )
-            ).copy(
-            statusCode = statusCode,
-            statusMessage = statusMessage,
-            durationMs = durationMs,
-            responseHeaders = responseHeaders,
-            responseBody = responseBody,
-            responseSize = responseSize,
-            contentType = contentType,
-            error = error,
-        )
 
-        // Replace in buffer
-        val list = buffer.toList()
-        val index = list.indexOfFirst { it.id == id }
-        if (index >= 0) {
-            buffer.clear()
-            for (i in list.indices) {
-                if (i == index) {
-                    buffer.addLast(updated)
-                } else {
-                    buffer.addLast(list[i])
+            val list = buffer.toList()
+            val index = list.indexOfFirst { it.id == id }
+            if (index >= 0) {
+                buffer.clear()
+                for (i in list.indices) {
+                    if (i == index) {
+                        buffer.addLast(entry)
+                    } else {
+                        buffer.addLast(list[i])
+                    }
+                }
+            } else {
+                buffer.addLast(entry)
+                while (buffer.size > DEFAULT_MAX_CAPACITY) {
+                    buffer.pollFirst()
                 }
             }
-        } else {
-            buffer.addLast(updated)
-            while (buffer.size > DEFAULT_MAX_CAPACITY) {
-                buffer.pollFirst()
-            }
+            entry
         }
 
         _networkFlow.tryEmit(updated)
     }
 
     fun getSnapshot(): List<NetworkRequestEntry> {
-        return buffer.toList()
+        return synchronized(bufferLock) {
+            buffer.toList()
+        }
     }
 
     fun clear() {
-        buffer.clear()
-        activeRequests.clear()
+        synchronized(bufferLock) {
+            buffer.clear()
+            activeRequests.clear()
+        }
     }
 
     fun filter(

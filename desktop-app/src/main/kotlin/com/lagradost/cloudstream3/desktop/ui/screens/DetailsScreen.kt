@@ -257,7 +257,9 @@ fun ComposeDetailsScreen(
                         val activeData = response ?: fakeData
                         if (activeData != null) {
                             val handleBack = {
-                                if (isPanelOpen) {
+                                if (uiState.trackers.isDrawerOpen) {
+                                    viewModel.onEvent(DetailsUiEvent.OnDismissTrackerDrawer)
+                                } else if (isPanelOpen) {
                                     viewModel.onEvent(DetailsUiEvent.OnCloseLinksPanel)
                                 } else {
                                     onBack()
@@ -446,7 +448,29 @@ fun DetailsContent(
     val detailsSectionOrder by AppearanceConfig.detailsSectionOrder.collectAsState()
     val detailsDisabledSections by AppearanceConfig.detailsDisabledSections.collectAsState()
 
-    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val isTrackerDrawerOpen = uiState?.trackers?.isDrawerOpen == true
+        val currentSeasonEps = remember(data, currentSeason, availableSeasons) {
+            val raw = when (data) {
+                is com.lagradost.cloudstream3.TvSeriesLoadResponse -> data.episodes
+                is com.lagradost.cloudstream3.AnimeLoadResponse -> data.episodes.values.flatten()
+                else -> emptyList()
+            }
+            val seasonList = raw.filter { it.season == currentSeason || (it.season == null && availableSeasons.size <= 1) }
+            seasonList.ifEmpty { raw }
+        }
+
+        BoxWithConstraints(
+            modifier = Modifier
+                .fillMaxSize()
+                .onPreviewKeyEvent { event ->
+                    if (isTrackerDrawerOpen && event.key == Key.Escape && event.type == KeyEventType.KeyUp) {
+                        onEvent(DetailsUiEvent.OnDismissTrackerDrawer)
+                        true
+                    } else {
+                        false
+                    }
+                },
+        ) {
         val viewportHeight = maxHeight
         val viewportWidth = maxWidth
         val isWindowCompact = viewportWidth < 600.dp
@@ -574,6 +598,9 @@ fun DetailsContent(
                                             onRemoveEpisodeWatched = onRemoveEpisodeWatched,
                                             onToggleEpisodesStackedView = onToggleEpisodesStackedView,
                                             onSetEpisodeViewMode = onSetEpisodeViewMode ?: {},
+                                            onSyncEpisodeToTracker = { providerId, ep ->
+                                                onEvent(DetailsUiEvent.OnSyncEpisodeToTracker(providerId, ep))
+                                            },
                                             selectedSeason = currentSeason,
                                             onSeasonChange = { onEvent(DetailsUiEvent.OnSelectSeason(it)) },
                                         )
@@ -827,5 +854,16 @@ fun DetailsContent(
             trailer = uiState?.activeTrailer,
             onDismissRequest = { onEvent(DetailsUiEvent.OnSelectTrailer(null)) },
         )
+
+        uiState?.trackers?.let { trackersState ->
+            com.lagradost.cloudstream3.desktop.ui.screens.details.DetailsTrackerDrawerHost(
+                isOpen = trackersState.isDrawerOpen,
+                showName = data.name.takeIf { it.isNotBlank() } ?: uiState.preloadedName.orEmpty(),
+                trackersState = trackersState,
+                currentSeasonEpisodes = currentSeasonEps,
+                isMovieLike = isMovieLike,
+                onEvent = onEvent,
+            )
+        }
     }
 }

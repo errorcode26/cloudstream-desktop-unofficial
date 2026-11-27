@@ -11,8 +11,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.lagradost.cloudstream3.desktop.domain.tracking.repository.TrackingRepository
 import com.lagradost.cloudstream3.desktop.player.PlayerConfig
 import com.lagradost.common.platform.PlatformPaths
 import com.lagradost.common.storage.DesktopDataStore
@@ -466,7 +468,10 @@ fun SettingsPlayerRenderingScreen(viewModel: SettingsViewModel) {
 // 3. AUTO-PLAY & SKIP AUTOMATION SUB-SCREEN
 // ─────────────────────────────────────────────────────────────────────────────
 @Composable
-fun SettingsPlayerAutoPlayScreen(viewModel: SettingsViewModel) {
+fun SettingsPlayerAutoPlayScreen(
+    viewModel: SettingsViewModel,
+    trackingRepo: TrackingRepository = com.lagradost.cloudstream3.desktop.di.AppContainerHolder.container.trackingRepository,
+) {
     val uiState by viewModel.uiState.collectAsState()
     val scrollState = rememberScrollState()
 
@@ -564,7 +569,6 @@ fun SettingsPlayerAutoPlayScreen(viewModel: SettingsViewModel) {
             )
         }
 
-        val trackingRepo = remember { com.lagradost.cloudstream3.desktop.di.AppContainerHolder.container.trackingRepository }
         val trackerSettingsVersion by trackingRepo.settingsVersion.collectAsState()
         val trackerAccounts by com.lagradost.cloudstream3.syncproviders.AccountManager.accountsFlow.collectAsState()
         val trackerScope = rememberCoroutineScope()
@@ -632,6 +636,7 @@ fun SettingsPlayerAutoPlayScreen(viewModel: SettingsViewModel) {
                                 trackingRepo.setAutoSyncEnabled(enabled, tracker.id)
                             }
                         },
+                        modifier = Modifier.testTag("settings_autoplay_auto_track_${tracker.id}"),
                         colors = SwitchDefaults.colors(
                             checkedThumbColor = MaterialTheme.colorScheme.primary,
                             checkedTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),

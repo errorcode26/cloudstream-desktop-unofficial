@@ -203,7 +203,11 @@ internal fun DetailsMetadataCompact(
         }
         if (typeStr.isNotBlank()) metaItems.add(typeStr)
 
-        data.contentRating?.takeIf { it.isNotBlank() }?.let { metaItems.add(it) }
+        val isSeriesType = data.type == TvType.TvSeries || data.type == TvType.Anime || data.type == TvType.AsianDrama
+        com.lagradost.cloudstream3.desktop.ui.badges.DesktopBadgeComponents.normalizeContentRating(
+            data.contentRating,
+            isSeries = isSeriesType,
+        )?.let { metaItems.add(it) }
 
         if (metaItems.isNotEmpty()) {
             Text(
@@ -217,54 +221,18 @@ internal fun DetailsMetadataCompact(
             )
         }
 
-        // 3. Compact Scores Row (IMDb / TMDB / AniList) + Genres
-        val imdbScore = uiState?.enrichedImdbRating
-        val tmdbScore = uiState?.enrichedTmdbRating ?: if (imdbScore == null) data.score?.toFloat(10)?.toDouble() else null
-        val anilistScore = uiState?.enrichedAniListRating
-
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            if (imdbScore != null && imdbScore > 0.0) {
-                val imdbUrl = RatingBadgeUrlResolver.getImdbUrl(data)
-                com.lagradost.cloudstream3.desktop.ui.badges.DesktopBadgeComponents.CompactRatingBadge(
-                    logoRes = "badges/rating_imdb.png",
-                    scoreText = String.format(java.util.Locale.US, "%.1f", imdbScore),
-                    brandColor = Color(0xFFF5C518),
-                    logoWidth = 24.dp,
-                    logoHeight = 12.dp,
-                    tooltipText = "Open in IMDb (browser)",
-                    onClick = { ExternalLinkHandler.launchSystemBrowser(imdbUrl) },
-                )
-            }
-            if (tmdbScore != null && tmdbScore > 0.0) {
-                val tmdbUrl = RatingBadgeUrlResolver.getTmdbUrl(data, uiState?.tmdbId)
-                com.lagradost.cloudstream3.desktop.ui.badges.DesktopBadgeComponents.CompactRatingBadge(
-                    logoRes = "badges/rating_tmdb.png",
-                    scoreText = String.format(java.util.Locale.US, "%.1f", tmdbScore),
-                    brandColor = Color(0xFF01B4E4),
-                    logoWidth = 20.dp,
-                    logoHeight = 12.dp,
-                    tooltipText = "Open in TMDb (browser)",
-                    onClick = { ExternalLinkHandler.launchSystemBrowser(tmdbUrl) },
-                )
-            }
-            if (anilistScore != null && anilistScore > 0.0) {
-                val animeUrl = RatingBadgeUrlResolver.getAniListUrl(data)
-                com.lagradost.cloudstream3.desktop.ui.badges.DesktopBadgeComponents.CompactRatingBadge(
-                    logoRes = "badges/rating_mal.png",
-                    scoreText = "${(anilistScore * 10).toInt()}%",
-                    brandColor = Color(0xFF02A9FF),
-                    logoWidth = 19.dp,
-                    logoHeight = 12.dp,
-                    tooltipText = "Open in AniList (browser)",
-                    onClick = { ExternalLinkHandler.launchSystemBrowser(animeUrl) },
-                )
-            }
-
-            // Clean Genre chips (first 2 genres)
-            val genres = data.tags ?: emptyList()
+        // 3. Compact Scores Row + Genres
+        val genres = data.tags ?: emptyList()
+        com.lagradost.cloudstream3.desktop.ui.badges.DesktopBadgeComponents.MediaRatingsRow(
+            data = data,
+            tmdbId = uiState?.tmdbId,
+            imdbScore = uiState?.enrichedImdbRating,
+            tmdbScore = uiState?.enrichedTmdbRating,
+            anilistScore = uiState?.enrichedAniListRating,
+            isCompact = true,
+            isCentered = false,
+            onOpenUrl = ExternalLinkHandler::launchSystemBrowser,
+        ) { _ ->
             genres.take(2).forEach { genre ->
                 Surface(
                     shape = RoundedCornerShape(4.dp),
@@ -423,6 +391,16 @@ internal fun DetailsMetadataCompact(
                     }
                 }
             }
+        }
+
+        // 4b. Compact Tracker Pills (when eligible & connected)
+        val trackersState = uiState?.trackers
+        if (trackersState != null && trackersState.availableTrackers.isNotEmpty()) {
+            DetailsTrackersHeroCluster(
+                trackersState = trackersState,
+                isButtonsNarrow = true,
+                onOpenTracker = { pId -> onEvent(DetailsUiEvent.OnOpenTrackerDrawer(pId)) },
+            )
         }
 
         // 5. Compact 2-Line Synopsis

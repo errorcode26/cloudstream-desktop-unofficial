@@ -1,9 +1,13 @@
 package com.lagradost.cloudstream3.desktop.ui.screens.settings.contract
 
+import com.lagradost.cloudstream3.desktop.backup.BackupArchiveEntry
+import com.lagradost.cloudstream3.desktop.backup.BackupInspection
+import com.lagradost.cloudstream3.desktop.backup.BackupOptions
+import com.lagradost.cloudstream3.desktop.backup.RestoreOptions
+import com.lagradost.cloudstream3.desktop.network.DohProvider
 import com.lagradost.cloudstream3.desktop.ui.base.UiEffect
 import com.lagradost.cloudstream3.desktop.ui.base.UiEvent
 import com.lagradost.cloudstream3.desktop.ui.base.UiState
-import com.lagradost.cloudstream3.desktop.network.DohProvider
 import okhttp3.Cookie
 
 enum class StorageCacheType {
@@ -89,6 +93,20 @@ data class DnsTestState(
     val result: DnsTestResult? = null,
 )
 
+data class BackupUiState(
+    val isCreatingBackup: Boolean = false,
+    val isInspectingBackup: Boolean = false,
+    val isRestoringBackup: Boolean = false,
+    val availableBackups: List<BackupArchiveEntry> = emptyList(),
+    val pendingRestoreInspection: BackupInspection? = null,
+    val exportOptions: BackupOptions = BackupOptions(),
+    val restoreOptions: RestoreOptions = RestoreOptions(),
+    val showExportDialog: Boolean = false,
+    val lastStatusMessage: String? = null,
+    val lastStatusIsError: Boolean = false,
+    val lastRestoreWarnings: List<String> = emptyList(),
+)
+
 sealed class SettingsUiEvent : UiEvent {
     data class OnUpdateString(val key: String, val value: String) : SettingsUiEvent()
     data class OnUpdateBoolean(val key: String, val value: Boolean) : SettingsUiEvent()
@@ -157,6 +175,24 @@ sealed class SettingsUiEvent : UiEvent {
     // Account API Testing
     data class TestAccountApiKey(val idPrefix: String, val apiKey: String) : SettingsUiEvent()
     data object ResetAccountApiTestStatus : SettingsUiEvent()
+
+    // Backup & Restore
+    data object LoadBackupsList : SettingsUiEvent()
+    data object OpenExportBackupDialog : SettingsUiEvent()
+    data object DismissExportBackupDialog : SettingsUiEvent()
+    data class UpdateExportOptions(val options: BackupOptions) : SettingsUiEvent()
+    data class CreateBackup(
+        val targetPath: String? = null,
+        val options: BackupOptions = BackupOptions(),
+    ) : SettingsUiEvent()
+    data class InspectBackupFile(val filePath: String) : SettingsUiEvent()
+    data object DismissRestoreDialog : SettingsUiEvent()
+    data class UpdateRestoreOptions(val options: RestoreOptions) : SettingsUiEvent()
+    data object ConfirmRestoreBackup : SettingsUiEvent()
+    data class RestoreBackupArchive(
+        val filePath: String,
+        val options: RestoreOptions = RestoreOptions(),
+    ) : SettingsUiEvent()
 }
 
 data class SettingsUiState(
@@ -182,6 +218,7 @@ data class SettingsUiState(
     val clonedSites: List<com.lagradost.cloudstream3.desktop.models.CustomSite> = emptyList(),
     val isTestingAccountApi: Boolean = false,
     val testAccountApiStatus: Pair<Boolean, String>? = null,
+    val backupState: BackupUiState = BackupUiState(),
 ) : UiState
 
 sealed class SettingsUiEffect : UiEffect {

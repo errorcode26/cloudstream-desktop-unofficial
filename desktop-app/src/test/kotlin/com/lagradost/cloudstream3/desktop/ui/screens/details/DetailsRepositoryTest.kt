@@ -7,6 +7,7 @@ import com.lagradost.cloudstream3.ProviderType
 import com.lagradost.cloudstream3.SearchResponseList
 import com.lagradost.cloudstream3.TvType
 import com.lagradost.cloudstream3.newMovieLoadResponse
+import com.lagradost.cloudstream3.desktop.ui.components.AppToastManager
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
@@ -194,5 +195,52 @@ class DetailsRepositoryTest {
             )
         }
         assertTrue(ex.message?.contains("returned no media details") == true)
+    }
+
+    @Test
+    fun `fetchRaw suppresses user notification alerts when notifyUserOnError is false`() = runBlocking {
+        AppToastManager.clearHistory()
+        val silentProvider = object : MainAPI() {
+            override var name = "MockSilentPrefetchProvider"
+            override var mainUrl = "https://www.themoviedb.org"
+            override val supportedTypes = setOf(TvType.Movie)
+
+            override suspend fun load(url: String): LoadResponse? = null
+        }
+
+        synchronized(APIHolder.allProviders) {
+            APIHolder.allProviders.clear()
+            APIHolder.allProviders.add(silentProvider)
+        }
+
+        try {
+            assertFailsWith<IOException> {
+                DetailsRepository.fetchRaw(
+                    provider = silentProvider,
+                    url = "https://www.themoviedb.org/imdb/movie/tt9990004",
+                    fallbackName = "Prefetch Title",
+                    notifyUserOnError = false,
+                )
+            }
+            assertTrue(
+                AppToastManager.history.value.none { it.text.contains("MockSilentPrefetchProvider") },
+                "Background prefetch failures must not pollute Activity notifications",
+            )
+
+            assertFailsWith<IOException> {
+                DetailsRepository.fetchRaw(
+                    provider = silentProvider,
+                    url = "https://www.themoviedb.org/imdb/movie/tt9990005",
+                    fallbackName = "Foreground Title",
+                    notifyUserOnError = true,
+                )
+            }
+            assertTrue(
+                AppToastManager.history.value.any { it.text.contains("MockSilentPrefetchProvider") },
+                "Foreground Details failures should still surface user error alerts",
+            )
+        } finally {
+            AppToastManager.clearHistory()
+        }
     }
 }

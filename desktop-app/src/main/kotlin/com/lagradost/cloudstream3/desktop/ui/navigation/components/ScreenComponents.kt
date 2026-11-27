@@ -149,7 +149,8 @@ class DetailsComponent(
     }
 
     fun getOrCreateViewModel(resolvedApi: MainAPI): DetailsViewModel {
-        return instanceKeeper.getOrCreate(key = "Details_${config.url}") {
+        val seedKey = config.canonicalSeed?.canonicalId.orEmpty()
+        return instanceKeeper.getOrCreate(key = "Details_${config.url}_$seedKey") {
             DetailsViewModel(
                 provider = resolvedApi,
                 url = config.url,
@@ -158,6 +159,7 @@ class DetailsComponent(
                 preloadedBg = config.preloadedBg,
                 initialSeason = config.targetSeason,
                 targetEpisodeId = config.targetEpisodeId,
+                canonicalSeed = config.canonicalSeed,
             )
         }.apply {
             if (config.targetSeason != null) {
@@ -211,4 +213,16 @@ class LinksComponent(
     val config: Config.Links,
 ) : ComponentContext by componentContext {
     val api: MainAPI? = APIHolder.allProviders.firstOrNull { it.name == config.providerName } ?: APIHolder.getApiFromNameNull(config.providerName)
+}
+
+class ProfileEditComponent(
+    componentContext: ComponentContext,
+    val config: Config.ProfileEdit,
+) : ComponentContext by componentContext {
+    val viewModel = instanceKeeper.getOrCreate(key = "ProfileEdit_${config.profileId}_${config.switchOnCreate}") {
+        com.lagradost.cloudstream3.desktop.ui.screens.profile.ProfileEditViewModel(
+            profileId = config.profileId,
+            switchOnSaveWhenCreated = config.switchOnCreate,
+        )
+    }
 }

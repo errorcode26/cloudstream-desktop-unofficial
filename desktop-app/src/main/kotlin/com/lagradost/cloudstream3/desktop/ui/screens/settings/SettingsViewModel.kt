@@ -1,6 +1,9 @@
 package com.lagradost.cloudstream3.desktop.ui.screens.settings
 
 import com.lagradost.cloudstream3.APIHolder
+import com.lagradost.cloudstream3.desktop.backup.BackupOptions
+import com.lagradost.cloudstream3.desktop.backup.DesktopBackupEngine
+import com.lagradost.cloudstream3.desktop.backup.RestoreOptions
 import com.lagradost.cloudstream3.desktop.core.preference.PreferenceKeys
 import com.lagradost.cloudstream3.desktop.debrid.torbox.TorboxApiClient
 import com.lagradost.cloudstream3.desktop.discord.DiscordRpcManager
@@ -61,96 +64,12 @@ class SettingsViewModel : BaseMviViewModel<SettingsUiState, SettingsUiEvent, Set
             )
         }
         viewModelScope.launch(Dispatchers.IO) {
-            val initialDownloadPath = DesktopDataStore.getKey<String>(DesktopDataStore.PREF_DOWNLOAD_PATH)
-                ?: DesktopDownloadManager.downloadsDir.absolutePath
-            val initialScreenshotPath = DesktopDataStore.getKey<String>(PlayerConfig.PREF_SCREENSHOT_DIR)
-                ?: PlatformPaths.screenshotsDir.absolutePath
-            val cfEnabled = DesktopDataStore.getKey<Boolean>(DesktopDataStore.PREF_ALLOW_CF_BYPASS) ?: false
-            val p2pEnabled = DesktopDataStore.getKey<Boolean>(DesktopDataStore.PREF_P2P_ENABLED) ?: false
-            val audioNorm = DesktopDataStore.getKey<Boolean>(PlayerConfig.PREF_AUDIO_NORMALIZATION) ?: false
-            val audioDelay = DesktopDataStore.getKey<Float>(PlayerConfig.PREF_AUDIO_DELAY) ?: 0f
-            val downloadThreads = DesktopDataStore.getKey<Float>(DesktopDataStore.PREF_DOWNLOAD_THREADS) ?: 8f
-            val maxConcurrent = DesktopDataStore.getKey<Float>(DesktopDataStore.PREF_DOWNLOAD_MAX_CONCURRENT) ?: 2f
-            val subBold = DesktopDataStore.getKey<String>(PlayerConfig.PREF_SUB_BOLD) ?: "no"
-            val subItalic = DesktopDataStore.getKey<String>(PlayerConfig.PREF_SUB_ITALIC) ?: "no"
-            val subColor = DesktopDataStore.getKey<String>(PlayerConfig.PREF_SUB_COLOR) ?: "#FFFFFF"
-            val subSize = DesktopDataStore.getKey<String>(PlayerConfig.PREF_SUB_SIZE) ?: "45"
-            val subBg = DesktopDataStore.getKey<String>(PlayerConfig.PREF_SUB_BG) ?: "#00000000"
-            val subFont = DesktopDataStore.getKey<String>(PlayerConfig.PREF_SUB_FONT) ?: "Inter"
-            val subBorderColor = DesktopDataStore.getKey<String>(PlayerConfig.PREF_SUB_BORDER_COLOR) ?: "#000000"
-            val subBorderSize = DesktopDataStore.getKey<String>(PlayerConfig.PREF_SUB_BORDER_SIZE) ?: "3"
-            val subShadowColor = DesktopDataStore.getKey<String>(PlayerConfig.PREF_SUB_SHADOW_COLOR) ?: "#00000000"
-            val subShadowOffset = DesktopDataStore.getKey<String>(PlayerConfig.PREF_SUB_SHADOW_OFFSET) ?: "0"
-            val subBlur = DesktopDataStore.getKey<String>(PlayerConfig.PREF_SUB_BLUR) ?: "0"
-            val subPos = DesktopDataStore.getKey<String>(PlayerConfig.PREF_SUB_POS) ?: "100"
-
-            val subOverride = DesktopDataStore.getKey<Boolean>(PlayerConfig.PREF_ENABLE_SUB_OVERRIDE) ?: true
-            val subCaptions = DesktopDataStore.getKey<Boolean>(PlayerConfig.PREF_SUB_REMOVE_CAPTIONS) ?: false
-            val subBloat = DesktopDataStore.getKey<Boolean>(PlayerConfig.PREF_SUB_REMOVE_BLOAT) ?: true
-            val subUppercase = DesktopDataStore.getKey<Boolean>(PlayerConfig.PREF_SUB_UPPERCASE) ?: false
-            val subEnabled = DesktopDataStore.getKey<Boolean>(PlayerConfig.PREF_SUB_ENABLED) ?: true
-
-            val dohProvider = DesktopDataStore.getKey<Int>(NetworkConfig.PREF_DOH_PROVIDER) ?: 0
-            val torboxApiKey = DesktopDataStore.getKey<String>(DesktopDataStore.PREF_TORBOX_API_KEY) ?: ""
-            val torboxUser = if (torboxApiKey.isNotBlank()) {
-                try {
-                    TorboxApiClient.getUser(torboxApiKey)
-                } catch (e: Exception) {
-                    null
-                }
-            } else {
-                null
-            }
-
-            val ignoredDomains = DesktopDataStore.getIgnoredCfDomains().toList().sorted()
-            val clonedSitesList = SettingsCustomSitesEngine.loadClonedSitesList()
-
-            updateState {
-                copy(
-                    downloadPath = initialDownloadPath,
-                    screenshotPath = initialScreenshotPath,
-                    torboxAccountState = torboxAccountState.copy(user = torboxUser),
-                    ignoredCfDomains = ignoredDomains,
-                    clonedSites = clonedSitesList,
-                    booleanSettings = booleanSettings + mapOf(
-                        DesktopDataStore.PREF_ALLOW_CF_BYPASS to cfEnabled,
-                        DesktopDataStore.PREF_P2P_ENABLED to p2pEnabled,
-                        PlayerConfig.PREF_AUDIO_NORMALIZATION to audioNorm,
-                        PlayerConfig.PREF_ENABLE_SUB_OVERRIDE to subOverride,
-                        PlayerConfig.PREF_SUB_REMOVE_CAPTIONS to subCaptions,
-                        PlayerConfig.PREF_SUB_REMOVE_BLOAT to subBloat,
-                        PlayerConfig.PREF_SUB_UPPERCASE to subUppercase,
-                        PlayerConfig.PREF_SUB_ENABLED to subEnabled,
-                    ),
-                    intSettings = intSettings + mapOf(
-                        NetworkConfig.PREF_DOH_PROVIDER to dohProvider,
-                    ),
-                    floatSettings = floatSettings + mapOf(
-                        PlayerConfig.PREF_AUDIO_DELAY to audioDelay,
-                        DesktopDataStore.PREF_DOWNLOAD_THREADS to downloadThreads,
-                        DesktopDataStore.PREF_DOWNLOAD_MAX_CONCURRENT to maxConcurrent,
-                    ),
-                    stringSettings = stringSettings + mapOf(
-                        PlayerConfig.PREF_SUB_BOLD to subBold,
-                        PlayerConfig.PREF_SUB_ITALIC to subItalic,
-                        PlayerConfig.PREF_SUB_COLOR to subColor,
-                        PlayerConfig.PREF_SUB_SIZE to subSize,
-                        PlayerConfig.PREF_SUB_BG to subBg,
-                        PlayerConfig.PREF_SUB_FONT to subFont,
-                        PlayerConfig.PREF_SUB_BORDER_COLOR to subBorderColor,
-                        PlayerConfig.PREF_SUB_BORDER_SIZE to subBorderSize,
-                        PlayerConfig.PREF_SUB_SHADOW_COLOR to subShadowColor,
-                        PlayerConfig.PREF_SUB_SHADOW_OFFSET to subShadowOffset,
-                        PlayerConfig.PREF_SUB_BLUR to subBlur,
-                        PlayerConfig.PREF_SUB_POS to subPos,
-                        NetworkConfig.PREF_CUSTOM_DOH_URL to (DesktopDataStore.getKey<String>(NetworkConfig.PREF_CUSTOM_DOH_URL) ?: ""),
-                    ),
-                )
-            }
+            loadPersistedSettingsIntoState()
         }
         handleEvent(SettingsUiEvent.RefreshStorageMetrics)
         handleEvent(SettingsUiEvent.RefreshTorrServerStatus)
         handleEvent(SettingsUiEvent.RefreshClearanceCookies)
+        handleEvent(SettingsUiEvent.LoadBackupsList)
         observeTorrServerDownloadTask()
         viewModelScope.launch(Dispatchers.IO) {
             DesktopDataStore.keyUpdates.collect { key ->
@@ -421,6 +340,256 @@ class SettingsViewModel : BaseMviViewModel<SettingsUiState, SettingsUiEvent, Set
             is SettingsUiEvent.ClearAllIgnoredCfDomains -> clearAllIgnoredCfDomains()
             is SettingsUiEvent.TestAccountApiKey -> testAccountApiKey(event.idPrefix, event.apiKey)
             is SettingsUiEvent.ResetAccountApiTestStatus -> updateState { copy(testAccountApiStatus = null) }
+            is SettingsUiEvent.LoadBackupsList -> refreshBackupsList()
+            is SettingsUiEvent.OpenExportBackupDialog -> updateState { copy(backupState = backupState.copy(showExportDialog = true)) }
+            is SettingsUiEvent.DismissExportBackupDialog -> updateState { copy(backupState = backupState.copy(showExportDialog = false)) }
+            is SettingsUiEvent.UpdateExportOptions -> updateState { copy(backupState = backupState.copy(exportOptions = event.options)) }
+            is SettingsUiEvent.CreateBackup -> createBackup(event.targetPath, event.options)
+            is SettingsUiEvent.InspectBackupFile -> inspectBackupFile(event.filePath)
+            is SettingsUiEvent.DismissRestoreDialog -> updateState {
+                copy(backupState = backupState.copy(pendingRestoreInspection = null))
+            }
+            is SettingsUiEvent.UpdateRestoreOptions -> updateState { copy(backupState = backupState.copy(restoreOptions = event.options)) }
+            is SettingsUiEvent.ConfirmRestoreBackup -> confirmRestoreBackup()
+            is SettingsUiEvent.RestoreBackupArchive -> restoreBackupArchive(event.filePath, event.options)
+        }
+    }
+
+    private suspend fun loadPersistedSettingsIntoState() {
+        val initialDownloadPath = DesktopDataStore.getKey<String>(DesktopDataStore.PREF_DOWNLOAD_PATH)
+            ?: DesktopDownloadManager.downloadsDir.absolutePath
+        val initialScreenshotPath = DesktopDataStore.getKey<String>(PlayerConfig.PREF_SCREENSHOT_DIR)
+            ?: PlatformPaths.screenshotsDir.absolutePath
+        val cfEnabled = DesktopDataStore.getKey<Boolean>(DesktopDataStore.PREF_ALLOW_CF_BYPASS) ?: false
+        val p2pEnabled = DesktopDataStore.getKey<Boolean>(DesktopDataStore.PREF_P2P_ENABLED) ?: false
+        val audioNorm = DesktopDataStore.getKey<Boolean>(PlayerConfig.PREF_AUDIO_NORMALIZATION) ?: false
+        val audioDelay = DesktopDataStore.getKey<Float>(PlayerConfig.PREF_AUDIO_DELAY) ?: 0f
+        val downloadThreads = DesktopDataStore.getKey<Float>(DesktopDataStore.PREF_DOWNLOAD_THREADS) ?: 8f
+        val maxConcurrent = DesktopDataStore.getKey<Float>(DesktopDataStore.PREF_DOWNLOAD_MAX_CONCURRENT) ?: 2f
+        val subBold = DesktopDataStore.getKey<String>(PlayerConfig.PREF_SUB_BOLD) ?: "no"
+        val subItalic = DesktopDataStore.getKey<String>(PlayerConfig.PREF_SUB_ITALIC) ?: "no"
+        val subColor = DesktopDataStore.getKey<String>(PlayerConfig.PREF_SUB_COLOR) ?: "#FFFFFF"
+        val subSize = DesktopDataStore.getKey<String>(PlayerConfig.PREF_SUB_SIZE) ?: "45"
+        val subBg = DesktopDataStore.getKey<String>(PlayerConfig.PREF_SUB_BG) ?: "#00000000"
+        val subFont = DesktopDataStore.getKey<String>(PlayerConfig.PREF_SUB_FONT) ?: "Inter"
+        val subBorderColor = DesktopDataStore.getKey<String>(PlayerConfig.PREF_SUB_BORDER_COLOR) ?: "#000000"
+        val subBorderSize = DesktopDataStore.getKey<String>(PlayerConfig.PREF_SUB_BORDER_SIZE) ?: "3"
+        val subShadowColor = DesktopDataStore.getKey<String>(PlayerConfig.PREF_SUB_SHADOW_COLOR) ?: "#00000000"
+        val subShadowOffset = DesktopDataStore.getKey<String>(PlayerConfig.PREF_SUB_SHADOW_OFFSET) ?: "0"
+        val subBlur = DesktopDataStore.getKey<String>(PlayerConfig.PREF_SUB_BLUR) ?: "0"
+        val subPos = DesktopDataStore.getKey<String>(PlayerConfig.PREF_SUB_POS) ?: "100"
+
+        val subOverride = DesktopDataStore.getKey<Boolean>(PlayerConfig.PREF_ENABLE_SUB_OVERRIDE) ?: true
+        val subCaptions = DesktopDataStore.getKey<Boolean>(PlayerConfig.PREF_SUB_REMOVE_CAPTIONS) ?: false
+        val subBloat = DesktopDataStore.getKey<Boolean>(PlayerConfig.PREF_SUB_REMOVE_BLOAT) ?: true
+        val subUppercase = DesktopDataStore.getKey<Boolean>(PlayerConfig.PREF_SUB_UPPERCASE) ?: false
+        val subEnabled = DesktopDataStore.getKey<Boolean>(PlayerConfig.PREF_SUB_ENABLED) ?: true
+
+        val dohProvider = DesktopDataStore.getKey<Int>(NetworkConfig.PREF_DOH_PROVIDER) ?: 0
+        val torboxApiKey = DesktopDataStore.getKey<String>(DesktopDataStore.PREF_TORBOX_API_KEY) ?: ""
+        val torboxUser = if (torboxApiKey.isNotBlank()) {
+            try {
+                TorboxApiClient.getUser(torboxApiKey)
+            } catch (_: Exception) {
+                null
+            }
+        } else {
+            null
+        }
+
+        val ignoredDomains = DesktopDataStore.getIgnoredCfDomains().toList().sorted()
+        val clonedSitesList = SettingsCustomSitesEngine.loadClonedSitesList()
+
+        updateState {
+            copy(
+                downloadPath = initialDownloadPath,
+                screenshotPath = initialScreenshotPath,
+                torboxAccountState = torboxAccountState.copy(user = torboxUser),
+                ignoredCfDomains = ignoredDomains,
+                clonedSites = clonedSitesList,
+                booleanSettings = booleanSettings + mapOf(
+                    DesktopDataStore.PREF_ALLOW_CF_BYPASS to cfEnabled,
+                    DesktopDataStore.PREF_P2P_ENABLED to p2pEnabled,
+                    PlayerConfig.PREF_AUDIO_NORMALIZATION to audioNorm,
+                    PlayerConfig.PREF_ENABLE_SUB_OVERRIDE to subOverride,
+                    PlayerConfig.PREF_SUB_REMOVE_CAPTIONS to subCaptions,
+                    PlayerConfig.PREF_SUB_REMOVE_BLOAT to subBloat,
+                    PlayerConfig.PREF_SUB_UPPERCASE to subUppercase,
+                    PlayerConfig.PREF_SUB_ENABLED to subEnabled,
+                ),
+                intSettings = intSettings + mapOf(
+                    NetworkConfig.PREF_DOH_PROVIDER to dohProvider,
+                ),
+                floatSettings = floatSettings + mapOf(
+                    PlayerConfig.PREF_AUDIO_DELAY to audioDelay,
+                    DesktopDataStore.PREF_DOWNLOAD_THREADS to downloadThreads,
+                    DesktopDataStore.PREF_DOWNLOAD_MAX_CONCURRENT to maxConcurrent,
+                ),
+                stringSettings = stringSettings + mapOf(
+                    PlayerConfig.PREF_SUB_BOLD to subBold,
+                    PlayerConfig.PREF_SUB_ITALIC to subItalic,
+                    PlayerConfig.PREF_SUB_COLOR to subColor,
+                    PlayerConfig.PREF_SUB_SIZE to subSize,
+                    PlayerConfig.PREF_SUB_BG to subBg,
+                    PlayerConfig.PREF_SUB_FONT to subFont,
+                    PlayerConfig.PREF_SUB_BORDER_COLOR to subBorderColor,
+                    PlayerConfig.PREF_SUB_BORDER_SIZE to subBorderSize,
+                    PlayerConfig.PREF_SUB_SHADOW_COLOR to subShadowColor,
+                    PlayerConfig.PREF_SUB_SHADOW_OFFSET to subShadowOffset,
+                    PlayerConfig.PREF_SUB_BLUR to subBlur,
+                    PlayerConfig.PREF_SUB_POS to subPos,
+                    NetworkConfig.PREF_CUSTOM_DOH_URL to (DesktopDataStore.getKey<String>(NetworkConfig.PREF_CUSTOM_DOH_URL) ?: ""),
+                ),
+            )
+        }
+    }
+
+    private fun refreshBackupsList() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val backups = runCatching { DesktopBackupEngine.listBackups() }.getOrDefault(emptyList())
+            updateState {
+                copy(backupState = backupState.copy(availableBackups = backups))
+            }
+        }
+    }
+
+    private fun createBackup(targetPath: String?, options: BackupOptions) {
+        if (uiState.value.backupState.isCreatingBackup) return
+        viewModelScope.launch(Dispatchers.IO) {
+            updateState {
+                copy(
+                    backupState = backupState.copy(
+                        isCreatingBackup = true,
+                        showExportDialog = false,
+                        lastStatusMessage = null,
+                        lastStatusIsError = false,
+                    ),
+                )
+            }
+            try {
+                val targetFile = if (!targetPath.isNullOrBlank()) {
+                    val normalized = if (targetPath.endsWith(".${DesktopBackupEngine.BACKUP_EXTENSION}", ignoreCase = true)) {
+                        targetPath
+                    } else {
+                        "$targetPath.${DesktopBackupEngine.BACKUP_EXTENSION}"
+                    }
+                    File(normalized)
+                } else {
+                    File(DesktopBackupEngine.getBackupsRootDir(), DesktopBackupEngine.defaultBackupFileName())
+                }
+                val inspection = DesktopBackupEngine.createBackup(targetFile, options)
+                val msg = "Backup saved: ${File(inspection.filePath).name} (${inspection.manifest.counts.profiles} profiles, ${inspection.manifest.counts.bookmarks} bookmarks, ${inspection.manifest.counts.extensions} extensions)"
+                updateState {
+                    copy(
+                        backupState = backupState.copy(
+                            isCreatingBackup = false,
+                            availableBackups = DesktopBackupEngine.listBackups(),
+                            lastStatusMessage = msg,
+                            lastStatusIsError = false,
+                            lastRestoreWarnings = emptyList(),
+                        ),
+                    )
+                }
+                sendEffect(SettingsUiEffect.ShowToast(msg))
+            } catch (e: Exception) {
+                val msg = "Backup failed: ${e.message}"
+                updateState {
+                    copy(
+                        backupState = backupState.copy(
+                            isCreatingBackup = false,
+                            lastStatusMessage = msg,
+                            lastStatusIsError = true,
+                        ),
+                    )
+                }
+                sendEffect(SettingsUiEffect.ShowToast(msg, isError = true))
+            }
+        }
+    }
+
+    private fun inspectBackupFile(filePath: String) {
+        if (uiState.value.backupState.isInspectingBackup || uiState.value.backupState.isRestoringBackup) return
+        viewModelScope.launch(Dispatchers.IO) {
+            updateState {
+                copy(
+                    backupState = backupState.copy(
+                        isInspectingBackup = true,
+                        lastStatusMessage = null,
+                        lastStatusIsError = false,
+                    ),
+                )
+            }
+            try {
+                val inspection = DesktopBackupEngine.inspectBackup(File(filePath))
+                val initialRestoreOptions = RestoreOptions(
+                    restoreDatabase = inspection.hasSqliteDatabase || inspection.hasPortableJson,
+                    restoreCredentials = inspection.hasCredentialsInBackup,
+                    restoreRepositories = inspection.hasRepositories,
+                    restoreExtensionBinaries = inspection.extensions.any { it.binaryBundled },
+                    restoreAssetsAndCookies = true,
+                )
+                updateState {
+                    copy(
+                        backupState = backupState.copy(
+                            isInspectingBackup = false,
+                            pendingRestoreInspection = inspection,
+                            restoreOptions = initialRestoreOptions,
+                        ),
+                    )
+                }
+            } catch (e: Exception) {
+                val msg = "Could not open backup: ${e.message}"
+                updateState {
+                    copy(
+                        backupState = backupState.copy(
+                            isInspectingBackup = false,
+                            lastStatusMessage = msg,
+                            lastStatusIsError = true,
+                        ),
+                    )
+                }
+                sendEffect(SettingsUiEffect.ShowToast(msg, isError = true))
+            }
+        }
+    }
+
+    private fun confirmRestoreBackup() {
+        val inspection = uiState.value.backupState.pendingRestoreInspection ?: return
+        val options = uiState.value.backupState.restoreOptions
+        restoreBackupArchive(inspection.filePath, options)
+    }
+
+    private fun restoreBackupArchive(filePath: String, options: RestoreOptions) {
+        if (uiState.value.backupState.isRestoringBackup) return
+        viewModelScope.launch(Dispatchers.IO) {
+            updateState {
+                copy(
+                    backupState = backupState.copy(
+                        isRestoringBackup = true,
+                        pendingRestoreInspection = null,
+                        lastStatusMessage = null,
+                        lastStatusIsError = false,
+                    ),
+                )
+            }
+            val result = DesktopBackupEngine.restoreBackup(File(filePath), options)
+            if (result.success) {
+                loadPersistedSettingsIntoState()
+            }
+            updateState {
+                copy(
+                    backupState = backupState.copy(
+                        isRestoringBackup = false,
+                        availableBackups = runCatching { DesktopBackupEngine.listBackups() }.getOrDefault(backupState.availableBackups),
+                        lastStatusMessage = result.message,
+                        lastStatusIsError = !result.success,
+                        lastRestoreWarnings = result.warnings,
+                    ),
+                )
+            }
+            sendEffect(SettingsUiEffect.ShowToast(result.message, isError = !result.success))
+            refreshStorageMetrics()
+            refreshClearanceCookies()
         }
     }
 

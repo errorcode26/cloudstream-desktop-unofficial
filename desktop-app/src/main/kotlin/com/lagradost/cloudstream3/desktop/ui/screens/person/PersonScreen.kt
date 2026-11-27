@@ -30,10 +30,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.lagradost.cloudstream3.TvType
-import com.lagradost.cloudstream3.desktop.ui.components.DesktopBackButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopDrilldownScaffold
 import com.lagradost.cloudstream3.desktop.ui.components.DesktopVerticalScrollbar
 import com.lagradost.cloudstream3.desktop.ui.components.LocalDesktopTheme
-import com.lagradost.cloudstream3.desktop.ui.components.WindowControlsPill
 import com.lagradost.cloudstream3.desktop.ui.components.defaultScrollbarStyle
 import com.lagradost.cloudstream3.desktop.ui.navigation.Config
 import com.lagradost.cloudstream3.desktop.explore.models.ExploreItem
@@ -60,56 +59,96 @@ fun PersonScreen(
         viewModel.loadPerson(name, tmdbId)
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(theme.Background),
+    DesktopDrilldownScaffold(
+        onBack = onBack,
+        dialogs = {
+            val selectedCredit = uiState.selectedCreditForMatch
+            if (selectedCredit != null) {
+                val exploreItem = remember(selectedCredit) {
+                    ExploreItem(
+                        id = selectedCredit.tmdbId.toString(),
+                        type = if (selectedCredit.mediaType == TvType.TvSeries) "series" else "movie",
+                        name = selectedCredit.title,
+                        posterUrl = selectedCredit.posterUrl,
+                        backgroundUrl = selectedCredit.backdropUrl,
+                        releaseYear = selectedCredit.releaseYear,
+                        description = selectedCredit.overview,
+                        rating = selectedCredit.voteAverage,
+                    )
+                }
+                ExploreProviderDialog(
+                    item = exploreItem,
+                    matches = uiState.providerMatches,
+                    isSearching = uiState.isSearchingProviders,
+                    characterOrJob = selectedCredit.characterOrJob,
+                    onDismissRequest = { viewModel.onEvent(PersonUiEvent.CloseProviderPicker) },
+                    onOpenDetails = { providerName, url, title ->
+                        viewModel.onEvent(PersonUiEvent.CloseProviderPicker)
+                        onNavigate(
+                            Config.Details(
+                                providerName = providerName,
+                                url = url,
+                                preloadedName = title,
+                                preloadedPoster = selectedCredit.posterUrl,
+                                preloadedBg = selectedCredit.backdropUrl,
+                            ),
+                        )
+                    },
+                    onOpenAddonMode = { item ->
+                        viewModel.onEvent(PersonUiEvent.CloseProviderPicker)
+                        onNavigate(
+                            Config.Details(
+                                providerName = "Stremio",
+                                url = "stremio://${item.type}/${item.id}",
+                                preloadedName = item.name,
+                                preloadedPoster = item.posterUrl,
+                                preloadedBg = item.backgroundUrl,
+                            ),
+                        )
+                    },
+                )
+            }
+        },
     ) {
-        // Main Content Area
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(top = 64.dp, start = 32.dp, end = 32.dp, bottom = 16.dp),
-        ) {
-            if (uiState.isLoading) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center,
+        if (uiState.isLoading) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center,
+            ) {
+                CircularProgressIndicator(
+                    color = theme.Accent,
+                    modifier = Modifier.size(48.dp),
+                )
+            }
+        } else if (uiState.error != null && uiState.personDetail == null) {
+            Column(
+                modifier = Modifier.fillMaxSize(),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Person,
+                    contentDescription = null,
+                    modifier = Modifier.size(64.dp),
+                    tint = theme.TextMuted.copy(alpha = 0.5f),
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = uiState.error ?: "No information available",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = theme.TextMuted,
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                com.lagradost.cloudstream3.desktop.ui.components.DesktopButton(
+                    onClick = { viewModel.onEvent(PersonUiEvent.Retry) },
+                    colors = ButtonDefaults.buttonColors(containerColor = theme.Accent),
                 ) {
-                    CircularProgressIndicator(
-                        color = theme.Accent,
-                        modifier = Modifier.size(48.dp),
-                    )
+                    Text("Retry", color = Color.White)
                 }
-            } else if (uiState.error != null && uiState.personDetail == null) {
-                Column(
-                    modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.Center,
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Person,
-                        contentDescription = null,
-                        modifier = Modifier.size(64.dp),
-                        tint = theme.TextMuted.copy(alpha = 0.5f),
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        text = uiState.error ?: "No information available",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = theme.TextMuted,
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    com.lagradost.cloudstream3.desktop.ui.components.DesktopButton(
-                        onClick = { viewModel.onEvent(PersonUiEvent.Retry) },
-                        colors = ButtonDefaults.buttonColors(containerColor = theme.Accent),
-                    ) {
-                        Text("Retry", color = Color.White)
-                    }
-                }
-            } else {
-                val detail = uiState.personDetail ?: return@Box
-                BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+            }
+        } else {
+            val detail = uiState.personDetail ?: return@DesktopDrilldownScaffold
+            BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
                     if (maxWidth >= 900.dp) {
                         // Desktop Split-View: Generous horizontal space with natural flow & boundary bar
                         Row(
@@ -174,69 +213,7 @@ fun PersonScreen(
                 }
             }
         }
-
-        // Floating Top Action Layer (Corner-anchored, matching DetailsScreen)
-        Row(
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .fillMaxWidth()
-                .padding(start = 16.dp, end = 16.dp, top = 7.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            DesktopBackButton(onClick = onBack)
-            WindowControlsPill(isHome = false, isCompact = false)
-        }
-
-        // Multi-Provider Stream Match Resolver Dialog
-        val selectedCredit = uiState.selectedCreditForMatch
-        if (selectedCredit != null) {
-            val exploreItem = remember(selectedCredit) {
-                ExploreItem(
-                    id = selectedCredit.tmdbId.toString(),
-                    type = if (selectedCredit.mediaType == TvType.TvSeries) "series" else "movie",
-                    name = selectedCredit.title,
-                    posterUrl = selectedCredit.posterUrl,
-                    backgroundUrl = selectedCredit.backdropUrl,
-                    releaseYear = selectedCredit.releaseYear,
-                    description = selectedCredit.overview,
-                    rating = selectedCredit.voteAverage,
-                )
-            }
-            ExploreProviderDialog(
-                item = exploreItem,
-                matches = uiState.providerMatches,
-                isSearching = uiState.isSearchingProviders,
-                characterOrJob = selectedCredit.characterOrJob,
-                onDismissRequest = { viewModel.onEvent(PersonUiEvent.CloseProviderPicker) },
-                onOpenDetails = { providerName, url, title ->
-                    viewModel.onEvent(PersonUiEvent.CloseProviderPicker)
-                    onNavigate(
-                        Config.Details(
-                            providerName = providerName,
-                            url = url,
-                            preloadedName = title,
-                            preloadedPoster = selectedCredit.posterUrl,
-                            preloadedBg = selectedCredit.backdropUrl,
-                        ),
-                    )
-                },
-                onOpenAddonMode = { item ->
-                    viewModel.onEvent(PersonUiEvent.CloseProviderPicker)
-                    onNavigate(
-                        Config.Details(
-                            providerName = "Stremio",
-                            url = "stremio://${item.type}/${item.id}",
-                            preloadedName = item.name,
-                            preloadedPoster = item.posterUrl,
-                            preloadedBg = item.backgroundUrl,
-                        ),
-                    )
-                },
-            )
-        }
     }
-}
 
 @Composable
 private fun PersonHeroSidebar(

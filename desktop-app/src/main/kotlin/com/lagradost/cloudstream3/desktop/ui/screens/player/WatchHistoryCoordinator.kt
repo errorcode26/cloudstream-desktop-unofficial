@@ -19,12 +19,14 @@ internal object WatchHistoryCoordinator {
         nextEpisode: Episode?,
         saveProgress: SavePlaybackProgress,
         forceNotify: Boolean = false,
+        allowCompletion: Boolean = true,
     ) {
         val currentDurSec = history.duration
         val currentPosSec = history.position
         val percentage = if (currentDurSec > 0) currentPosSec.toFloat() / currentDurSec else 0f
+        val isCompleted = allowCompletion && percentage >= 0.90f && currentDurSec > 0
 
-        val finalHistory = if (percentage >= 0.90f && currentDurSec > 0) {
+        val finalHistory = if (isCompleted) {
             history.copy(position = currentDurSec)
         } else {
             history
@@ -32,7 +34,7 @@ internal object WatchHistoryCoordinator {
 
         saveProgress.await(finalHistory, forceNotify = forceNotify)
 
-        if (percentage >= 0.90f && hasNextEpisode && nextEpisode != null) {
+        if (isCompleted && hasNextEpisode && nextEpisode != null) {
             val nextEpReleaseStatus = com.lagradost.cloudstream3.desktop.ui.screens.details.parseEpisodeReleaseStatus(nextEpisode)
             val isNextEpUnreleased = nextEpReleaseStatus.isUnreleased ||
                 nextEpReleaseStatus.isMissingFromProvider ||

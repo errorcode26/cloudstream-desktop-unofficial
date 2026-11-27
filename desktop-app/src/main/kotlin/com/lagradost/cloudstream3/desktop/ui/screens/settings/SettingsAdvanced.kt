@@ -341,7 +341,12 @@ fun SettingsAdvanced(viewModel: SettingsViewModel) {
             PathRow("Update Packages", com.lagradost.cloudstream3.desktop.updates.UnifiedUpdateManager.getUpdatesDirectory(), Icons.Default.SystemUpdate)
         }
 
-        // ── 3. Cloned Sites & Custom URLs ─────────────────────────────
+        // ── 3. Backup & Restore ───────────────────────────────────────
+        com.lagradost.cloudstream3.desktop.ui.screens.settings.advanced.SettingsAdvancedBackup(
+            viewModel = viewModel,
+        )
+
+        // ── 4. Cloned Sites & Custom URLs ─────────────────────────────
         com.lagradost.cloudstream3.desktop.ui.screens.settings.advanced.SettingsAdvancedClonedSites(
             viewModel = viewModel,
         )

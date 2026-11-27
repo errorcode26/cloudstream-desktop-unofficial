@@ -78,6 +78,22 @@ object UnifiedUpdateManager {
     private val client: OkHttpClient get() = com.lagradost.cloudstream3.app.baseClient
     private val mapper = jacksonObjectMapper()
 
+    @Volatile
+    internal var githubApiBaseUrl: String = "https://api.github.com"
+
+    @Volatile
+    internal var appVersionOverride: String? = null
+
+    internal fun resetForTesting() {
+        githubApiBaseUrl = "https://api.github.com"
+        appVersionOverride = null
+        hasCheckedInitial = false
+        _availableUpdates.value = emptyList()
+        _activeDialogUpdate.value = null
+        _releaseHistory.value = emptyList()
+        _isFetchingHistory.value = false
+    }
+
     private val _availableUpdates = MutableStateFlow<List<PendingUpdate>>(emptyList())
     val availableUpdates: StateFlow<List<PendingUpdate>> = _availableUpdates.asStateFlow()
 
@@ -110,7 +126,7 @@ object UnifiedUpdateManager {
         if (!force && _releaseHistory.value.isNotEmpty()) return@withContext _releaseHistory.value
         _isFetchingHistory.value = true
         try {
-            val url = "https://api.github.com/repos/${AppConfig.GITHUB_REPO}/releases?per_page=30"
+            val url = "$githubApiBaseUrl/repos/${AppConfig.GITHUB_REPO}/releases?per_page=30"
             val req = Request.Builder()
                 .url(url)
                 .header("Accept", "application/vnd.github.v3+json")
@@ -228,7 +244,7 @@ object UnifiedUpdateManager {
 
     suspend fun checkAppUpdate(force: Boolean = false): PendingUpdate? = withContext(Dispatchers.IO) {
         try {
-            val url = "https://api.github.com/repos/${AppConfig.GITHUB_REPO}/releases?per_page=5"
+            val url = "$githubApiBaseUrl/repos/${AppConfig.GITHUB_REPO}/releases?per_page=5"
             val req = Request.Builder()
                 .url(url)
                 .header("Accept", "application/vnd.github.v3+json")
@@ -240,21 +256,9 @@ object UnifiedUpdateManager {
                     val releases = mapper.readValue<List<GitHubApiRelease>>(body)
                     val release = releases.firstOrNull { !it.draft } ?: return@withContext null
                     val remoteVersion = release.tag_name.removePrefix("v")
-                    val currentVersion = AppConfig.APP_VERSION
+                    val currentVersion = appVersionOverride ?: AppConfig.APP_VERSION
 
-                    val installerAsset = when (PlatformPaths.installationFlavor) {
-                        PlatformPaths.Flavor.PORTABLE -> {
-                            release.assets.firstOrNull { it.name.contains("portable", ignoreCase = true) && it.name.endsWith(".zip", ignoreCase = true) }
-                        }
-                        PlatformPaths.Flavor.MSI -> {
-                            release.assets.firstOrNull { it.name.endsWith(".msi", ignoreCase = true) }
-                                ?: release.assets.firstOrNull { it.name.startsWith("CloudStream-Setup", ignoreCase = true) && it.name.endsWith(".exe", ignoreCase = true) }
-                        }
-                        PlatformPaths.Flavor.INNO_SETUP -> {
-                            release.assets.firstOrNull { it.name.startsWith("CloudStream-Setup", ignoreCase = true) && it.name.endsWith(".exe", ignoreCase = true) }
-                                ?: release.assets.firstOrNull { it.name.endsWith(".exe", ignoreCase = true) }
-                        }
-                    }
+                    val installerAsset = resolveInstallerAsset(release)
                     val downloadUrl = installerAsset?.browser_download_url ?: release.html_url
                     val expectedSha256 = if (installerAsset != null) {
                         fetchReleaseChecksum(release, installerAsset.name)
@@ -295,7 +299,7 @@ object UnifiedUpdateManager {
 
     suspend fun checkTorrServerUpdate(force: Boolean = false): PendingUpdate? = withContext(Dispatchers.IO) {
         try {
-            val url = "https://api.github.com/repos/YouROK/TorrServer/releases/latest"
+            val url = "$githubApiBaseUrl/repos/YouROK/TorrServer/releases/latest"
             val req = Request.Builder()
                 .url(url)
                 .header("Accept", "application/vnd.github.v3+json")
@@ -339,7 +343,7 @@ object UnifiedUpdateManager {
 
     suspend fun checkYtDlpUpdate(force: Boolean = false): PendingUpdate? = withContext(Dispatchers.IO) {
         try {
-            val url = "https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest"
+            val url = "$githubApiBaseUrl/repos/yt-dlp/yt-dlp/releases/latest"
             val req = Request.Builder()
                 .url(url)
                 .header("Accept", "application/vnd.github.v3+json")
@@ -590,6 +594,13 @@ object UnifiedUpdateManager {
 
     fun launchInstallerAndExit(file: File) {
         if (!file.exists()) return
+        try {
+            kotlinx.coroutines.runBlocking {
+                com.lagradost.cloudstream3.desktop.backup.DesktopBackupEngine.createPreUpdateBackup()
+            }
+        } catch (t: Throwable) {
+            AppLogger.w("UnifiedUpdateManager: Pre-update safety backup failed (${t.message})")
+        }
         try {
             com.lagradost.cloudstream3.desktop.sandbox.SandboxedPluginManager.close()
         } catch (t: Throwable) {

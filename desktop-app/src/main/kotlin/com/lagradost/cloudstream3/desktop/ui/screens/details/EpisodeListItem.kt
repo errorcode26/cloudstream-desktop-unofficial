@@ -357,41 +357,12 @@ fun EpisodeListItem(
                     )
 
                     if (rating10p != null && !shouldHideSpoilers) {
-                        val isAnime = data is com.lagradost.cloudstream3.AnimeLoadResponse ||
-                            data.type == com.lagradost.cloudstream3.TvType.Anime ||
-                            data.type == com.lagradost.cloudstream3.TvType.AnimeMovie ||
-                            data.type == com.lagradost.cloudstream3.TvType.OVA
-                        val hasImdb = uiState?.enrichedImdbRating != null ||
-                            data.syncData["imdb"]?.startsWith("tt") == true ||
-                            data.syncData.values.any { it.startsWith("tt") }
-
-                        val (logoRes, logoWidth, logoHeight) = when {
-                            isAnime -> Triple("badges/rating_mal.png", 27.dp, 16.dp)
-                            hasImdb -> Triple("badges/rating_imdb.png", 33.dp, 16.dp)
-                            else -> Triple("badges/rating_tmdb.png", 28.dp, 16.dp)
-                        }
-                        val badgePainter = com.lagradost.cloudstream3.desktop.ui.badges.DesktopBadgeComponents.rememberSharpBadgePainter(logoRes)
-
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(5.dp),
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(Color.Black.copy(alpha = 0.45f))
-                                .border(0.5.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(6.dp))
-                                .padding(horizontal = 6.dp, vertical = 2.5.dp),
-                        ) {
-                            androidx.compose.foundation.Image(
-                                painter = badgePainter,
-                                contentDescription = null,
-                                modifier = Modifier.size(width = logoWidth, height = logoHeight),
-                            )
-                            Text(
-                                text = String.format(java.util.Locale.US, "%.1f", rating10p),
-                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp, fontWeight = FontWeight.Bold),
-                                color = Color.White,
-                            )
-                        }
+                        val epKey = (ep.season ?: 1) to (ep.episode ?: 0)
+                        com.lagradost.cloudstream3.desktop.ui.badges.DesktopBadgeComponents.EpisodeRatingBadge(
+                            score10p = rating10p,
+                            source = uiState?.episodeRatingSources?.get(epKey),
+                            compact = true,
+                        )
                     }
                 }
 

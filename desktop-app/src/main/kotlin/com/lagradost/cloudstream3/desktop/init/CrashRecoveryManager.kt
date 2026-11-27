@@ -12,11 +12,17 @@ import java.io.File
  * between application sessions with zero false positives on clean exits.
  */
 object CrashRecoveryManager {
-    private val sessionLockFile by lazy { File(PlatformPaths.appDataDir, ".session_active") }
-    private val acknowledgedCrashFile by lazy { File(PlatformPaths.appDataDir, ".last_acknowledged_crash") }
+    private val sessionLockFile: File
+        get() = File(PlatformPaths.appDataDir, ".session_active")
+    private val acknowledgedCrashFile: File
+        get() = File(PlatformPaths.appDataDir, ".last_acknowledged_crash")
 
     var hasCrashDetected by mutableStateOf(false)
         private set
+
+    internal fun resetForTesting() {
+        hasCrashDetected = false
+    }
 
     /**
      * Inspects previous session health during pre-UI startup.

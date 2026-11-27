@@ -56,7 +56,12 @@ class HeroRepositoryImpl : HeroRepository {
                 if (provider != null && !DetailsCache.containsKey(history.showUrl) && HeroCache.get(cacheKey) == null) {
                     if (!prefetchingUrls.add(cacheKey)) continue
                     try {
-                        val raw = DetailsRepository.fetchRaw(provider, history.showUrl, fallbackName = history.showName)
+                        val raw = DetailsRepository.fetchRaw(
+                            provider = provider,
+                            url = history.showUrl,
+                            fallbackName = history.showName,
+                            notifyUserOnError = false,
+                        )
                         if (raw != null) {
                             HybridEnrichmentService.enrich(raw, history.showUrl, fetchCast = false, onScreenshotsLoaded = {})
                         }
@@ -110,7 +115,12 @@ class HeroRepositoryImpl : HeroRepository {
                 if (provider != null) {
                     // Fetch authentic scraped provider details like upstream Android
                     val raw = try {
-                        DetailsRepository.fetchRaw(provider, item.url, fallbackName = item.name)
+                        DetailsRepository.fetchRaw(
+                            provider = provider,
+                            url = item.url,
+                            fallbackName = item.name,
+                            notifyUserOnError = false,
+                        )
                     } catch (e: Exception) {
                         AppLogger.w("HeroRepository", "fetchRaw failed for ${item.name}, using fallback dummy", e)
                         null

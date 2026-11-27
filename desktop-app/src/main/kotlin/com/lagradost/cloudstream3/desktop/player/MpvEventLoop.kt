@@ -34,6 +34,12 @@ internal class MpvEventLoop(
 ) {
     companion object {
         private const val LIVE_STALL_MS = 12_000L
+        private const val MIN_GENUINE_EOF_DURATION_SEC = 60.0
+    }
+
+    private fun isGenuineEndOfFile(posSec: Double, durSec: Double): Boolean {
+        if (durSec < MIN_GENUINE_EOF_DURATION_SEC) return false
+        return posSec >= durSec * 0.85 || (durSec > 120.0 && posSec >= durSec - 10.0)
     }
 
     @Volatile
@@ -133,13 +139,12 @@ internal class MpvEventLoop(
                                             } catch (e: Exception) {
                                                 AppLogger.e("DesktopMpvEngine", "Live recovery failed", e)
                                             }
-                                        } else if (!hasEverPlayed || lastDur <= 0.0 || (lastPos < 1.0 && lastStreamErrorReason != null)) {
-                                            val errDesc = lastStreamErrorReason ?: "Stream instantly closed (Empty / EOF)"
-                                            AppLogger.e("DesktopMpvEngine", "Stream ended before playing: $errDesc")
+                                        } else if (!hasEverPlayed || lastDur < MIN_GENUINE_EOF_DURATION_SEC || (lastPos < 1.0 && lastStreamErrorReason != null)) {
+                                            val errDesc = lastStreamErrorReason ?: "Stream ended before minimum valid playback (dur=${lastDur.toInt()}s)"
+                                            AppLogger.e("DesktopMpvEngine", "Stream ended before valid playback: $errDesc")
                                             onPlaybackError(errDesc)
                                         } else {
-                                            val isNearEnd = lastDur > 0 && (lastPos >= lastDur * 0.85 || lastPos >= lastDur - 10.0)
-                                            val isPremature = !isNearEnd
+                                            val isPremature = !isGenuineEndOfFile(lastPos, lastDur)
                                             if (isPremature) {
                                                 val errDesc = lastStreamErrorReason ?: "Stream ended prematurely at ${lastPos.toInt()}s"
                                                 AppLogger.w("DesktopMpvEngine", "Premature EOF at ${lastPos}s of ${lastDur}s: $errDesc")
@@ -318,7 +323,7 @@ internal class MpvEventLoop(
                                             "eof-reached" -> {
                                                 if (prop.format == 3) {
                                                     val isEof = propData.getInt(0) != 0
-                                                    val isNearEnd = lastDur > 0 && (lastPos >= lastDur * 0.85 || lastPos >= lastDur - 10.0)
+                                                    val isNearEnd = isGenuineEndOfFile(lastPos, lastDur)
                                                     if (isEof && hasEverPlayed && !hasFiredFinished && !waitingForTimePosReset && isNearEnd) {
                                                         hasFiredFinished = true
                                                         AppLogger.i("DesktopMpvEngine", "Stream reached genuine EOF (property) at ${lastPos}s of ${lastDur}s.")
@@ -389,7 +394,7 @@ internal class MpvEventLoop(
                                 }
                             }
                             val isEofPolled = MpvLibrary.getPropertyString(handle, "eof-reached") == "yes"
-                            val isNearEnd = lastDur > 0 && (lastPos >= lastDur * 0.85 || lastPos >= lastDur - 10.0)
+                            val isNearEnd = isGenuineEndOfFile(lastPos, lastDur)
                             if (isEofPolled && hasEverPlayed && !hasFiredFinished && !waitingForTimePosReset && isNearEnd) {
                                 hasFiredFinished = true
                                 AppLogger.i("DesktopMpvEngine", "Stream reached genuine EOF (polled) at ${lastPos}s of ${lastDur}s.")

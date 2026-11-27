@@ -144,7 +144,41 @@ abstract class AuthAPI {
             get() = System.currentTimeMillis()
 
         fun splitRedirectUrl(redirectUrl: String): Map<String, String> {
-            return emptyMap()
+            val result = mutableMapOf<String, String>()
+
+            fun parseParams(raw: String) {
+                raw.split('&').forEach { pair ->
+                    val eq = pair.indexOf('=')
+                    if (eq > 0) {
+                        val key = pair.substring(0, eq).trim()
+                        val rawVal = pair.substring(eq + 1)
+                        val decoded = runCatching {
+                            java.net.URLDecoder.decode(rawVal, Charsets.UTF_8.name())
+                        }.getOrDefault(rawVal)
+                        if (key.isNotEmpty()) result[key] = decoded
+                    }
+                }
+            }
+
+            // Parse URL fragment (#key=val&key=val) — used by AniList implicit/token flow.
+            val hashIdx = redirectUrl.indexOf('#')
+            if (hashIdx != -1) {
+                parseParams(redirectUrl.substring(hashIdx + 1))
+            }
+            // Parse query string (?key=val).
+            val queryStart = redirectUrl.indexOf('?')
+            if (queryStart != -1) {
+                val queryEnd = if (hashIdx != -1 && hashIdx > queryStart) hashIdx else redirectUrl.length
+                parseParams(redirectUrl.substring(queryStart + 1, queryEnd))
+            }
+            // Also support bare parameter strings (e.g. "access_token=...&expires_in=..."),
+            // while avoiding base64 JWT strings that only contain trailing '=' padding.
+            if (hashIdx == -1 && queryStart == -1 &&
+                (redirectUrl.contains('&') || redirectUrl.trimStart().startsWith("access_token="))
+            ) {
+                parseParams(redirectUrl.trim())
+            }
+            return result
         }
 
         fun generateCodeVerifier(): String {

@@ -176,6 +176,21 @@ Full credit, recognition, and deep gratitude go to the original creators and con
 - **Third-Party Libraries:** [mpv](https://mpv.io/) · [Compose Multiplatform](https://www.jetbrains.com/lp/compose-multiplatform/) · [Dex2jar](https://github.com/pxb1988/dex2jar) · [SQLDelight](https://github.com/cashapp/sqldelight) · [Microsoft Edge WebView2](https://developer.microsoft.com/en-us/microsoft-edge/webview2/) · [OkHttp](https://square.github.io/okhttp/)
 - **License:** [GNU General Public License v3.0](LICENSE)
 
+### Profile Avatars & Artwork
+Profile avatar styles are optionally fetched live from the [DiceBear](https://www.dicebear.com/) HTTP API (`MIT` core library) at user request and may be cropped and cached locally for offline profile display. Full license details are maintained at [dicebear.com/licenses](https://www.dicebear.com/licenses/):
+- **DiceBear ([CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/)):** Pixel Art, Pixel Art Neutral, Thumbs, Glass, Shapes, Rings, Identicon
+- **Lisa Wischofsky:** Lorelei & Lorelei Neutral ([CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/)) · Adventurer & Adventurer Neutral ([CC BY 4.0](https://creativecommons.org/licenses/by/4.0/))
+- **Pablo Stanley:** Open Peeps ([CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/)) · Avataaars, Avataaars Neutral, Bottts & Bottts Neutral *(Free for personal and commercial use)*
+- **Zoish:** Notionists & Notionists Neutral ([CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/))
+- **The Visual Team:** Big Ears & Big Ears Neutral ([CC BY 4.0](https://creativecommons.org/licenses/by/4.0/))
+- **Ashley Seo:** Big Smile ([CC BY 4.0](https://creativecommons.org/licenses/by/4.0/))
+- **vijay verma:** Croodles & Croodles Neutral ([CC BY 4.0](https://creativecommons.org/licenses/by/4.0/))
+- **Natalia Spivak:** Dylan ([CC BY 4.0](https://creativecommons.org/licenses/by/4.0/))
+- **Davis Uche:** Fun Emoji ([CC BY 4.0](https://creativecommons.org/licenses/by/4.0/))
+- **Micah Lanier:** Micah ([CC BY 4.0](https://creativecommons.org/licenses/by/4.0/))
+- **Webpixels:** Miniavs ([CC BY 4.0](https://creativecommons.org/licenses/by/4.0/))
+- **Draftbit:** Personas ([CC BY 4.0](https://creativecommons.org/licenses/by/4.0/))
+
 ### Forks & References
 
 This repository is open source under GPLv3. Forks and derivative works must comply with GPLv3 terms. If you use this project as a reference, base, or starting point — even partially — a credit back to [`errorcode26/cloudstream-desktop-unofficial`](https://github.com/errorcode26/cloudstream-desktop-unofficial) is appreciated. It takes minimal effort and means a lot to the people who built this.

@@ -2,6 +2,8 @@ package com.lagradost.cloudstream3.desktop.explore.models
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.lagradost.cloudstream3.SearchResponse
+import com.lagradost.cloudstream3.desktop.metadata.CanonicalMediaSeed
+import com.lagradost.cloudstream3.desktop.metadata.MediaSeedOrigin
 
 data class ExploreItem(
     val id: String,
@@ -17,7 +19,26 @@ data class ExploreItem(
     val posterShape: String? = null,
     val providerName: String? = null,
     val itemUrl: String? = null,
-)
+    val anilistId: Int? = null,
+    val malId: Int? = null,
+    val tmdbId: Int? = null,
+    val imdbId: String? = null,
+) {
+    fun toCanonicalSeed(origin: MediaSeedOrigin = MediaSeedOrigin.EXPLORE): CanonicalMediaSeed? {
+        val parsedYear = releaseYear?.let { Regex("""\b(19\d{2}|20\d{2})\b""").find(it)?.groupValues?.get(1)?.toIntOrNull() }
+        return CanonicalMediaSeed.fromCanonicalId(
+            rawId = id,
+            anilistId = anilistId,
+            malId = malId,
+            tmdbId = tmdbId,
+            imdbId = imdbId,
+            expectedTitle = name,
+            expectedYear = parsedYear,
+            mediaType = type,
+            origin = origin,
+        )
+    }
+}
 
 enum class ExploreSearchScope(val label: String) {
     ALL("All Sources"),

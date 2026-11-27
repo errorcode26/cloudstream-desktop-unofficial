@@ -66,7 +66,9 @@ class PlayerInboundDispatcher(
                         val json = playerObjectMapper.writeValueAsString(
                             mapOf("type" to "subtitle_search_results", "results" to allResults),
                         )
-                        NativePlayerBridge.postMessage(json)
+                        NativePlayerBridge.safePostMessage(json)
+                    } catch (e: kotlinx.coroutines.CancellationException) {
+                        throw e
                     } catch (e: Exception) {
                         AppLogger.e("Player:Web", "searchSubtitles error: ${e.message}", e)
                     }
@@ -115,14 +117,16 @@ class PlayerInboundDispatcher(
                             val toastJson = playerObjectMapper.writeValueAsString(
                                 mapOf("type" to "show_toast", "message" to "Loaded subtitle: $cleanName"),
                             )
-                            NativePlayerBridge.postMessage(toastJson)
+                            NativePlayerBridge.safePostMessage(toastJson)
                         } else {
                             AppLogger.w("Player:Web", "Failed to extract/download subtitle for '$name'")
                             val errToastJson = playerObjectMapper.writeValueAsString(
                                 mapOf("type" to "show_toast", "message" to "Failed to download subtitle: $name"),
                             )
-                            NativePlayerBridge.postMessage(errToastJson)
+                            NativePlayerBridge.safePostMessage(errToastJson)
                         }
+                    } catch (e: kotlinx.coroutines.CancellationException) {
+                        throw e
                     } catch (e: Exception) {
                         AppLogger.e("Player:Web", "downloadSubtitle error: ${e.message}", e)
                     }
@@ -141,7 +145,9 @@ class PlayerInboundDispatcher(
                         val toastJson = playerObjectMapper.writeValueAsString(
                             mapOf("type" to "show_toast", "message" to msg),
                         )
-                        NativePlayerBridge.postMessage(toastJson)
+                        NativePlayerBridge.safePostMessage(toastJson)
+                    } catch (e: kotlinx.coroutines.CancellationException) {
+                        throw e
                     } catch (e: Exception) {
                         AppLogger.e("Player:Web", "Failed to save SubSource API key: ${e.message}", e)
                     }
@@ -171,8 +177,10 @@ class PlayerInboundDispatcher(
                             val toastJson = playerObjectMapper.writeValueAsString(
                                 mapOf("type" to "show_toast", "message" to "Loaded subtitle: ${chosenFile.name}"),
                             )
-                            NativePlayerBridge.postMessage(toastJson)
+                            NativePlayerBridge.safePostMessage(toastJson)
                         }
+                    } catch (e: kotlinx.coroutines.CancellationException) {
+                        throw e
                     } catch (e: Exception) {
                         AppLogger.e("Player:Web", "openLocalSubtitlePicker error: ${e.message}", e)
                     }
@@ -198,8 +206,10 @@ class PlayerInboundDispatcher(
                             val toastJson = playerObjectMapper.writeValueAsString(
                                 mapOf("type" to "show_toast", "message" to "Loaded subtitle: ${file.name}"),
                             )
-                            NativePlayerBridge.postMessage(toastJson)
+                            NativePlayerBridge.safePostMessage(toastJson)
                         }
+                    } catch (e: kotlinx.coroutines.CancellationException) {
+                        throw e
                     } catch (e: Exception) {
                         AppLogger.e("Player:Web", "loadLocalSubtitleFile error: ${e.message}", e)
                     }
@@ -351,7 +361,7 @@ class PlayerInboundDispatcher(
                     val toastJson = playerObjectMapper.writeValueAsString(
                         mapOf("type" to "show_toast", "message" to "Diagnostics copied to clipboard"),
                     )
-                    NativePlayerBridge.postMessage(toastJson)
+                    NativePlayerBridge.safePostMessage(toastJson)
                 }
             }
             is PlayerInboundEvent.ChangeLink -> {

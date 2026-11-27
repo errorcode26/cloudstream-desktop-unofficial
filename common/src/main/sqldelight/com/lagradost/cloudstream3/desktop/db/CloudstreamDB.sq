@@ -15,6 +15,9 @@ DELETE FROM KeyValueStore WHERE key = ?;
 selectAllKeyValues:
 SELECT * FROM KeyValueStore;
 
+deleteAllKeyValues:
+DELETE FROM KeyValueStore;
+
 
 CREATE TABLE IF NOT EXISTS Bookmarks (
     id TEXT NOT NULL PRIMARY KEY,
@@ -173,4 +176,79 @@ SELECT * FROM DownloadTasks WHERE id = ?;
 
 selectDownloadByCanonical:
 SELECT * FROM DownloadTasks WHERE canonicalKey = ? AND season = ? AND episode = ?;
+
+
+CREATE TABLE IF NOT EXISTS TrackerBindings (
+    profileId INTEGER NOT NULL,
+    trackerId TEXT NOT NULL,
+    showKey TEXT NOT NULL,
+    mappedSeason INTEGER NOT NULL DEFAULT 1,
+    remoteMediaId TEXT NOT NULL,
+    remoteTitle TEXT NOT NULL DEFAULT '',
+    bindMode TEXT NOT NULL DEFAULT 'AUTO_VERIFIED',
+    episodeOffset INTEGER NOT NULL DEFAULT 0,
+    expectedTotalEpisodes INTEGER,
+    updatedAt INTEGER NOT NULL,
+    PRIMARY KEY (profileId, trackerId, showKey, mappedSeason)
+);
+
+upsertTrackerBinding:
+INSERT OR REPLACE INTO TrackerBindings(profileId, trackerId, showKey, mappedSeason, remoteMediaId, remoteTitle, bindMode, episodeOffset, expectedTotalEpisodes, updatedAt)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+selectTrackerBinding:
+SELECT * FROM TrackerBindings WHERE profileId = ? AND trackerId = ? AND showKey = ? AND mappedSeason = ?;
+
+selectTrackerBindingsForShow:
+SELECT * FROM TrackerBindings WHERE profileId = ? AND trackerId = ? AND showKey = ?;
+
+selectAllTrackerBindingsForProfile:
+SELECT * FROM TrackerBindings WHERE profileId = ? AND trackerId = ?;
+
+deleteTrackerBinding:
+DELETE FROM TrackerBindings WHERE profileId = ? AND trackerId = ? AND showKey = ? AND mappedSeason = ?;
+
+deleteTrackerBindingsForProfile:
+DELETE FROM TrackerBindings WHERE profileId = ?;
+
+selectAllTrackerBindings:
+SELECT * FROM TrackerBindings;
+
+
+CREATE TABLE IF NOT EXISTS TrackerSyncAudit (
+    id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    profileId INTEGER NOT NULL,
+    trackerId TEXT NOT NULL,
+    showName TEXT NOT NULL,
+    remoteMediaId TEXT NOT NULL,
+    episodeNum INTEGER NOT NULL,
+    effectiveRemoteEpisode INTEGER NOT NULL,
+    oldProgress INTEGER NOT NULL DEFAULT 0,
+    newProgress INTEGER NOT NULL,
+    statusApplied TEXT,
+    state TEXT NOT NULL DEFAULT 'PENDING',
+    reason TEXT,
+    timestamp INTEGER NOT NULL
+);
+
+insertTrackerSyncAudit:
+INSERT INTO TrackerSyncAudit(profileId, trackerId, showName, remoteMediaId, episodeNum, effectiveRemoteEpisode, oldProgress, newProgress, statusApplied, state, reason, timestamp)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+selectLastInsertRowId:
+SELECT last_insert_rowid();
+
+updateTrackerSyncAuditState:
+UPDATE TrackerSyncAudit SET state = ?, reason = ? WHERE id = ?;
+
+selectTrackerSyncAudit:
+SELECT * FROM TrackerSyncAudit WHERE profileId = ? AND trackerId = ? ORDER BY timestamp DESC, id DESC LIMIT 100;
+
+pruneTrackerSyncAudit:
+DELETE FROM TrackerSyncAudit WHERE trackerId = ? AND id NOT IN (
+    SELECT id FROM TrackerSyncAudit WHERE trackerId = ? ORDER BY timestamp DESC, id DESC LIMIT 500
+);
+
+selectAllTrackerSyncAudits:
+SELECT * FROM TrackerSyncAudit ORDER BY id ASC;
 

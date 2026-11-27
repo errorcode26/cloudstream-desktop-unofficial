@@ -102,6 +102,11 @@ fun LinksSidePanel(
     enrichedActors: List<ActorData>? = null,
     enrichedLogoUrl: String? = null,
     enrichedBackdropUrl: String? = null,
+    canonicalSeed: com.lagradost.cloudstream3.desktop.metadata.CanonicalMediaSeed? = null,
+    resolvedAnilistId: Int? = null,
+    resolvedMalId: Int? = null,
+    resolvedYear: Int? = null,
+    hasMultipleSeasons: Boolean = false,
     onClose: () -> Unit,
 ) {
     val coroutineScope = rememberCoroutineScope()
@@ -177,7 +182,21 @@ fun LinksSidePanel(
         }
     }
 
-    val handleConfirmedTorrentAction = remember(viewModel, displayTitle, history, loadResponse, currentPlayingUrl, enrichedActors, enrichedLogoUrl, enrichedBackdropUrl) {
+    val handleConfirmedTorrentAction = remember(
+        viewModel,
+        displayTitle,
+        history,
+        loadResponse,
+        currentPlayingUrl,
+        enrichedActors,
+        enrichedLogoUrl,
+        enrichedBackdropUrl,
+        canonicalSeed,
+        resolvedAnilistId,
+        resolvedMalId,
+        resolvedYear,
+        hasMultipleSeasons,
+    ) {
         { targetLink: com.lagradost.cloudstream3.utils.ExtractorLink, isDownload: Boolean ->
             if (isDownload) {
                 viewModel.onEvent(LinksUiEvent.OnSetLinkToDownload(targetLink))
@@ -192,6 +211,11 @@ fun LinksSidePanel(
                         enrichedActors = enrichedActors,
                         enrichedLogoUrl = enrichedLogoUrl,
                         enrichedBackdropUrl = enrichedBackdropUrl,
+                        canonicalSeed = canonicalSeed,
+                        resolvedAnilistId = resolvedAnilistId,
+                        resolvedMalId = resolvedMalId,
+                        resolvedYear = resolvedYear,
+                        hasMultipleSeasons = hasMultipleSeasons,
                     ),
                 )
             }
@@ -639,6 +663,11 @@ fun ComposeLinksScreen(
     enrichedActors: List<ActorData>? = null,
     enrichedLogoUrl: String? = null,
     enrichedBackdropUrl: String? = null,
+    canonicalSeed: com.lagradost.cloudstream3.desktop.metadata.CanonicalMediaSeed? = null,
+    resolvedAnilistId: Int? = null,
+    resolvedMalId: Int? = null,
+    resolvedYear: Int? = null,
+    hasMultipleSeasons: Boolean = false,
     onBack: () -> Unit,
 ) {
     val isAmoled = LocalDesktopTheme.current.isAmoled
@@ -658,7 +687,6 @@ fun ComposeLinksScreen(
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black)
             .onPreviewKeyEvent { event ->
                 if ((event.key == Key.Escape || event.key == Key.Back || event.key == Key.Backspace) && event.type == KeyEventType.KeyUp) {
                     onBack()
@@ -753,6 +781,11 @@ fun ComposeLinksScreen(
                     enrichedActors = enrichedActors,
                     enrichedLogoUrl = enrichedLogoUrl,
                     enrichedBackdropUrl = enrichedBackdropUrl,
+                    canonicalSeed = canonicalSeed,
+                    resolvedAnilistId = resolvedAnilistId,
+                    resolvedMalId = resolvedMalId,
+                    resolvedYear = resolvedYear,
+                    hasMultipleSeasons = hasMultipleSeasons,
                     onClose = onBack,
                 )
             }

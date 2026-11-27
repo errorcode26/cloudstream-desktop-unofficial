@@ -8,15 +8,14 @@ import com.lagradost.common.logging.AppLogger
 import com.lagradost.common.platform.PlatformPaths
 import com.lagradost.common.storage.DesktopDataStore
 import java.io.File
-import java.sql.DriverManager
 
 object SettingsStorageEngine {
-    val imageCacheDir = File(PlatformPaths.appDataDir, "image_cache")
-    val networkCacheDir = File(PlatformPaths.cacheDir, "network")
-    val dbFile = File(PlatformPaths.dataDir, "cloudstream.db")
-    val logsDir = PlatformPaths.logsDir
-    val streamCacheDir = File(PlatformPaths.cacheDir, "stream_cache")
-    val updatesDir = UnifiedUpdateManager.getUpdatesDirectory()
+    val imageCacheDir: File get() = File(PlatformPaths.appDataDir, "image_cache")
+    val networkCacheDir: File get() = File(PlatformPaths.cacheDir, "network")
+    val dbFile: File get() = File(PlatformPaths.dataDir, "cloudstream.db")
+    val logsDir: File get() = PlatformPaths.logsDir
+    val streamCacheDir: File get() = File(PlatformPaths.cacheDir, "stream_cache")
+    val updatesDir: File get() = UnifiedUpdateManager.getUpdatesDirectory()
 
     fun getDirectorySizeBytes(dir: File): Long {
         if (!dir.exists()) return 0L
@@ -65,13 +64,7 @@ object SettingsStorageEngine {
 
     fun vacuumDatabase(): Pair<Boolean, String> {
         return try {
-            if (dbFile.exists()) {
-                DriverManager.getConnection("jdbc:sqlite:${dbFile.absolutePath}").use { conn ->
-                    conn.createStatement().use { stmt ->
-                        stmt.execute("VACUUM;")
-                    }
-                }
-            }
+            DesktopDataStore.vacuumDatabase()
             true to "Database defragmented and compacted"
         } catch (e: Exception) {
             false to "Optimization failed: ${e.message}"
@@ -80,14 +73,7 @@ object SettingsStorageEngine {
 
     fun resetSettingsToDefault(): Pair<Boolean, String> {
         return try {
-            if (dbFile.exists()) {
-                DriverManager.getConnection("jdbc:sqlite:${dbFile.absolutePath}").use { conn ->
-                    conn.createStatement().use { stmt ->
-                        stmt.execute("DELETE FROM KeyValueStore;")
-                    }
-                }
-            }
-            DesktopDataStore.rawKeyCache.clear()
+            DesktopDataStore.clearAllSettings()
             com.lagradost.cloudstream3.desktop.ui.theme.AppearanceConfig.reloadFromDataStore()
             true to "Settings restored to defaults"
         } catch (e: Exception) {

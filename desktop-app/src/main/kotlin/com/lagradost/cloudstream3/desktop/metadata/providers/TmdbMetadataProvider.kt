@@ -65,6 +65,7 @@ object TmdbMetadataProvider : MetadataProvider {
                 directImdbId = directImdbId,
                 overwrite = context.overwrite,
                 onEpisodeThumbnailsEnriched = callbacks.onEpisodeThumbnailsEnriched,
+                onEpisodeRatingSourcesLoaded = callbacks.onEpisodeRatingSourcesLoaded,
             )
             AppLogger.i(TAG, "✓ TMDB enrichment completed successfully")
             true

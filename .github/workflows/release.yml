@@ -81,8 +81,22 @@ jobs:
         }
         Write-Host "libmpv-2.dll ready."
 
+    - name: Verify Test Suite
+      shell: bash
+      env:
+        ANILIST_KEY: ${{ secrets.ANILIST_KEY }}
+        TMDB_KEY: ${{ secrets.TMDB_KEY }}
+        MAL_KEY: ${{ secrets.MAL_KEY }}
+        SIMKL_KEY: ${{ secrets.SIMKL_KEY }}
+      run: ./gradlew :common:test :plugin-runtime:test :player-abstraction:test :desktop-app:test --no-daemon
+
     - name: Build App (createDistributable and packageMsi)
       shell: bash
+      env:
+        ANILIST_KEY: ${{ secrets.ANILIST_KEY }}
+        TMDB_KEY: ${{ secrets.TMDB_KEY }}
+        MAL_KEY: ${{ secrets.MAL_KEY }}
+        SIMKL_KEY: ${{ secrets.SIMKL_KEY }}
       run: |
         # Extract version from tag (e.g., v0.1.4 -> 0.1.4)
         VERSION=${GITHUB_REF_NAME#v}

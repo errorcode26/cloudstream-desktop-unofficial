@@ -43,27 +43,37 @@ class AccountManager {
         val accountsFlow: StateFlow<Map<String, Array<AuthData>>> = _accountsFlow.asStateFlow()
 
         const val ACCOUNT_TOKEN = "auth_tokens"
+        private val TRACKER_PREFIXES = setOf("anilist", "mal", "simkl")
 
-        // Defaulting to "default" account since Desktop might not have multiple profile switching yet.
-        val currentAccount = "default"
+        val currentAccount: String
+            get() = "profile_${com.lagradost.common.storage.DesktopDataStore.activeProfileId}"
+
+        private fun storageKeyForPrefix(prefix: String, profileId: Int? = null): String {
+            val scope = if (prefix in TRACKER_PREFIXES) {
+                "profile_${profileId ?: com.lagradost.common.storage.DesktopDataStore.activeProfileId}"
+            } else {
+                "default"
+            }
+            return "${ACCOUNT_TOKEN}_${prefix}_$scope"
+        }
 
         fun accounts(prefix: String): Array<AuthData> {
             require(prefix != "NONE")
             return com.lagradost.common.storage.DesktopDataStore.getKey<Array<AuthData>>(
-                "${ACCOUNT_TOKEN}_${prefix}_$currentAccount",
+                storageKeyForPrefix(prefix),
             ) ?: arrayOf()
         }
 
         fun updateAccounts(prefix: String, array: Array<AuthData>) {
             require(prefix != "NONE")
-            com.lagradost.common.storage.DesktopDataStore.setKey("${ACCOUNT_TOKEN}_${prefix}_$currentAccount", array)
+            com.lagradost.common.storage.DesktopDataStore.setKey(storageKeyForPrefix(prefix), array)
             synchronized(cachedAccounts) {
                 cachedAccounts[prefix] = array
                 _accountsFlow.value = cachedAccounts.toMap()
             }
         }
 
-        init {
+        fun reloadFromDataStore() {
             val data = mutableMapOf<String, Array<AuthData>>()
             for (api in allApis) {
                 data[api.idPrefix] = accounts(api.idPrefix)
@@ -72,6 +82,19 @@ class AccountManager {
                 cachedAccounts = data
                 _accountsFlow.value = data.toMap()
             }
+        }
+
+        fun clearTrackerAccountsForProfile(profileId: Int) {
+            for (prefix in TRACKER_PREFIXES) {
+                com.lagradost.common.storage.DesktopDataStore.removeKey(storageKeyForPrefix(prefix, profileId))
+            }
+            if (com.lagradost.common.storage.DesktopDataStore.activeProfileId == profileId) {
+                reloadFromDataStore()
+            }
+        }
+
+        init {
+            reloadFromDataStore()
         }
     }
 }

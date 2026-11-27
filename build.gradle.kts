@@ -30,6 +30,28 @@ subprojects {
             }
         }
 
+        if (project.name in setOf("common", "plugin-runtime", "player-abstraction", "desktop-app")) {
+            apply(plugin = "jacoco")
+            configure<org.gradle.testing.jacoco.plugins.JacocoPluginExtension> {
+                toolVersion = "0.8.12"
+            }
+            tasks.withType<Test>().configureEach {
+                systemProperty(
+                    "cloudstream.data.dir",
+                    project.layout.buildDirectory.dir("test-data").get().asFile.absolutePath,
+                )
+                systemProperty("cloudstream.test.isolated", "true")
+            }
+            tasks.withType<org.gradle.testing.jacoco.tasks.JacocoReport>().configureEach {
+                dependsOn(tasks.withType<Test>())
+                reports {
+                    xml.required.set(true)
+                    html.required.set(true)
+                    csv.required.set(false)
+                }
+            }
+        }
+
         apply(plugin = "com.diffplug.spotless")
         
         configure<com.diffplug.gradle.spotless.SpotlessExtension> {

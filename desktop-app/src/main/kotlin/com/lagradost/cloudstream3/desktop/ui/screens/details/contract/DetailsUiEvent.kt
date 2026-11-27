@@ -1,6 +1,9 @@
 package com.lagradost.cloudstream3.desktop.ui.screens.details.contract
 
 import com.lagradost.cloudstream3.MainAPI
+import com.lagradost.cloudstream3.desktop.tracking.TrackerBindPolicy
+import com.lagradost.cloudstream3.desktop.tracking.TrackerMediaCandidate
+import com.lagradost.cloudstream3.desktop.tracking.UnifiedWatchStatus
 import com.lagradost.cloudstream3.desktop.ui.base.UiEvent
 import com.lagradost.common.storage.WatchHistory
 
@@ -27,4 +30,25 @@ sealed interface DetailsUiEvent : UiEvent {
     data class OnSelectTrailer(val trailer: TrailerData?) : DetailsUiEvent
     data class OnSetPendingExternalUrl(val url: String?) : DetailsUiEvent
     data object OnTogglePinRightColumn : DetailsUiEvent
+    data class OnOpenTrackerDrawer(val providerId: String? = null) : DetailsUiEvent
+    data object OnDismissTrackerDrawer : DetailsUiEvent
+    data class OnSelectTrackerTab(val providerId: String) : DetailsUiEvent
+    data class OnRefreshTrackerState(val providerId: String? = null) : DetailsUiEvent
+    data class OnTrackerSearchQueryChange(val providerId: String, val query: String) : DetailsUiEvent
+    data class OnSearchTrackerCandidates(val providerId: String) : DetailsUiEvent
+    data class OnPinTrackerCandidate(val providerId: String, val candidate: TrackerMediaCandidate) : DetailsUiEvent
+    data class OnSetTrackerOffset(val providerId: String, val offset: Int) : DetailsUiEvent
+    data class OnSetTrackerRemoteStatus(val providerId: String, val status: UnifiedWatchStatus) : DetailsUiEvent
+    data class OnSetTrackerRemoteProgress(val providerId: String, val progress: Int) : DetailsUiEvent
+    data class OnSetTrackerScore(val providerId: String, val score100: Int) : DetailsUiEvent
+    data class OnToggleTrackerFavorite(val providerId: String) : DetailsUiEvent
+    data class OnToggleTrackerSearch(val providerId: String) : DetailsUiEvent
+    data class OnPushTrackerRemoteUpdate(val providerId: String) : DetailsUiEvent
+    data class OnRemoveFromTracker(val providerId: String) : DetailsUiEvent
+    data class OnSyncEpisodeToTracker(val providerId: String, val ep: com.lagradost.cloudstream3.Episode) : DetailsUiEvent
+    data class OnSyncReleasedEpisodesToTracker(val providerId: String, val episodes: List<com.lagradost.cloudstream3.Episode>) : DetailsUiEvent
+    data class OnBlockTrackerShow(val providerId: String) : DetailsUiEvent
+    data class OnUnbindTrackerSeason(val providerId: String) : DetailsUiEvent
+    data class OnSetTrackerAutoSync(val providerId: String, val enabled: Boolean) : DetailsUiEvent
+    data class OnSetTrackerBindPolicy(val providerId: String, val policy: TrackerBindPolicy) : DetailsUiEvent
 }

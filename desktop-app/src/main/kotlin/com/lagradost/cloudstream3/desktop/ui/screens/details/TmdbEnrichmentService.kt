@@ -34,8 +34,23 @@ object TmdbRateLimiter {
 // the upstream API goes down), create a new service with the same enrich()
 // signature and swap the single call site in HybridEnrichmentService.
 object TmdbEnrichmentService {
+    private val bakedTmdbKey: String by lazy {
+        try {
+            TmdbEnrichmentService::class.java.getResourceAsStream("/tracker.properties")?.use { stream ->
+                java.util.Properties().apply { load(stream) }.getProperty("tmdb.api_key")?.trim().orEmpty()
+            }.orEmpty()
+        } catch (_: Exception) {
+            ""
+        }
+    }
+
     internal val TMDB_API_KEY: String
-        get() = com.lagradost.common.storage.DesktopDataStore.getKey<String>("tmdb_api_key")?.takeIf { it.isNotBlank() } ?: "3828864585df9d4f006c09403eb9a888"
+        get() = com.lagradost.common.storage.DesktopDataStore.getKey<String>("tmdb_api_key")?.trim()?.takeIf { it.isNotBlank() }
+            ?: bakedTmdbKey
+
+    fun hasBakedApiKey(): Boolean = bakedTmdbKey.isNotBlank()
+
+    fun hasApiKey(): Boolean = TMDB_API_KEY.isNotBlank()
 
     private val dummyApi = object : com.lagradost.cloudstream3.MainAPI() {
         override var name = "TMDB"
@@ -152,6 +167,7 @@ object TmdbEnrichmentService {
         tmdbId: Int,
         seasonNumber: Int,
     ): List<com.lagradost.cloudstream3.ActorData> = withContext(Dispatchers.IO) {
+        if (TMDB_API_KEY.isBlank()) return@withContext emptyList()
         try {
             TmdbRateLimiter.acquire()
             val tmdbLang = com.lagradost.cloudstream3.desktop.metadata.MetadataConfig.tmdbLanguage.value.ifBlank { "en-US" }
@@ -172,6 +188,37 @@ object TmdbEnrichmentService {
         } catch (e: Exception) {
             com.lagradost.common.logging.AppLogger.e("TmdbEnrichment", "Failed to fetch season $seasonNumber credits for series $tmdbId: ${e.message}")
             emptyList()
+        }
+    }
+
+    /**
+     * Fetches TMDB episode details for a single [seasonNumber] and enriches [loaded]
+     * so seasons beyond the initial appended batch still receive episode ratings and stills.
+     */
+    suspend fun enrichSeason(
+        loaded: LoadResponse,
+        tmdbId: Int,
+        seasonNumber: Int,
+        overwrite: Boolean = false,
+    ): Map<Pair<Int, Int>, com.lagradost.cloudstream3.desktop.metadata.RatingSource> = withContext(Dispatchers.IO) {
+        if (TMDB_API_KEY.isBlank() || seasonNumber <= 0) return@withContext emptyMap()
+        try {
+            TmdbRateLimiter.acquire()
+            val tmdbLang = com.lagradost.cloudstream3.desktop.metadata.MetadataConfig.tmdbLanguage.value.ifBlank { "en-US" }
+            val url = "https://api.themoviedb.org/3/tv/$tmdbId/season/$seasonNumber?api_key=$TMDB_API_KEY&language=$tmdbLang"
+            val seasonData = com.lagradost.cloudstream3.app.get(url).parsedSafe<com.fasterxml.jackson.databind.JsonNode>()
+                ?: return@withContext emptyMap()
+            TmdbEpisodeEnricher.enrichSeasonNode(
+                loaded = loaded,
+                seasonNum = seasonNumber,
+                seasonNode = seasonData,
+                overwrite = overwrite,
+            )
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            com.lagradost.common.logging.AppLogger.e("TmdbEnrichment", "Failed to fetch season $seasonNumber episodes for series $tmdbId: ${e.message}")
+            emptyMap()
         }
     }
 
@@ -211,12 +258,17 @@ object TmdbEnrichmentService {
         onRatingsLoaded: (imdb: Double?, tmdb: Double?, anilist: Double?) -> Unit = { _, _, _ -> },
         onEnrichmentComplete: () -> Unit = {},
         onEpisodeThumbnailsEnriched: () -> Unit = {},
+        onEpisodeRatingSourcesLoaded: (Map<Pair<Int, Int>, com.lagradost.cloudstream3.desktop.metadata.RatingSource>) -> Unit = {},
         // When Cinemeta already resolved the TMDB ID, we can skip text search entirely.
         directTmdbId: Int? = null,
         directImdbId: String? = null,
         overwrite: Boolean = false,
     ) {
         withContext(Dispatchers.IO) {
+            if (TMDB_API_KEY.isBlank()) {
+                onEnrichmentComplete()
+                return@withContext
+            }
             try {
                 val isDummy = url.startsWith("dummy_")
                 val urlClean = url.removePrefix("dummy_")
@@ -271,7 +323,7 @@ object TmdbEnrichmentService {
                             emptyList()
                         }
                         val neededSeasons = allLoadedEpisodes.mapNotNull { it.season }.distinct().ifEmpty { listOf(1) }
-                        val targetSeasons = neededSeasons.filter { it in 1..25 }.take(6)
+                        val targetSeasons = neededSeasons.filter { it in 1..30 }.take(12)
                         val seasonsAppend = if (!isMovie && targetSeasons.isNotEmpty()) ",${targetSeasons.joinToString(",") { "season/$it" }}" else ""
                         val ratingsAppend = if (isMovie) ",release_dates" else ",content_ratings"
                         val tmdbLang = com.lagradost.cloudstream3.desktop.metadata.MetadataConfig.tmdbLanguage.value.ifBlank { "en-US" }
@@ -484,9 +536,10 @@ object TmdbEnrichmentService {
                                     }
                                 }
 
-                                val voteAverage = tmdbData.get("vote_average")?.asDouble()
+                                val voteAverage = tmdbData.get("vote_average")?.asDouble()?.takeIf { it > 0.0 }
                                 if (voteAverage != null) {
-                                    if (loaded.score == null) {
+                                    val curScore = loaded.score?.toDouble(10) ?: 0.0
+                                    if (loaded.score == null || curScore <= 0.0) {
                                         loaded.score = com.lagradost.cloudstream3.Score.from10(voteAverage)
                                     }
                                     onRatingsLoaded(null, voteAverage, null)
@@ -645,13 +698,14 @@ object TmdbEnrichmentService {
                                 }
                             }
 
-                            // Enrich episode thumbnails, descriptions, and synthesize future episodes
+                            // Enrich episode thumbnails, descriptions, ratings, and synthesize future episodes
                             TmdbEpisodeEnricher.enrich(
                                 loaded = loaded,
                                 tmdbData = tmdbData,
                                 isMovie = isMovie,
                                 overwrite = overwrite,
                                 onEpisodeThumbnailsEnriched = onEpisodeThumbnailsEnriched,
+                                onEpisodeRatingSourcesLoaded = onEpisodeRatingSourcesLoaded,
                             )
 
                             var resolvedLogoUrl: String? = null

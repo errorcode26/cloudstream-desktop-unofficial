@@ -117,6 +117,24 @@ object EpisodeSectionState {
         }
     }
 
+    fun filterReleasedEpisodes(
+        episodes: List<Episode>,
+        providerName: String,
+        aniListCeilingEpisode: Int? = null,
+        episodeOffset: Int = 0,
+    ): List<Episode> {
+        return episodes.filter { ep ->
+            val localStatus = parseEpisodeReleaseStatus(ep, providerName)
+            if (localStatus.isUnreleased || localStatus.isMissingFromProvider) return@filter false
+            if (aniListCeilingEpisode != null) {
+                val epNum = ep.episode ?: return@filter false
+                if (epNum <= 0) return@filter false
+                if (epNum + episodeOffset > aniListCeilingEpisode) return@filter false
+            }
+            true
+        }
+    }
+
     fun isSeasonCompleted(currentSeasonEpisodes: List<Episode>, historyLookup: EpisodeHistoryLookup): Boolean {
         return currentSeasonEpisodes.isNotEmpty() && currentSeasonEpisodes.all { ep ->
             val hist = historyLookup.find(ep)

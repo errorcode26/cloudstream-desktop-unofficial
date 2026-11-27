@@ -52,6 +52,27 @@ class SandboxHostCallbackHandler(
         }
     }
 
+    private fun isSettingKeyAllowed(key: String): Boolean {
+        if (SandboxSecurityPolicy.PROTECTED_HOST_KEYS.any { key.equals(it, ignoreCase = true) }) {
+            logger.error("Rejected unauthorized worker write to protected host key: $key")
+            return false
+        }
+
+        val validPrefixes = loadedPluginPaths.mapNotNull { path ->
+            val f = File(path)
+            val m = com.lagradost.cloudstream3.desktop.repo.DesktopRepositoryManager.readPluginManifest(f)
+            val id = m?.get("internalName")?.toString()?.takeIf { it.isNotBlank() }
+                ?: m?.get("name")?.toString()?.takeIf { it.isNotBlank() }
+                ?: f.nameWithoutExtension
+            val clean = id.trim().replace(Regex("[^a-zA-Z0-9_]"), "_").trim('_')
+            if (clean.length >= 3) "${clean}_" else null
+        }.toSet()
+
+        return (key.startsWith("cf_silenced_") && key.length > "cf_silenced_".length) ||
+            validPrefixes.any { p -> key.startsWith(p) && key.length > p.length } ||
+            com.lagradost.common.storage.PluginSettingsSchemaRegistry.schemas.values.flatMap { it.values }.any { it.storageKey == key }
+    }
+
     suspend fun handleWorkerCallback(cbReq: WorkerCallbackRequest) {
         if (cbReq.action == WorkerCallbackRequest.ACTION_EMIT_LINK) {
             val reqId = cbReq.requestId ?: return
@@ -116,27 +137,7 @@ class SandboxHostCallbackHandler(
         if (cbReq.action == WorkerCallbackRequest.ACTION_SAVE_SETTING) {
             val key = cbReq.key ?: return
             val valueJson = cbReq.valueJson ?: return
-            if (SandboxSecurityPolicy.PROTECTED_HOST_KEYS.any { key.equals(it, ignoreCase = true) }) {
-                logger.error("Rejected unauthorized worker write to protected host key: $key")
-                return
-            }
-
-            // Derive host prefixes of all currently loaded plugins
-            val validPrefixes = loadedPluginPaths.mapNotNull { path ->
-                val f = File(path)
-                val m = com.lagradost.cloudstream3.desktop.repo.DesktopRepositoryManager.readPluginManifest(f)
-                val id = m?.get("internalName")?.toString()?.takeIf { it.isNotBlank() }
-                    ?: m?.get("name")?.toString()?.takeIf { it.isNotBlank() }
-                    ?: f.nameWithoutExtension
-                val clean = id.trim().replace(Regex("[^a-zA-Z0-9_]"), "_").trim('_')
-                if (clean.length >= 3) "${clean}_" else null
-            }.toSet()
-
-            val isAllowed = (key.startsWith("cf_silenced_") && key.length > "cf_silenced_".length) ||
-                validPrefixes.any { p -> key.startsWith(p) && key.length > p.length } ||
-                com.lagradost.common.storage.PluginSettingsSchemaRegistry.schemas.values.flatMap { it.values }.any { it.storageKey == key }
-
-            if (isAllowed) {
+            if (isSettingKeyAllowed(key)) {
                 com.lagradost.common.storage.DesktopDataStore.setRawJson(key, valueJson)
             } else {
                 logger.warn("Rejected unauthorized worker setting write to key: $key")
@@ -146,26 +147,7 @@ class SandboxHostCallbackHandler(
 
         if (cbReq.action == WorkerCallbackRequest.ACTION_REMOVE_SETTING) {
             val key = cbReq.key ?: return
-            if (SandboxSecurityPolicy.PROTECTED_HOST_KEYS.any { key.equals(it, ignoreCase = true) }) {
-                logger.error("Rejected unauthorized worker write to protected host key: $key")
-                return
-            }
-
-            val validPrefixes = loadedPluginPaths.mapNotNull { path ->
-                val f = File(path)
-                val m = com.lagradost.cloudstream3.desktop.repo.DesktopRepositoryManager.readPluginManifest(f)
-                val id = m?.get("internalName")?.toString()?.takeIf { it.isNotBlank() }
-                    ?: m?.get("name")?.toString()?.takeIf { it.isNotBlank() }
-                    ?: f.nameWithoutExtension
-                val clean = id.trim().replace(Regex("[^a-zA-Z0-9_]"), "_").trim('_')
-                if (clean.length >= 3) "${clean}_" else null
-            }.toSet()
-
-            val isAllowed = (key.startsWith("cf_silenced_") && key.length > "cf_silenced_".length) ||
-                validPrefixes.any { p -> key.startsWith(p) && key.length > p.length } ||
-                com.lagradost.common.storage.PluginSettingsSchemaRegistry.schemas.values.flatMap { it.values }.any { it.storageKey == key }
-
-            if (isAllowed) {
+            if (isSettingKeyAllowed(key)) {
                 com.lagradost.common.storage.DesktopDataStore.removeKey(key)
             } else {
                 logger.warn("Rejected unauthorized worker setting delete for key: $key")

@@ -14,6 +14,7 @@ import com.lagradost.cloudstream3.desktop.explore.models.StreamingPlatform
 import com.lagradost.cloudstream3.desktop.explore.search.ExploreSearchEngine
 import com.lagradost.cloudstream3.desktop.explore.search.ExploreSearchResults
 import com.lagradost.cloudstream3.desktop.explore.settings.ExploreCatalogSettingsManager
+import com.lagradost.cloudstream3.desktop.metadata.MetadataConfig
 import com.lagradost.cloudstream3.desktop.stremio.ManagedStremioAddon
 import com.lagradost.cloudstream3.desktop.stremio.StremioAddonManager
 import com.lagradost.cloudstream3.desktop.ui.base.BaseMviViewModel
@@ -25,6 +26,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
@@ -104,6 +106,25 @@ class ExploreViewModel(
                 }
             }
         }
+
+        viewModelScope.launch {
+            MetadataConfig.animeTitleLanguage.drop(1).collect {
+                catalogItemsCache.clear()
+                val state = uiState.value
+                when {
+                    state.drilledPlatform != null -> loadPlatformShelves(state.drilledPlatform)
+                    state.isShelvesMode && state.drilledCatalog == null && state.filteredCatalogs.isNotEmpty() -> {
+                        updateState { copy(heroItems = emptyList()) }
+                        val orderedAndFiltered = ExploreCatalogSettingsManager.filterAndSort(state.filteredCatalogs)
+                        loadShelves(state.selectedType, orderedAndFiltered)
+                    }
+                    state.selectedCatalog != null -> loadCurrentCatalog(skip = 0)
+                }
+                if (state.searchQuery.isNotBlank()) {
+                    updateSearchQuery(state.searchQuery)
+                }
+            }
+        }
     }
 
     override fun handleEvent(event: ExploreUiEvent) {
@@ -135,12 +156,14 @@ class ExploreViewModel(
     }
 
     private fun selectProviderMatch(match: ProviderMatch) {
+        val seed = uiState.value.selectedItemForMatch?.toCanonicalSeed()
         closeProviderPicker()
         sendEffect(
             ExploreUiEffect.OpenDetails(
                 providerName = match.providerName,
                 url = match.searchResponse.url,
                 title = match.displayTitle,
+                canonicalSeed = seed,
             ),
         )
     }

@@ -71,11 +71,8 @@ object WindowsCookieVault {
         }
     }
 
-    private val vaultFile: File by lazy {
-        val dir = File(PlatformPaths.appDataDir, "network")
-        if (!dir.exists()) dir.mkdirs()
-        File(dir, "cookies.vault")
-    }
+    private val vaultFile: File
+        get() = File(PlatformPaths.appDataDir, "network/cookies.vault")
 
     private val cache = ConcurrentHashMap<String, VaultEntry>()
     private val isLoaded = AtomicBoolean(false)
@@ -231,6 +228,7 @@ object WindowsCookieVault {
             }
 
             val target = vaultFile
+            target.parentFile?.mkdirs()
             val tempFile = File(target.parentFile, "${target.name}.tmp")
             tempFile.writeBytes(protectedBytes)
 

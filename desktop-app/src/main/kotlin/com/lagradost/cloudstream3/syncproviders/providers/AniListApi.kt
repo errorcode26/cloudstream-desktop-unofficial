@@ -10,6 +10,8 @@ import com.lagradost.cloudstream3.Score
 import com.lagradost.cloudstream3.app
 import com.lagradost.cloudstream3.desktop.tracking.AniListOAuthFlow
 import com.lagradost.cloudstream3.desktop.tracking.TrackerPropertiesConfig
+import com.lagradost.cloudstream3.desktop.tracking.TrackerRateLimitException
+import com.lagradost.cloudstream3.desktop.tracking.TrackerRateLimiter
 import com.lagradost.cloudstream3.mapper
 import com.lagradost.cloudstream3.mvvm.logError
 import com.lagradost.cloudstream3.syncproviders.AuthData
@@ -114,7 +116,7 @@ class AniListApi : SyncAPI() {
                 },
             ).toRequestBody("application/json; charset=utf-8".toMediaTypeOrNull())
             val response = app.post(
-                ANILIST_OAUTH_TOKEN_URL,
+                oauthTokenUrl,
                 headers = mapOf(
                     "Accept" to "application/json",
                     "Content-Type" to "application/json",
@@ -235,7 +237,7 @@ class AniListApi : SyncAPI() {
                 ),
             ).toRequestBody("application/json; charset=utf-8".toMediaTypeOrNull())
             val response = app.post(
-                ANILIST_OAUTH_TOKEN_URL,
+                oauthTokenUrl,
                 headers = mapOf(
                     "Accept" to "application/json",
                     "Content-Type" to "application/json",
@@ -423,9 +425,50 @@ class AniListApi : SyncAPI() {
     }
 
     suspend fun getFullAniListList(auth: AuthData): FullAnilistList? {
-        val query = AniListQueries.buildFullListQuery(auth.user.id)
-        val text = postApi(auth.token, query) ?: return null
-        return tryParseJson<FullAnilistList>(text)
+        val mergedLists = ArrayList<Lists>()
+        var chunk = 1
+        while (chunk <= 20) {
+            val query = AniListQueries.buildFullListQuery(auth.user.id, chunk = chunk, perChunk = 500)
+            val text = postApi(auth.token, query) ?: return if (mergedLists.isEmpty()) null else {
+                FullAnilistList(Data(MediaListCollection(hasNextChunk = false, lists = mergedLists)))
+            }
+            val parsed = tryParseJson<FullAnilistList>(text) ?: break
+            val col = parsed.data?.mediaListCollection ?: break
+            mergedLists += col.lists
+            if (col.hasNextChunk != true) break
+            chunk++
+        }
+        return if (mergedLists.isEmpty()) {
+            FullAnilistList(Data(MediaListCollection(hasNextChunk = false, lists = emptyList())))
+        } else {
+            FullAnilistList(Data(MediaListCollection(hasNextChunk = false, lists = mergedLists)))
+        }
+    }
+
+    suspend fun getPagedAniListList(
+        auth: AuthData,
+        page: Int,
+        perPage: Int,
+        status: AniListStatusType? = null,
+        sortGraphQl: String = "UPDATED_TIME_DESC",
+        includeStatistics: Boolean = false,
+    ): Result<PagedAniListRoot> {
+        val graphQlStatus = status?.takeIf { it != AniListStatusType.None }?.toGraphQlStatus()
+        val query = AniListQueries.buildPagedListQuery(
+            userId = auth.user.id,
+            page = page,
+            perPage = perPage,
+            graphQlStatus = graphQlStatus,
+            sortGraphQl = sortGraphQl,
+            includeStatistics = includeStatistics,
+        )
+        val (text, error) = postApiWithError(auth.token, query, cache = false)
+        if (text.isNullOrBlank()) {
+            return Result.failure(IllegalStateException(error ?: "Unable to load AniList library right now."))
+        }
+        val parsed = tryParseJson<PagedAniListRoot>(text)
+            ?: return Result.failure(IllegalStateException("Invalid AniList library response."))
+        return Result.success(parsed)
     }
 
     suspend fun toggleLike(auth: AuthData, id: Int): Boolean {
@@ -593,8 +636,24 @@ class AniListApi : SyncAPI() {
 
     companion object {
         private const val TAG = "AniListApi"
-        private const val ANILIST_GRAPHQL_URL = "https://graphql.anilist.co"
-        private const val ANILIST_OAUTH_TOKEN_URL = "https://anilist.co/api/v2/oauth/token"
+        internal const val DEFAULT_GRAPHQL_URL = "https://graphql.anilist.co"
+        internal const val DEFAULT_OAUTH_TOKEN_URL = "https://anilist.co/api/v2/oauth/token"
+
+        @Volatile
+        internal var graphQlUrl: String = DEFAULT_GRAPHQL_URL
+
+        @Volatile
+        internal var oauthTokenUrl: String = DEFAULT_OAUTH_TOKEN_URL
+
+        internal fun resetForTesting() {
+            synchronized(publicCache) { publicCache.clear() }
+            synchronized(authReadCache) { authReadCache.clear() }
+            inFlightPublic.clear()
+            inFlightAuth.clear()
+            rateLimiter.clear()
+            graphQlUrl = DEFAULT_GRAPHQL_URL
+            oauthTokenUrl = DEFAULT_OAUTH_TOKEN_URL
+        }
         const val MAX_STALE = 60 * 10
         private const val PUBLIC_CACHE_TTL_MS = 10L * 60L * 1000L
         private const val PUBLIC_CACHE_MAX_ENTRIES = 256
@@ -620,31 +679,14 @@ class AniListApi : SyncAPI() {
         private val inFlightPublic = ConcurrentHashMap<String, CompletableDeferred<String?>>()
         private val inFlightAuth = ConcurrentHashMap<String, CompletableDeferred<Pair<String?, String?>>>()
 
-        @Volatile
-        private var rateLimitedUntilMs: Long = 0L
+        internal val rateLimiter = TrackerRateLimiter(
+            providerName = "AniList",
+            minIntervalMs = 700L,
+            maxBurst = 4,
+            defaultCooldownMs = DEFAULT_RATE_LIMIT_MS,
+        )
 
-        @Volatile
-        private var lastRateLimitLogAtMs: Long = 0L
-
-        private fun remainingRateLimitSeconds(nowMs: Long = System.currentTimeMillis()): Long {
-            val remainingMs = rateLimitedUntilMs - nowMs
-            return if (remainingMs > 0L) (remainingMs + 999L) / 1000L else 0L
-        }
-
-        private fun recordRateLimit(retryAfterHeader: String?) {
-            val headerSecs = retryAfterHeader?.trim()?.toLongOrNull()
-            val backoffMs = if (headerSecs != null && headerSecs > 0L) {
-                headerSecs.coerceIn(5L, 180L) * 1000L
-            } else {
-                DEFAULT_RATE_LIMIT_MS
-            }
-            val now = System.currentTimeMillis()
-            rateLimitedUntilMs = maxOf(rateLimitedUntilMs, now + backoffMs)
-            if (now - lastRateLimitLogAtMs >= 10_000L) {
-                lastRateLimitLogAtMs = now
-                AppLogger.w(TAG, "AniList rate-limited (HTTP 429); backing off for ${backoffMs / 1000L}s")
-            }
-        }
+        private fun remainingRateLimitSeconds(): Long = rateLimiter.remainingCooldownSeconds()
 
         private fun getCachedResponse(
             cacheMap: MutableMap<String, CachedGraphQlResponse>,
@@ -683,6 +725,7 @@ class AniListApi : SyncAPI() {
             logErrorBody: (Exception) -> Unit = { e -> AppLogger.w(TAG, "GraphQL postApi error: ${e.message}") },
         ): Pair<String?, String?> = withContext(Dispatchers.IO) {
             try {
+                rateLimiter.acquireSlot()
                 val headers = buildMap {
                     if (bearerToken != null) put("Authorization", "Bearer $bearerToken")
                     put("Content-Type", "application/json")
@@ -691,15 +734,18 @@ class AniListApi : SyncAPI() {
                 }
                 val requestBody = payload.toRequestBody("application/json; charset=utf-8".toMediaTypeOrNull())
                 val response = app.post(
-                    ANILIST_GRAPHQL_URL,
+                    graphQlUrl,
                     headers = headers,
                     requestBody = requestBody,
                     cacheTime = 0,
                     timeout = 8000L,
                 )
+                val resetEpoch = runCatching {
+                    response.okhttpResponse.header("X-RateLimit-Reset")?.trim()?.toLongOrNull()
+                }.getOrNull()
                 if (response.code == 429) {
                     val retryAfter = runCatching { response.okhttpResponse.header("Retry-After") }.getOrNull()
-                    recordRateLimit(retryAfter)
+                    rateLimiter.recordRateLimit(retryAfterHeader = retryAfter, resetEpochSec = resetEpoch)
                     val cooldownSecs = remainingRateLimitSeconds().coerceAtLeast(1L)
                     return@withContext null to "AniList rate limited (HTTP 429). Retry in ${cooldownSecs}s."
                 }
@@ -710,9 +756,15 @@ class AniListApi : SyncAPI() {
                     AppLogger.w(TAG, "GraphQL request failed (http=${response.code}): $summary")
                     return@withContext null to "AniList error (HTTP ${response.code}): $summary"
                 }
+                val remaining = runCatching {
+                    response.okhttpResponse.header("X-RateLimit-Remaining")?.trim()?.toIntOrNull()
+                }.getOrNull()
+                rateLimiter.recordSuccess(rateLimitRemaining = remaining, resetEpochSec = resetEpoch)
                 bodyText.replace("\\/", "/") to null
             } catch (e: CancellationException) {
                 throw e
+            } catch (e: TrackerRateLimitException) {
+                null to (e.message ?: "AniList rate limited (HTTP 429).")
             } catch (e: Exception) {
                 currentCoroutineContext().ensureActive()
                 logErrorBody(e)
@@ -879,7 +931,7 @@ class AniListApi : SyncAPI() {
             }
         }
 
-        private fun AniListStatusType.toGraphQlStatus(): String = when (this) {
+        internal fun AniListStatusType.toGraphQlStatus(): String = when (this) {
             AniListStatusType.Watching -> "CURRENT"
             AniListStatusType.Completed -> "COMPLETED"
             AniListStatusType.Paused -> "PAUSED"

@@ -217,7 +217,7 @@ object MetadataConfig {
     }
 
     fun setAnimeTitleLanguage(lang: String) {
-        val normalized = lang.trim().lowercase().ifBlank { "romaji" }
+        val normalized = lang.trim().lowercase().ifBlank { "english" }
         _animeTitleLanguage.value = normalized
         com.lagradost.cloudstream3.desktop.utils.appScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             DesktopDataStore.setKey(KEY_ANIME_TITLE_LANGUAGE, normalized)
@@ -276,7 +276,7 @@ object MetadataConfig {
         _anilistEnabled.value = DesktopDataStore.getKey<Boolean>(KEY_ANILIST_ENABLED) ?: true
         _kitsuEnabled.value = DesktopDataStore.getKey<Boolean>(KEY_KITSU_ENABLED) ?: true
         _tvmazeEnabled.value = DesktopDataStore.getKey<Boolean>(KEY_TVMAZE_ENABLED) ?: true
-        _animeTitleLanguage.value = DesktopDataStore.getKey<String>(KEY_ANIME_TITLE_LANGUAGE) ?: "romaji"
+        _animeTitleLanguage.value = DesktopDataStore.getKey<String>(KEY_ANIME_TITLE_LANGUAGE) ?: "english"
         _animeVoiceCast.value = DesktopDataStore.getKey<Boolean>(KEY_ANIME_VOICE_CAST) ?: true
         _animeSimulcast.value = DesktopDataStore.getKey<Boolean>(KEY_ANIME_SIMULCAST) ?: true
         _animeStudios.value = DesktopDataStore.getKey<Boolean>(KEY_ANIME_STUDIOS) ?: true

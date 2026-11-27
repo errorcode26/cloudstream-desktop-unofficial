@@ -87,6 +87,7 @@ object MetadataPipeline {
         url: String,
         fetchCast: Boolean = true,
         callbacks: MetadataEnrichmentCallbacks = MetadataEnrichmentCallbacks(),
+        canonicalSeed: CanonicalMediaSeed? = null,
     ) {
         withContext(Dispatchers.IO) {
             val isDummy = url.startsWith("dummy_")
@@ -169,9 +170,22 @@ object MetadataPipeline {
                 ?: Regex("""themoviedb\.org/(?:movie|tv)/(\d+)""").find(urlClean)?.groupValues?.get(1)?.toIntOrNull()?.takeIf { it > 0 }
                 ?: Regex("""themoviedb\.org/(?:movie|tv)/(\d+)""").find(loaded.url)?.groupValues?.get(1)?.toIntOrNull()?.takeIf { it > 0 }
                 ?: jsonTmdbId
+                ?: canonicalSeed?.tmdbId
 
-            AppLogger.i(TAG, "▶ START pipeline | raw='${loaded.name}' | clean='$cleanName' | year=${loaded.year} | type=${loaded.type} | directImdb=$directImdbId | directTmdb=$directTmdbId")
-            if (cleanName.isBlank() && directImdbId == null && directTmdbId == null) {
+            val directAnilistId = loaded.syncData["anilist"]?.toIntOrNull()?.takeIf { it > 0 }
+                ?: Regex("""anilist\.co/anime/(\d+)""").find(urlClean)?.groupValues?.get(1)?.toIntOrNull()?.takeIf { it > 0 }
+                ?: Regex("""anilist\.co/anime/(\d+)""").find(loaded.url)?.groupValues?.get(1)?.toIntOrNull()?.takeIf { it > 0 }
+                ?: canonicalSeed?.anilistId
+
+            val directMalId = loaded.syncData["mal"]?.toIntOrNull()?.takeIf { it > 0 }
+                ?: Regex("""myanimelist\.net/anime/(\d+)""").find(urlClean)?.groupValues?.get(1)?.toIntOrNull()?.takeIf { it > 0 }
+                ?: Regex("""myanimelist\.net/anime/(\d+)""").find(loaded.url)?.groupValues?.get(1)?.toIntOrNull()?.takeIf { it > 0 }
+                ?: canonicalSeed?.malId
+
+            val effectiveDirectImdbId = directImdbId ?: canonicalSeed?.imdbId
+
+            AppLogger.i(TAG, "▶ START pipeline | raw='${loaded.name}' | clean='$cleanName' | year=${loaded.year} | type=${loaded.type} | directImdb=$effectiveDirectImdbId | directTmdb=$directTmdbId | directAnilist=$directAnilistId | directMal=$directMalId")
+            if (cleanName.isBlank() && effectiveDirectImdbId == null && directTmdbId == null && directAnilistId == null) {
                 AppLogger.w(TAG, "Cannot run metadata pipeline on blank title without IDs. Aborting.")
                 return@withContext
             }
@@ -208,7 +222,7 @@ object MetadataPipeline {
             )
 
             // 3. Resolve Media Identity (Stage 1 Resolvers with Canonical Identity Caching)
-            val identityKey = "${cleanName.lowercase().trim()}_${loaded.year}_${loaded.type}"
+            val identityKey = "${cleanName.lowercase().trim()}_${loaded.year}_${loaded.type}_${directAnilistId}_${directMalId}_${directTmdbId}_${effectiveDirectImdbId}"
             var activeMatch: MetadataMatch? = identityCache[identityKey]
 
             if (activeMatch == null) {
@@ -281,12 +295,22 @@ object MetadataPipeline {
             }
 
             // 4. Progressive Enrichment (Stage 1 -> Stage 2+ Concurrent Execution)
+            val resolvedImdbId = effectiveDirectImdbId ?: activeMatch?.imdbId
+            val resolvedTmdbId = directTmdbId ?: activeMatch?.tmdbId
+            val resolvedAnilistId = directAnilistId ?: activeMatch?.anilistId
+            val resolvedMalId = directMalId ?: activeMatch?.malId
+            if (resolvedTmdbId != null || resolvedImdbId != null || resolvedAnilistId != null || resolvedMalId != null) {
+                callbacks.onIdentityResolved(resolvedTmdbId, resolvedImdbId, resolvedAnilistId, resolvedMalId)
+            }
             val context = MetadataEnrichmentContext(
                 rawUrl = if (isDummy) "dummy_$urlClean" else urlClean,
                 isDummy = isDummy,
                 fetchCast = fetchCast,
-                directImdbId = directImdbId ?: activeMatch?.imdbId,
-                directTmdbId = directTmdbId ?: activeMatch?.tmdbId,
+                directImdbId = resolvedImdbId,
+                directTmdbId = resolvedTmdbId,
+                directAnilistId = resolvedAnilistId,
+                directMalId = resolvedMalId,
+                canonicalSeed = canonicalSeed,
             )
 
             val sortedEnrichers = supportedProviders.sortedWith(

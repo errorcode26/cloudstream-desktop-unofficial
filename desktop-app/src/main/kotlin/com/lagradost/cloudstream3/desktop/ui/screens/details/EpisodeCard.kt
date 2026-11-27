@@ -416,50 +416,16 @@ fun EpisodeCard(
 
             // Rating badge
             if (rating10p != null && !shouldHideSpoilers) {
-                val isAnime = data is com.lagradost.cloudstream3.AnimeLoadResponse ||
-                    data.type == com.lagradost.cloudstream3.TvType.Anime ||
-                    data.type == com.lagradost.cloudstream3.TvType.AnimeMovie ||
-                    data.type == com.lagradost.cloudstream3.TvType.OVA
-                val hasImdb = uiState?.enrichedImdbRating != null ||
-                    data.syncData["imdb"]?.startsWith("tt") == true ||
-                    data.syncData.values.any { it.startsWith("tt") }
-
-                val (logoRes, logoWidth, logoHeight) = when {
-                    isAnime -> Triple("badges/rating_mal.png", if (isNarrow) 24.dp else 27.dp, if (isNarrow) 14.dp else 16.dp)
-                    hasImdb -> Triple("badges/rating_imdb.png", if (isNarrow) 29.dp else 33.dp, if (isNarrow) 14.dp else 16.dp)
-                    else -> Triple("badges/rating_tmdb.png", if (isNarrow) 25.dp else 28.dp, if (isNarrow) 14.dp else 16.dp)
-                }
-                val badgePainter = com.lagradost.cloudstream3.desktop.ui.badges.DesktopBadgeComponents.rememberSharpBadgePainter(logoRes)
-
-                Box(
+                val epKey = (ep.season ?: 1) to (ep.episode ?: 0)
+                com.lagradost.cloudstream3.desktop.ui.badges.DesktopBadgeComponents.EpisodeRatingBadge(
+                    score10p = rating10p,
+                    source = uiState?.episodeRatingSources?.get(epKey),
+                    isNarrow = isNarrow,
+                    compact = false,
                     modifier = Modifier
                         .align(Alignment.TopStart)
-                        .padding(if (isNarrow) 8.dp else 12.dp)
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(Color.Black.copy(alpha = 0.75f))
-                        .border(0.5.dp, Color.White.copy(alpha = 0.18f), RoundedCornerShape(6.dp))
-                        .padding(horizontal = if (isNarrow) 5.dp else 6.5.dp, vertical = 3.dp),
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.5.dp),
-                    ) {
-                        androidx.compose.foundation.Image(
-                            painter = badgePainter,
-                            contentDescription = null,
-                            modifier = Modifier.size(width = logoWidth, height = logoHeight),
-                        )
-                        Text(
-                            text = String.format(java.util.Locale.US, "%.1f", rating10p),
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                fontSize = if (isNarrow) 10.5.sp else 11.5.sp,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 0.2.sp,
-                            ),
-                            color = Color.White,
-                        )
-                    }
-                }
+                        .padding(if (isNarrow) 8.dp else 12.dp),
+                )
             }
 
             // Top-Right: Watched completion indicator or Unreleased indicator

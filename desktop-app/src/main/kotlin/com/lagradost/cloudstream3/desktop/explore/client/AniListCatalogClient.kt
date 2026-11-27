@@ -1,8 +1,10 @@
 package com.lagradost.cloudstream3.desktop.explore.client
 
+import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.lagradost.cloudstream3.app
 import com.lagradost.cloudstream3.desktop.explore.models.ExploreItem
+import com.lagradost.cloudstream3.desktop.metadata.MetadataConfig
 import com.lagradost.common.logging.AppLogger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -100,23 +102,7 @@ object AniListCatalogClient {
                         startDate_greater: ${'$'}startDate_greater,
                         startDate_lesser: ${'$'}startDate_lesser
                     ) {
-                        id
-                        idMal
-                        title {
-                            userPreferred
-                            english
-                            romaji
-                        }
-                        coverImage {
-                            extraLarge
-                            large
-                        }
-                        bannerImage
-                        averageScore
-                        seasonYear
-                        genres
-                        description(asHtml: false)
-                        format
+                        $ANILIST_MEDIA_SELECTION
                     }
                 }
             }
@@ -148,47 +134,87 @@ object AniListCatalogClient {
                 cacheTime = 60 * 6,
             )
             val root = mapper.readTree(response.text)
-            val mediaArray = root["data"]?.get("Page")?.get("media") ?: return@withContext emptyList()
-            if (!mediaArray.isArray) return@withContext emptyList()
-
-            val items = mutableListOf<ExploreItem>()
-            for (node in mediaArray) {
-                val anilistId = node["id"]?.asInt() ?: continue
-                val idMal = node["idMal"]?.asInt()
-                val titleNode = node["title"]
-                val title = (
-                    titleNode?.get("userPreferred")?.asText()
-                        ?: titleNode?.get("english")?.asText()
-                        ?: titleNode?.get("romaji")?.asText()
-                    )?.takeIf { it.isNotBlank() } ?: continue
-
-                val coverNode = node["coverImage"]
-                val posterUrl = (coverNode?.get("extraLarge")?.asText() ?: coverNode?.get("large")?.asText())?.takeIf { it.isNotBlank() }
-                val bannerUrl = node["bannerImage"]?.asText()?.takeIf { it.isNotBlank() }
-                val score = node["averageScore"]?.asDouble()?.let { it / 10.0 }
-                val year = node["seasonYear"]?.asText()?.takeIf { it.isNotBlank() }
-                val desc = node["description"]?.asText()?.takeIf { it.isNotBlank() }
-                val genres = node["genres"]?.mapNotNull { it.asText() } ?: emptyList()
-                val itemFormat = node["format"]?.asText()?.lowercase() ?: "anime"
-
-                items.add(
-                    ExploreItem(
-                        id = if (idMal != null) "mal:$idMal" else "anilist:$anilistId",
-                        type = if (itemFormat == "movie") "movie" else "series",
-                        name = title,
-                        posterUrl = posterUrl,
-                        backgroundUrl = bannerUrl,
-                        releaseYear = year,
-                        description = desc,
-                        rating = score,
-                        genres = genres,
-                    ),
-                )
-            }
-            items
+            val mediaArray = root["data"]?.get("Page")?.get("media")
+            parseMediaItems(mediaArray, useMalPrefix = true)
         } catch (e: Exception) {
             AppLogger.e(TAG, "AniList fetch error: ${e.message}")
             emptyList()
         }
+    }
+
+    internal const val ANILIST_MEDIA_SELECTION =
+        "id idMal title { english romaji native userPreferred } coverImage { extraLarge large } bannerImage averageScore seasonYear genres description(asHtml: false) format"
+
+    internal fun JsonNode?.asNonBlankTextOrNull(): String? {
+        if (this == null || isNull) return null
+        return asText().takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
+    }
+
+    internal fun resolvePreferredTitle(
+        titleNode: JsonNode?,
+        preferredLanguage: String = MetadataConfig.animeTitleLanguage.value,
+    ): String? {
+        val english = titleNode?.get("english").asNonBlankTextOrNull()
+        val romaji = titleNode?.get("romaji").asNonBlankTextOrNull()
+        val nativeTitle = titleNode?.get("native").asNonBlankTextOrNull()
+        val userPreferred = titleNode?.get("userPreferred").asNonBlankTextOrNull()
+
+        return when (preferredLanguage.trim().lowercase()) {
+            "romaji" -> romaji ?: userPreferred ?: english ?: nativeTitle
+            "native" -> nativeTitle ?: romaji ?: userPreferred ?: english
+            else -> english ?: romaji ?: userPreferred ?: nativeTitle
+        }
+    }
+
+    internal fun parseMediaItems(
+        mediaArray: JsonNode?,
+        useMalPrefix: Boolean = true,
+        preferredLanguage: String = MetadataConfig.animeTitleLanguage.value,
+    ): List<ExploreItem> {
+        if (mediaArray == null || !mediaArray.isArray) return emptyList()
+
+        val items = mutableListOf<ExploreItem>()
+        for (node in mediaArray) {
+            val idNode = node["id"]
+            if (idNode == null || idNode.isNull) continue
+            val anilistId = idNode.asInt()
+
+            val idMalNode = node["idMal"]
+            val idMal = if (idMalNode != null && !idMalNode.isNull) idMalNode.asInt().takeIf { it > 0 } else null
+
+            val title = resolvePreferredTitle(node["title"], preferredLanguage) ?: continue
+
+            val coverNode = node["coverImage"]
+            val posterUrl = coverNode?.get("extraLarge").asNonBlankTextOrNull()
+                ?: coverNode?.get("large").asNonBlankTextOrNull()
+            val bannerUrl = node["bannerImage"].asNonBlankTextOrNull()
+            val scoreNode = node["averageScore"]
+            val score = if (scoreNode != null && !scoreNode.isNull) {
+                scoreNode.asDouble().takeIf { it > 0.0 }?.div(10.0)
+            } else {
+                null
+            }
+            val year = node["seasonYear"].asNonBlankTextOrNull()
+            val desc = node["description"].asNonBlankTextOrNull()
+            val genres = node["genres"]?.mapNotNull { it.asNonBlankTextOrNull() } ?: emptyList()
+            val itemFormat = node["format"].asNonBlankTextOrNull()?.lowercase() ?: "series"
+
+            items.add(
+                ExploreItem(
+                    id = if (useMalPrefix && idMal != null) "mal:$idMal" else "anilist:$anilistId",
+                    type = if (itemFormat == "movie") "movie" else "series",
+                    name = title,
+                    posterUrl = posterUrl,
+                    backgroundUrl = bannerUrl,
+                    releaseYear = year,
+                    description = desc,
+                    rating = score,
+                    genres = genres,
+                    anilistId = anilistId,
+                    malId = idMal,
+                ),
+            )
+        }
+        return items
     }
 }

@@ -42,6 +42,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithCache
@@ -51,7 +52,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
@@ -321,7 +321,7 @@ internal fun HomeHeroGlassSpotlightStack(
                 val posterWidth = HomeHeroSpotlightStackMath.calculatePosterWidth(rowHeight)
                 val rowGap = 24.dp
                 val usableWidth = (rootWidth - paddingStart - paddingEnd - rowGap).coerceAtLeast(400.dp)
-                val maxStackAllocation = (usableWidth * 0.46f).coerceAtLeast(posterWidth)
+                val maxStackAllocation = (usableWidth * 0.54f).coerceAtLeast(posterWidth)
                 val step = HomeHeroSpotlightStackMath.calculateQueueStep(
                     posterWidth = posterWidth,
                     visibleQueueCount = queuedIndices.size,
@@ -338,7 +338,7 @@ internal fun HomeHeroGlassSpotlightStack(
                         .fillMaxWidth()
                         .height(rowHeight),
                     horizontalArrangement = Arrangement.spacedBy(rowGap),
-                    verticalAlignment = Alignment.CenterVertically,
+                    verticalAlignment = Alignment.Bottom,
                 ) {
                     FrostedSpotlightCard(
                         item = activeItem,
@@ -364,6 +364,7 @@ internal fun HomeHeroGlassSpotlightStack(
                             rowHeight = rowHeight,
                             stackWidth = stackWidth,
                             step = step,
+                            performanceModeEnabled = performanceModeEnabled,
                             onPosterSelect = { targetIdx ->
                                 currentIndex = targetIdx
                                 userInteractionTrigger++
@@ -463,23 +464,25 @@ private fun FrostedSpotlightCard(
             ) {
                 val scoreValue = targetMeta?.score?.toDoubleOrNull()?.takeIf { it > 0.0 }
                 val ratingBadge = targetMeta?.contentRating?.takeIf { it.isNotBlank() }
-                if (scoreValue != null || ratingBadge != null) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        if (scoreValue != null) {
-                            DesktopBadgeComponents.RatingGoldBadge(rating = scoreValue)
-                        }
-                        if (ratingBadge != null) {
-                            DesktopBadgeComponents.ContentRatingBadge(
-                                rating = ratingBadge,
-                                isLarge = false,
-                            )
+                Box(modifier = Modifier.height(32.dp), contentAlignment = Alignment.CenterStart) {
+                    if (scoreValue != null || ratingBadge != null) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            if (scoreValue != null) {
+                                DesktopBadgeComponents.RatingGoldBadge(rating = scoreValue)
+                            }
+                            if (ratingBadge != null) {
+                                DesktopBadgeComponents.ContentRatingBadge(
+                                    rating = ratingBadge,
+                                    isLarge = false,
+                                )
+                            }
                         }
                     }
-                    Spacer(Modifier.height(8.dp))
                 }
+                Spacer(Modifier.height(8.dp))
 
                 HeroLogoOrTitle(
                     item = targetItem,
@@ -540,6 +543,7 @@ private fun SpotlightPosterStack(
     rowHeight: Dp,
     stackWidth: Dp,
     step: Dp,
+    performanceModeEnabled: Boolean,
     onPosterSelect: (Int) -> Unit,
 ) {
     val posterShape: Shape = RoundedCornerShape(14.dp)
@@ -548,7 +552,7 @@ private fun SpotlightPosterStack(
         modifier = Modifier
             .width(stackWidth)
             .height(rowHeight),
-        contentAlignment = Alignment.CenterStart,
+        contentAlignment = Alignment.BottomStart,
     ) {
         queuedIndices.forEachIndexed { queuePos, slideIdx ->
             val queuedItem = displayItems.getOrNull(slideIdx) ?: return@forEachIndexed
@@ -557,6 +561,7 @@ private fun SpotlightPosterStack(
                 val targetScale = HomeHeroSpotlightStackMath.queueScaleForPosition(queuePos)
                 val targetDim = HomeHeroSpotlightStackMath.queueDimAlphaForPosition(queuePos)
                 val targetOpacity = HomeHeroSpotlightStackMath.queueOpacityForPosition(queuePos)
+                val targetShadowAlpha = HomeHeroSpotlightStackMath.queueShadowAlphaForPosition(queuePos)
                 val zVal = HomeHeroSpotlightStackMath.queueZIndexForPosition(queuePos)
 
                 val animOffsetX by animateDpAsState(
@@ -579,6 +584,11 @@ private fun SpotlightPosterStack(
                     animationSpec = tween(420, easing = SpotlightTransitionEasing),
                     label = "poster_stack_alpha",
                 )
+                val animShadowAlpha by animateFloatAsState(
+                    targetValue = targetShadowAlpha,
+                    animationSpec = tween(420, easing = SpotlightTransitionEasing),
+                    label = "poster_stack_shadow",
+                )
 
                 val interactionSource = remember { MutableInteractionSource() }
                 val isHovered by interactionSource.collectIsHoveredAsState()
@@ -589,69 +599,102 @@ private fun SpotlightPosterStack(
                         .zIndex(zVal)
                         .offset { IntOffset(animOffsetX.roundToPx(), 0) }
                         .width(posterWidth)
-                        .height(rowHeight)
-                        .graphicsLayer {
-                            scaleX = animScale
-                            scaleY = animScale
-                            transformOrigin = TransformOrigin(0f, 0.5f)
-                            alpha = animOpacity
-                        }
-                        .shadow(
-                            elevation = if (queuePos == 0) 18.dp else 10.dp,
-                            shape = posterShape,
-                            spotColor = Color.Black.copy(alpha = 0.72f),
-                            ambientColor = Color.Transparent,
-                        )
-                        .clip(posterShape)
-                        .background(Color(0xFF141722))
-                        .border(
-                            width = if (isHovered) 1.5.dp else 1.dp,
-                            color = when {
-                                isHovered -> Color.White.copy(alpha = 0.55f)
-                                queuePos == 0 -> Color.White.copy(alpha = 0.24f)
-                                else -> Color.White.copy(alpha = 0.12f)
-                            },
-                            shape = posterShape,
-                        )
-                        .pointerHoverIcon(PointerIcon.Hand)
-                        .hoverable(interactionSource)
-                        .clickable(interactionSource = interactionSource, indication = null) {
-                            onPosterSelect(slideIdx)
-                        },
+                        .height(rowHeight),
                 ) {
-                    if (posterUrl != null) {
-                        AsyncImage(
-                            model = ImageRequest.Builder(LocalPlatformContext.current)
-                                .data(posterUrl)
-                                .crossfade(true)
-                                .build(),
-                            contentDescription = queuedItem.name,
-                            contentScale = ContentScale.Crop,
-                            filterQuality = FilterQuality.Medium,
-                            modifier = Modifier.fillMaxSize(),
-                        )
-                    } else {
-                        Box(
-                            modifier = Modifier.fillMaxSize().padding(12.dp),
-                            contentAlignment = Alignment.BottomStart,
-                        ) {
-                            Text(
-                                text = HeroRepository.cleanHeroTitle(queuedItem.name),
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White,
-                                maxLines = 3,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                    }
-
-                    if (animDim > 0.01f && !isHovered) {
+                    if (!performanceModeEnabled) {
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .background(Color.Black.copy(alpha = animDim)),
+                                .offset(x = 8.dp, y = 4.dp)
+                                .blur(22.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
+                                .background(
+                                    Color.Black.copy(alpha = (0.46f * animShadowAlpha * animOpacity).coerceIn(0f, 1f)),
+                                    posterShape,
+                                ),
                         )
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .offset(x = 3.dp, y = 2.dp)
+                                .blur(10.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
+                                .background(
+                                    Color.Black.copy(alpha = (0.36f * animShadowAlpha * animOpacity).coerceIn(0f, 1f)),
+                                    posterShape,
+                                ),
+                        )
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer {
+                                scaleX = animScale
+                                scaleY = animScale
+                                alpha = animOpacity
+                            }
+                            .then(
+                                if (performanceModeEnabled) {
+                                    Modifier.shadow(
+                                        elevation = HomeHeroSpotlightStackMath.queueElevationForPosition(queuePos).dp,
+                                        shape = posterShape,
+                                        spotColor = Color.Black.copy(alpha = 0.85f),
+                                        ambientColor = Color.Black.copy(alpha = 0.65f),
+                                    )
+                                } else {
+                                    Modifier
+                                },
+                            )
+                            .clip(posterShape)
+                            .background(Color(0xFF141722))
+                            .border(
+                                width = if (isHovered) 1.5.dp else 1.dp,
+                                color = when {
+                                    isHovered -> Color.White.copy(alpha = 0.55f)
+                                    queuePos == 0 -> Color.White.copy(alpha = 0.24f)
+                                    else -> Color.White.copy(alpha = 0.12f)
+                                },
+                                shape = posterShape,
+                            )
+                            .pointerHoverIcon(PointerIcon.Hand)
+                            .hoverable(interactionSource)
+                            .clickable(interactionSource = interactionSource, indication = null) {
+                                onPosterSelect(slideIdx)
+                            },
+                    ) {
+                        if (posterUrl != null) {
+                            AsyncImage(
+                                model = ImageRequest.Builder(LocalPlatformContext.current)
+                                    .data(posterUrl)
+                                    .crossfade(true)
+                                    .build(),
+                                contentDescription = queuedItem.name,
+                                contentScale = ContentScale.Crop,
+                                filterQuality = FilterQuality.Medium,
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        } else {
+                            Box(
+                                modifier = Modifier.fillMaxSize().padding(12.dp),
+                                contentAlignment = Alignment.BottomStart,
+                            ) {
+                                Text(
+                                    text = HeroRepository.cleanHeroTitle(queuedItem.name),
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White,
+                                    maxLines = 3,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                        }
+
+                        if (animDim > 0.01f && !isHovered) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(Color.Black.copy(alpha = animDim)),
+                            )
+                        }
                     }
                 }
             }

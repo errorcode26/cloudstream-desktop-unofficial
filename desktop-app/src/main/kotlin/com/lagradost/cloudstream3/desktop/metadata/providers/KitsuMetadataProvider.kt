@@ -176,8 +176,9 @@ object KitsuMetadataProvider : MetadataProvider {
             if (loaded.plot.isNullOrBlank() && !resolvedMatch.description.isNullOrBlank()) {
                 loaded.plot = com.lagradost.cloudstream3.desktop.utils.TitleUtils.cleanPlot(resolvedMatch.description)
             }
-            if (resolvedMatch.rating != null && loaded.score == null) {
-                loaded.score = Score.from10(resolvedMatch.rating)
+            val kitsuRating = resolvedMatch.rating?.takeIf { it > 0.0 }
+            if (kitsuRating != null && (loaded.score == null || loaded.score!!.toDouble(10) <= 0.0)) {
+                loaded.score = Score.from10(kitsuRating)
             }
 
             AppLogger.i(TAG, "✓ Kitsu enrichment applied. Banner: ${resolvedMatch.backdropUrl}")

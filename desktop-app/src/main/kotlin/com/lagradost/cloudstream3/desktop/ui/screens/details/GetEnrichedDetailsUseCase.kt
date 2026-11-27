@@ -3,8 +3,10 @@ package com.lagradost.cloudstream3.desktop.ui.screens.details
 import com.lagradost.cloudstream3.LoadResponse
 import com.lagradost.cloudstream3.MainAPI
 import com.lagradost.cloudstream3.SearchResponse
+import com.lagradost.cloudstream3.desktop.metadata.CanonicalMediaSeed
 import com.lagradost.cloudstream3.desktop.metadata.MetadataEnrichmentCallbacks
 import com.lagradost.cloudstream3.desktop.metadata.MetadataPipeline
+import com.lagradost.cloudstream3.desktop.metadata.RatingSource
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -49,7 +51,14 @@ sealed interface EnrichmentUpdate {
         val tmdb: Double? = null,
         val anilist: Double? = null,
     ) : EnrichmentUpdate
+    data class IdentityResolved(
+        val tmdbId: Int? = null,
+        val imdbId: String? = null,
+        val anilistId: Int? = null,
+        val malId: Int? = null,
+    ) : EnrichmentUpdate
     data object EpisodeThumbnailsEnriched : EnrichmentUpdate
+    data class EpisodeRatingSourcesLoaded(val sources: Map<Pair<Int, Int>, RatingSource>) : EnrichmentUpdate
     data object FullyEnriched : EnrichmentUpdate
     data class Error(val message: String) : EnrichmentUpdate
 }
@@ -61,6 +70,7 @@ object GetEnrichedDetailsUseCase {
         preloadedName: String? = null,
         preloadedPoster: String? = null,
         preloadedBg: String? = null,
+        canonicalSeed: CanonicalMediaSeed? = null,
     ): Flow<EnrichmentUpdate> = callbackFlow {
         val rawData = try {
             DetailsRepository.fetchRaw(provider, url, fallbackName = preloadedName)
@@ -86,6 +96,7 @@ object GetEnrichedDetailsUseCase {
                 loaded = rawData,
                 url = url,
                 fetchCast = true,
+                canonicalSeed = canonicalSeed,
                 callbacks = MetadataEnrichmentCallbacks(
                     onLogoLoaded = { logo ->
                         trySend(EnrichmentUpdate.LogoLoaded(logo))
@@ -108,8 +119,16 @@ object GetEnrichedDetailsUseCase {
                     onEpisodeThumbnailsEnriched = {
                         trySend(EnrichmentUpdate.EpisodeThumbnailsEnriched)
                     },
+                    onEpisodeRatingSourcesLoaded = { sources ->
+                        if (sources.isNotEmpty()) {
+                            trySend(EnrichmentUpdate.EpisodeRatingSourcesLoaded(sources))
+                        }
+                    },
                     onRatingsLoaded = { imdb, tmdb, anilist ->
                         trySend(EnrichmentUpdate.RatingsLoaded(imdb = imdb, tmdb = tmdb, anilist = anilist))
+                    },
+                    onIdentityResolved = { tmdbId, imdbId, anilistId, malId ->
+                        trySend(EnrichmentUpdate.IdentityResolved(tmdbId = tmdbId, imdbId = imdbId, anilistId = anilistId, malId = malId))
                     },
                     onMetadataLoaded = { tagline, status, studios, collName, collBg, seasonsCount, episodesCount, seasonsMetadata, origLang, releaseDate, country, collItems, budget, revenue, networks, year, duration, tags, actors, productionCompanies, networkCompanies ->
                         trySend(

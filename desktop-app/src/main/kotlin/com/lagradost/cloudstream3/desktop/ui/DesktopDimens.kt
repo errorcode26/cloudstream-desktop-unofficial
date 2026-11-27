@@ -25,4 +25,12 @@ object DesktopDimens {
 
     val PosterAspectRatio: Float = 2f / 3f
     val PosterCornerRadius: Dp = 8.dp
+
+    val ScreenMaxContentWidth: Dp = 1280.dp
+    val TabInnerHorizontalPadding: Dp = 8.dp
+    val TabInnerVerticalPadding: Dp = 8.dp
+    val DrilldownHorizontalPadding: Dp = 28.dp
+    val DrilldownTopPadding: Dp = 68.dp
+    val DrilldownBottomPadding: Dp = 24.dp
+    val WatermarkBottomInset: Dp = 38.dp
 }

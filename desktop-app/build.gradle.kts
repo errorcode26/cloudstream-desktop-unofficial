@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     kotlin("jvm")
     id("org.jetbrains.compose") version "1.11.1"
@@ -92,6 +94,10 @@ dependencies {
     implementation(libs.logback.classic)
 
     testImplementation(kotlin("test"))
+    @OptIn(org.jetbrains.compose.ExperimentalComposeLibrary::class)
+    testImplementation(compose.uiTest)
+    testImplementation("com.squareup.okhttp3:mockwebserver:5.3.2")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:$coroutinesVersion")
 
     // SQLDelight
     implementation(libs.sqldelight.sqlite.driver)
@@ -209,6 +215,32 @@ val generateInstallerVersion by tasks.registering {
     }
 }
 
+fun resolveBuildSecret(localPropertyKey: String, vararg candidates: String): String {
+    val localFile = rootProject.file("local.properties")
+    val fromLocal = if (localFile.exists()) {
+        Properties().apply { localFile.inputStream().use { load(it) } }
+            .getProperty(localPropertyKey)?.trim().orEmpty()
+    } else {
+        ""
+    }
+    if (fromLocal.isNotBlank()) return fromLocal
+
+    for (name in candidates) {
+        val fromProp = (project.findProperty(name) as? String)?.trim().orEmpty()
+        if (fromProp.isNotBlank()) return fromProp
+        val fromEnv = System.getenv(name)?.trim().orEmpty()
+        if (fromEnv.isNotBlank()) return fromEnv
+    }
+    return ""
+}
+
+val resolvedAnilistClientId: String = resolveBuildSecret("anilist.key", "anilist.key", "ANILIST_KEY")
+val resolvedAnilistClientSecret: String = resolveBuildSecret("anilist.secret", "anilist.secret", "ANILIST_SECRET")
+val resolvedTmdbApiKey: String = resolveBuildSecret("tmdb.key", "tmdb.key", "TMDB_KEY")
+val resolvedMalClientId: String = resolveBuildSecret("mal.key", "mal.key", "MAL_KEY")
+val resolvedMalClientSecret: String = resolveBuildSecret("mal.secret", "mal.secret", "MAL_SECRET")
+val resolvedSimklClientId: String = resolveBuildSecret("simkl.key", "simkl.key", "SIMKL_KEY")
+
 val generateVersionProperties by tasks.registering {
     val propFile = project.layout.buildDirectory.file("generated/version-resources/version.properties")
     outputs.file(propFile)
@@ -219,6 +251,31 @@ val generateVersionProperties by tasks.registering {
     }
 }
 
+val generateTrackerProperties by tasks.registering {
+    val propFile = project.layout.buildDirectory.file("generated/version-resources/tracker.properties")
+    inputs.property("anilistClientId", resolvedAnilistClientId)
+    inputs.property("anilistClientSecret", resolvedAnilistClientSecret)
+    inputs.property("tmdbApiKey", resolvedTmdbApiKey)
+    inputs.property("malClientId", resolvedMalClientId)
+    inputs.property("malClientSecret", resolvedMalClientSecret)
+    inputs.property("simklClientId", resolvedSimklClientId)
+    outputs.file(propFile)
+    doLast {
+        val f = propFile.get().asFile
+        f.parentFile.mkdirs()
+        f.writeText(
+            buildString {
+                appendLine("anilist.client_id=$resolvedAnilistClientId")
+                appendLine("anilist.client_secret=$resolvedAnilistClientSecret")
+                appendLine("tmdb.api_key=$resolvedTmdbApiKey")
+                appendLine("mal.client_id=$resolvedMalClientId")
+                appendLine("mal.client_secret=$resolvedMalClientSecret")
+                appendLine("simkl.client_id=$resolvedSimklClientId")
+            },
+        )
+    }
+}
+
 sourceSets {
     named("main") {
         resources.srcDir(project.layout.buildDirectory.dir("generated/version-resources"))
@@ -226,7 +283,7 @@ sourceSets {
 }
 
 tasks.named("processResources") {
-    dependsOn(generateInstallerVersion, generateVersionProperties)
+    dependsOn(generateInstallerVersion, generateVersionProperties, generateTrackerProperties)
 }
 
 fun injectWorkerExecutables(runtimeBinDir: File) {
@@ -282,11 +339,6 @@ tasks.withType<Test> {
         // Run them manually with: ./gradlew :desktop-app:test -Dtags=native
         excludeTags("native")
     }
-    // Keep tests away from the live user profile; PlatformPaths.appDataDir honours this property.
-    systemProperty(
-        "cloudstream.data.dir",
-        project.layout.buildDirectory.dir("test-data").get().asFile.absolutePath,
-    )
 }
 
 val packagePortableZip by tasks.registering(Zip::class) {

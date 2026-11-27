@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -38,9 +39,9 @@ import coil3.compose.AsyncImage
 import coil3.request.crossfade
 import com.lagradost.cloudstream3.ActorData
 import com.lagradost.cloudstream3.MainAPI
-import com.lagradost.cloudstream3.desktop.ui.components.DesktopBackButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopDrilldownScaffold
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopVerticalScrollbar
 import com.lagradost.cloudstream3.desktop.ui.components.LocalDesktopTheme
-import com.lagradost.cloudstream3.desktop.ui.components.WindowControlsPill
 import com.lagradost.cloudstream3.desktop.ui.components.posterHoverEffect
 import com.lagradost.cloudstream3.desktop.ui.navigation.Config
 import com.lagradost.cloudstream3.desktop.ui.screens.details.contract.FullCastUiEvent
@@ -66,18 +67,8 @@ fun FullCastScreen(
     val invertedMap = remember { mutableStateMapOf<ActorData, Boolean>() }
     val theme = LocalDesktopTheme.current
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(theme.Background),
-    ) {
-        // Main Content Area
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(top = 72.dp, start = 32.dp, end = 32.dp, bottom = 16.dp),
-        ) {
-            Column(modifier = Modifier.fillMaxSize()) {
+    DesktopDrilldownScaffold(onBack = onBack) {
+        Column(modifier = Modifier.fillMaxSize()) {
                 // Header Row: Titles & Subtitle + Search Bar
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -305,46 +296,43 @@ fun FullCastScreen(
                         }
                     }
                 } else {
-                    LazyVerticalGrid(
-                        columns = GridCells.Adaptive(minSize = 140.dp),
-                        horizontalArrangement = Arrangement.spacedBy(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(20.dp),
-                        contentPadding = PaddingValues(top = 4.dp, bottom = 32.dp),
+                    val gridState = rememberLazyGridState()
+                    Box(
                         modifier = Modifier
                             .fillMaxWidth()
                             .weight(1f),
                     ) {
-                        itemsIndexed(uiState.filteredMembers, key = { index, it -> "${it.actor.name}_${it.roleString}_${it.voiceActor?.name}_$index" }) { _, actor ->
-                            FullCastCard(
-                                actor = actor,
-                                provider = provider,
-                                isInverted = invertedMap[actor] == true,
-                                onInvertToggle = { invertedMap[actor] = !(invertedMap[actor] ?: false) },
-                                onClick = {
-                                    val searchName = actor.voiceActor?.name?.takeIf { it.isNotBlank() } ?: actor.actor.name
-                                    onNavigate(Config.Person(name = searchName, image = actor.actor.image, tmdbId = null))
-                                },
-                            )
+                        LazyVerticalGrid(
+                            state = gridState,
+                            columns = GridCells.Adaptive(minSize = 140.dp),
+                            horizontalArrangement = Arrangement.spacedBy(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(20.dp),
+                            contentPadding = PaddingValues(top = 4.dp, end = 12.dp, bottom = 32.dp),
+                            modifier = Modifier.fillMaxSize(),
+                        ) {
+                            itemsIndexed(uiState.filteredMembers, key = { index, it -> "${it.actor.name}_${it.roleString}_${it.voiceActor?.name}_$index" }) { _, actor ->
+                                FullCastCard(
+                                    actor = actor,
+                                    provider = provider,
+                                    isInverted = invertedMap[actor] == true,
+                                    onInvertToggle = { invertedMap[actor] = !(invertedMap[actor] ?: false) },
+                                    onClick = {
+                                        val searchName = actor.voiceActor?.name?.takeIf { it.isNotBlank() } ?: actor.actor.name
+                                        onNavigate(Config.Person(name = searchName, image = actor.actor.image, tmdbId = null))
+                                    },
+                                )
+                            }
                         }
+
+                        DesktopVerticalScrollbar(
+                            gridState = gridState,
+                            modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
+                        )
                     }
                 }
             }
         }
-
-        // Floating Top Action Layer (Corner-anchored, matching DetailsScreen)
-        Row(
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .fillMaxWidth()
-                .padding(start = 16.dp, end = 16.dp, top = 7.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            DesktopBackButton(onClick = onBack)
-            WindowControlsPill(isHome = false, isCompact = false)
-        }
     }
-}
 
 @Composable
 private fun FullCastCard(

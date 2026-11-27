@@ -28,6 +28,11 @@ sealed interface LinksUiEvent : UiEvent {
         val enrichedActors: List<com.lagradost.cloudstream3.ActorData>? = null,
         val enrichedLogoUrl: String? = null,
         val enrichedBackdropUrl: String? = null,
+        val canonicalSeed: com.lagradost.cloudstream3.desktop.metadata.CanonicalMediaSeed? = null,
+        val resolvedAnilistId: Int? = null,
+        val resolvedMalId: Int? = null,
+        val resolvedYear: Int? = null,
+        val hasMultipleSeasons: Boolean = false,
     ) : LinksUiEvent
     data class OnFilterQuality(val quality: Int?) : LinksUiEvent
     data class OnFilterFormat(val format: com.lagradost.cloudstream3.desktop.ui.screens.StreamFormatFilter) : LinksUiEvent

@@ -90,7 +90,16 @@ fun ComposeExtensionScreen(
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
-            .padding(if (isInsideSettings) PaddingValues(0.dp) else PaddingValues(horizontal = 24.dp, vertical = 16.dp)),
+            .padding(
+                if (isInsideSettings) {
+                    PaddingValues(0.dp)
+                } else {
+                    PaddingValues(
+                        horizontal = com.lagradost.cloudstream3.desktop.ui.DesktopDimens.TabInnerHorizontalPadding,
+                        vertical = com.lagradost.cloudstream3.desktop.ui.DesktopDimens.TabInnerVerticalPadding,
+                    )
+                },
+            ),
     ) {
         val isCompactHeight = maxHeight < 780.dp
         val isCompactWidth = maxWidth < 950.dp

@@ -83,7 +83,12 @@ object DetailsRepository {
     }
     private val inflightMutexes = java.util.concurrent.ConcurrentHashMap<String, kotlinx.coroutines.sync.Mutex>()
 
-    suspend fun fetchRaw(provider: com.lagradost.cloudstream3.MainAPI, url: String, fallbackName: String? = null): LoadResponse? {
+    suspend fun fetchRaw(
+        provider: com.lagradost.cloudstream3.MainAPI,
+        url: String,
+        fallbackName: String? = null,
+        notifyUserOnError: Boolean = true,
+    ): LoadResponse? {
         DetailsCache.get(url)?.let { return it }
 
         val mutex = inflightMutexes.getOrPut(url) { kotlinx.coroutines.sync.Mutex() }
@@ -92,14 +97,19 @@ object DetailsRepository {
             // Check cache again after acquiring lock
             DetailsCache.get(url)?.let { return it }
 
-            return doFetchRaw(provider, url, fallbackName)
+            return doFetchRaw(provider, url, fallbackName, notifyUserOnError)
         } finally {
             mutex.unlock()
             inflightMutexes.remove(url, mutex)
         }
     }
 
-    private suspend fun doFetchRaw(provider: com.lagradost.cloudstream3.MainAPI, url: String, fallbackName: String? = null): LoadResponse? {
+    private suspend fun doFetchRaw(
+        provider: com.lagradost.cloudstream3.MainAPI,
+        url: String,
+        fallbackName: String? = null,
+        notifyUserOnError: Boolean = true,
+    ): LoadResponse? {
         DetailsCache.get(url)?.let { return it }
 
         var targetProvider = provider
@@ -323,11 +333,13 @@ object DetailsRepository {
                 "${targetProvider.name} is temporarily paused due to consecutive errors."
             else -> rawMsg
         }
-        com.lagradost.cloudstream3.desktop.ui.components.AppToastManager.showPluginError(
-            pluginName = targetProvider.name,
-            action = "Details fetch",
-            error = finalErrorMsg,
-        )
+        if (notifyUserOnError) {
+            com.lagradost.cloudstream3.desktop.ui.components.AppToastManager.showPluginError(
+                pluginName = targetProvider.name,
+                action = "Details fetch",
+                error = finalErrorMsg,
+            )
+        }
         throw (lastError ?: RuntimeException(finalErrorMsg))
     }
 }

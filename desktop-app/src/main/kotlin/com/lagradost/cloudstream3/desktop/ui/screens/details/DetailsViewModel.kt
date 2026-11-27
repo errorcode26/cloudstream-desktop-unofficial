@@ -9,6 +9,7 @@ import com.lagradost.cloudstream3.desktop.domain.history.interactor.GetWatchHist
 import com.lagradost.cloudstream3.desktop.domain.history.interactor.RemoveWatchHistory
 import com.lagradost.cloudstream3.desktop.domain.history.interactor.UpsertWatchHistory
 import com.lagradost.cloudstream3.desktop.domain.tracking.repository.TrackingRepository
+import com.lagradost.cloudstream3.desktop.metadata.RatingSource
 import com.lagradost.cloudstream3.desktop.ui.base.BaseMviViewModel
 import com.lagradost.cloudstream3.desktop.ui.navigation.Config
 import com.lagradost.cloudstream3.desktop.ui.screens.details.contract.DetailsUiEffect
@@ -95,6 +96,11 @@ class DetailsViewModel(
         sendEffect = ::sendEffect,
     )
 
+    @Volatile
+    private var hasUserToggledRightColumnPin = false
+
+    private val fetchedEpisodeSeasons = java.util.concurrent.ConcurrentHashMap.newKeySet<Int>()
+
     init {
         viewModelScope.launch(Dispatchers.IO) {
             val autoPlay = DesktopDataStore.getKey<Boolean>(com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_AUTO_PLAY) ?: true
@@ -106,7 +112,7 @@ class DetailsViewModel(
                     autoPlayEnabled = autoPlay,
                     isEpisodesStackedView = isStacked,
                     episodeViewMode = viewMode,
-                    isRightColumnPinned = isPinned,
+                    isRightColumnPinned = if (hasUserToggledRightColumnPin) isRightColumnPinned else isPinned,
                 )
             }
         }
@@ -342,12 +348,23 @@ class DetailsViewModel(
                     is EnrichmentUpdate.EpisodeThumbnailsEnriched -> {
                         updateState { copy(episodeThumbnailVersion = episodeThumbnailVersion + 1) }
                     }
+                    is EnrichmentUpdate.EpisodeRatingSourcesLoaded -> {
+                        if (update.sources.isNotEmpty()) {
+                            updateState {
+                                copy(
+                                    episodeRatingSources = episodeRatingSources + update.sources,
+                                    episodeThumbnailVersion = episodeThumbnailVersion + 1,
+                                )
+                            }
+                            cacheEnrichedState(uiState.value)
+                        }
+                    }
                     is EnrichmentUpdate.RatingsLoaded -> {
                         updateState {
                             copy(
-                                enrichedImdbRating = update.imdb ?: enrichedImdbRating,
-                                enrichedTmdbRating = update.tmdb ?: enrichedTmdbRating,
-                                enrichedAniListRating = update.anilist ?: enrichedAniListRating,
+                                enrichedImdbRating = update.imdb?.takeIf { it > 0.0 } ?: enrichedImdbRating,
+                                enrichedTmdbRating = update.tmdb?.takeIf { it > 0.0 } ?: enrichedTmdbRating,
+                                enrichedAniListRating = update.anilist?.takeIf { it > 0.0 } ?: enrichedAniListRating,
                             )
                         }
                     }
@@ -468,6 +485,7 @@ class DetailsViewModel(
                                 updateState { copy(selectedSeason = currentSeason) }
                             }
                             loadSeasonCredits(currentSeason)
+                            loadMissingSeasonEpisodes(currentSeason)
                         }
                         trackerCoordinator.refreshAll()
                     }
@@ -490,8 +508,59 @@ class DetailsViewModel(
         updateState { copy(selectedSeason = season, hasUserSelectedSeason = true) }
         if (season != null && season > 0) {
             loadSeasonCredits(season)
+            loadMissingSeasonEpisodes(season)
         }
         trackerCoordinator.refreshAll()
+    }
+
+    private fun loadMissingSeasonEpisodes(season: Int) {
+        if (season <= 0) return
+        val state = uiState.value
+        val loaded = state.response ?: return
+        val tmdbId = state.tmdbId ?: loaded.syncData["tmdb"]?.toIntOrNull() ?: return
+        val seasonEps = when (loaded) {
+            is TvSeriesLoadResponse -> loaded.episodes.filter { it.season == season }
+            is AnimeLoadResponse -> loaded.episodes.values.flatten().filter { it.season == season }
+            else -> emptyList()
+        }
+        if (seasonEps.isEmpty()) return
+
+        val missingEpisodeData = seasonEps.any { ep ->
+            val epNum = ep.episode
+            val epScore = ep.score?.toDouble(10) ?: 0.0
+            ep.posterUrl.isNullOrBlank() && epScore <= 0.0 &&
+                (epNum == null || (season to epNum) !in state.episodeRatingSources)
+        }
+        val missingTmdbSeasonBatch = seasonEps.none { ep ->
+            val epNum = ep.episode
+            epNum != null && (season to epNum) in state.episodeRatingSources
+        } && seasonEps.any { ep ->
+            (ep.score?.toDouble(10) ?: 0.0) <= 0.0 || ep.posterUrl.isNullOrBlank()
+        }
+        if (!missingEpisodeData && !missingTmdbSeasonBatch) return
+        if (!fetchedEpisodeSeasons.add(season)) return
+
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val sources = TmdbEnrichmentService.enrichSeason(
+                    loaded = loaded,
+                    tmdbId = tmdbId,
+                    seasonNumber = season,
+                )
+                if (sources.isNotEmpty() || seasonEps.any { !it.posterUrl.isNullOrBlank() || (it.score?.toDouble(10) ?: 0.0) > 0.0 }) {
+                    updateState {
+                        copy(
+                            episodeRatingSources = if (sources.isNotEmpty()) episodeRatingSources + sources else episodeRatingSources,
+                            episodeThumbnailVersion = episodeThumbnailVersion + 1,
+                        )
+                    }
+                    cacheEnrichedState(uiState.value)
+                }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                fetchedEpisodeSeasons.remove(season)
+                throw e
+            }
+        }
     }
 
     private fun loadSeasonCredits(season: Int) {
@@ -862,7 +931,8 @@ class DetailsViewModel(
     }
 
     private fun retry() {
-        updateState { copy(fetchFailed = false, isLoading = true) }
+        fetchedEpisodeSeasons.clear()
+        updateState { copy(fetchFailed = false, isLoading = true, episodeRatingSources = emptyMap()) }
         DetailsCache.remove(url)
         loadDetails()
     }
@@ -874,6 +944,7 @@ class DetailsViewModel(
         uiState.value.response?.url?.let { EnrichedDetailsCache.remove(it) }
         val titleToEvict = uiState.value.response?.name ?: uiState.value.preloadedName
         com.lagradost.cloudstream3.desktop.metadata.MetadataPipeline.clearCache(titleToEvict)
+        fetchedEpisodeSeasons.clear()
         // Redundant toast removed in favor of native UI loading state
         updateState {
             copy(
@@ -921,6 +992,7 @@ class DetailsViewModel(
                 malId = canonicalSeed?.malId,
                 seasonCredits = emptyMap(),
                 episodeThumbnailVersion = 0,
+                episodeRatingSources = emptyMap(),
             )
         }
         loadDetails()
@@ -966,6 +1038,7 @@ class DetailsViewModel(
     }
 
     private fun handleTogglePinRightColumn() {
+        hasUserToggledRightColumnPin = true
         val nextPinned = !uiState.value.isRightColumnPinned
         updateState { copy(isRightColumnPinned = nextPinned) }
         viewModelScope.launch(Dispatchers.IO) {

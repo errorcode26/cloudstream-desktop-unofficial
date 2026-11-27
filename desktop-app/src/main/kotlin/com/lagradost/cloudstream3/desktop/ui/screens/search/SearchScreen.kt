@@ -90,10 +90,13 @@ fun ComposeSearchScreen(
     }
 
     val safeArea = com.lagradost.cloudstream3.desktop.ui.LocalSafeArea.current
-    val topPadding = safeArea.calculateTopPadding().coerceAtLeast(64.dp) + 8.dp
-    val dockPosition by com.lagradost.cloudstream3.desktop.ui.theme.AppearanceConfig.dockPosition.collectAsState()
-    val dockPaddingStart = if (dockPosition == com.lagradost.cloudstream3.desktop.ui.DockPosition.LEFT) 88.dp else 24.dp
-    val dockPaddingEnd = if (dockPosition == com.lagradost.cloudstream3.desktop.ui.DockPosition.RIGHT) 88.dp else 24.dp
+    val layoutDirection = androidx.compose.ui.platform.LocalLayoutDirection.current
+    val topPadding = safeArea.calculateTopPadding().coerceAtLeast(64.dp) +
+        com.lagradost.cloudstream3.desktop.ui.DesktopDimens.TabInnerVerticalPadding
+    val dockPaddingStart = safeArea.calculateStartPadding(layoutDirection) +
+        com.lagradost.cloudstream3.desktop.ui.DesktopDimens.TabInnerHorizontalPadding
+    val dockPaddingEnd = safeArea.calculateEndPadding(layoutDirection) +
+        com.lagradost.cloudstream3.desktop.ui.DesktopDimens.TabInnerHorizontalPadding
 
     Column(
         modifier = Modifier

@@ -128,6 +128,68 @@ class AniListTrackerProvider(
         return Result.success(entries)
     }
 
+    override suspend fun fetchLibraryPage(
+        repository: TrackingRepository,
+        statusFilter: UnifiedWatchStatus?,
+        sortKey: String?,
+        cursor: String?,
+        pageSize: Int,
+    ): Result<TrackerLibraryPage> {
+        val auth = repository.getAccountsForProvider(id)?.firstOrNull()
+        if (auth == null || auth.token.accessToken.isNullOrBlank()) {
+            return Result.failure(IllegalStateException("AniList is not connected"))
+        }
+        val page = cursor?.toIntOrNull()?.coerceAtLeast(1) ?: 1
+        val sortGraphQl = when (sortKey) {
+            "DATE_ADDED_ASC" -> "UPDATED_TIME"
+            "ALPHA_ASC" -> "MEDIA_TITLE_ROMAJI"
+            "ALPHA_DESC" -> "MEDIA_TITLE_ROMAJI_DESC"
+            "SCORE_DESC" -> "SCORE_DESC"
+            else -> "UPDATED_TIME_DESC"
+        }
+        val api = apiProvider()
+        val result = api.getPagedAniListList(
+            auth = auth,
+            page = page,
+            perPage = pageSize.coerceIn(1, 100),
+            status = statusFilter?.takeIf { it != UnifiedWatchStatus.NONE }?.toAniListStatusType(),
+            sortGraphQl = sortGraphQl,
+            includeStatistics = page == 1,
+        )
+        return result.map { root ->
+            api.requireLibraryRefresh = false
+            val pageData = root.data?.page
+            val seenIds = HashSet<String>()
+            val fallbackStatus = statusFilter ?: UnifiedWatchStatus.WATCHING
+            val entries = pageData?.mediaList.orEmpty()
+                .mapNotNull { mapEntry(it, fallbackStatus) }
+                .filter { seenIds.add(it.remoteMediaId) }
+
+            val animeStats = root.data?.user?.statistics?.anime
+            val statusCounts = animeStats?.let { stats ->
+                val map = HashMap<UnifiedWatchStatus, Int>()
+                stats.statuses.forEach { st ->
+                    val unified = parseRawStatus(st.status)
+                    val count = st.count ?: 0
+                    if (unified != UnifiedWatchStatus.NONE) {
+                        map[unified] = (map[unified] ?: 0) + count
+                    }
+                }
+                map
+            }
+            val totalCount = animeStats?.count ?: statusCounts?.values?.sum() ?: pageData?.pageInfo?.total
+            val hasMore = pageData?.pageInfo?.hasNextPage == true
+            TrackerLibraryPage(
+                entries = entries,
+                nextCursor = if (hasMore) (page + 1).toString() else null,
+                hasMore = hasMore,
+                statusCounts = statusCounts,
+                totalCount = totalCount,
+                supportsServerTabFilter = true,
+            )
+        }
+    }
+
     override fun requiresLibraryRefresh(): Boolean = apiProvider().requireLibraryRefresh
 
     override fun validateStatusAndProgress(

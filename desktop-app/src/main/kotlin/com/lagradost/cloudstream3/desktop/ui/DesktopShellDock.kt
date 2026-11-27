@@ -316,6 +316,7 @@ internal fun NavigationDock(
                             isExpanded = false,
                             isHorizontal = true,
                             onOpenProfileManager = onOpenProfileManager,
+                            onOpenCreateProfile = { onNavigate(Config.ProfileEdit(profileId = null, switchOnCreate = true)) },
                         )
                     }
                 } else {
@@ -337,6 +338,7 @@ internal fun NavigationDock(
                             isExpanded = isExpanded,
                             isRight = isRight,
                             onOpenProfileManager = onOpenProfileManager,
+                            onOpenCreateProfile = { onNavigate(Config.ProfileEdit(profileId = null, switchOnCreate = true)) },
                         )
                     }
                 }
@@ -440,6 +442,7 @@ internal fun NavigationDock(
                                 isExpanded = false,
                                 isHorizontal = true,
                                 onOpenProfileManager = onOpenProfileManager,
+                                onOpenCreateProfile = { onNavigate(Config.ProfileEdit(profileId = null, switchOnCreate = true)) },
                             )
                         }
                     } else {
@@ -454,6 +457,7 @@ internal fun NavigationDock(
                                 isExpanded = false,
                                 isRight = false,
                                 onOpenProfileManager = onOpenProfileManager,
+                                onOpenCreateProfile = { onNavigate(Config.ProfileEdit(profileId = null, switchOnCreate = true)) },
                             )
                         }
                     }

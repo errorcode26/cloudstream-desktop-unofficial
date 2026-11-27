@@ -317,6 +317,8 @@ internal object DashProxyHandler {
             if (key != null) {
                 entry.last[key] = rest
             }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
         } catch (e: Exception) {
             val isChannelClosed = e is io.ktor.utils.io.ClosedWriteChannelException ||
                 e.cause is io.ktor.utils.io.ClosedWriteChannelException ||

@@ -15,20 +15,21 @@ object PluginBytecodeTransformer {
         val tempFile = File(jarFile.absolutePath + ".tmp")
         val effectiveLoader = classLoader ?: PluginBytecodeTransformer::class.java.classLoader
 
-        ZipInputStream(FileInputStream(jarFile)).use { zis ->
-            ZipOutputStream(FileOutputStream(tempFile)).use { zos ->
-                var entry = zis.nextEntry
-                while (entry != null) {
-                    if (entry.name == "META-INF/shadowui.version") {
-                        entry = zis.nextEntry
-                        continue
-                    }
-                    val newEntry = ZipEntry(entry.name)
-                    zos.putNextEntry(newEntry)
+        try {
+            ZipInputStream(FileInputStream(jarFile)).use { zis ->
+                ZipOutputStream(FileOutputStream(tempFile)).use { zos ->
+                    var entry = zis.nextEntry
+                    while (entry != null) {
+                        if (entry.name == "META-INF/shadowui.version") {
+                            entry = zis.nextEntry
+                            continue
+                        }
+                        val newEntry = ZipEntry(entry.name)
+                        zos.putNextEntry(newEntry)
 
-                    val bytes = zis.readBytes()
-                    if (entry.name.endsWith(".class")) {
-                        try {
+                        val bytes = zis.readBytes()
+                        if (entry.name.endsWith(".class")) {
+                            try {
                             val reader = ClassReader(bytes)
                             val writer = SafeComputeClassWriter(
                                 reader = null,
@@ -373,7 +374,6 @@ object PluginBytecodeTransformer {
                             reader.accept(visitor, ClassReader.SKIP_FRAMES)
                             zos.write(writer.toByteArray())
                         } catch (t: Throwable) {
-                            tempFile.delete()
                             AppLogger.e("Plugin Security: Failed to verify and transform bytecode for ${entry.name}: ${t.message}", t)
                             throw SecurityException("Plugin Security: Failed to parse and verify bytecode for ${entry.name}. Unverified or obfuscated bytecode cannot be loaded.", t)
                         }
@@ -392,11 +392,16 @@ object PluginBytecodeTransformer {
                 zos.closeEntry()
             }
         }
-        java.nio.file.Files.move(
-            tempFile.toPath(),
-            jarFile.toPath(),
-            java.nio.file.StandardCopyOption.REPLACE_EXISTING,
-        )
+            java.nio.file.Files.move(
+                tempFile.toPath(),
+                jarFile.toPath(),
+                java.nio.file.StandardCopyOption.REPLACE_EXISTING,
+            )
+        } catch (t: Throwable) {
+            // Streams must be closed before deleting tempFile because Windows holds locks on open handles.
+            tempFile.delete()
+            throw t
+        }
     }
 
     private fun fixMethodName(name: String): String {

@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
@@ -142,7 +143,7 @@ class MalAndSimklTrackerApiTest {
         assertEquals(1, parsed.size)
         val item = parsed.first()
         assertEquals("anime:8888", item.ref.encode())
-        assertEquals("https://wsrv.nl/?url=https://simkl.in/posters/12/3456abcd_w.webp&q=90", item.posterUrl)
+        assertEquals("https://wsrv.nl/?url=https://simkl.in/posters/12/3456abcd_m.webp&q=90", item.posterUrl)
         assertEquals(80, item.userScore100)
         assertEquals(5, item.watchedEpisodesCount)
         assertEquals("RELEASING", item.normalizedAirStatus)
@@ -229,7 +230,7 @@ class MalAndSimklTrackerApiTest {
         assertEquals("show:1039812", parsedSearch.first().ref.encode())
         assertEquals(16, parsedSearch.first().totalEpisodesCount)
         assertEquals(
-            "https://wsrv.nl/?url=https://simkl.in/posters/20/2074178531633fb87c_w.webp&q=90",
+            "https://wsrv.nl/?url=https://simkl.in/posters/20/2074178531633fb87c_m.webp&q=90",
             parsedSearch.first().posterUrl,
         )
 
@@ -307,6 +308,240 @@ class MalAndSimklTrackerApiTest {
         )
         assertTrue(invalidClient.isFailure)
         assertTrue(invalidClient.exceptionOrNull()?.message.orEmpty().contains("Client Secret"))
+    }
+
+    @Test
+    fun `rate limiter enforces token bucket pacing and Retry-After cooldown`() = runBlocking {
+        var now = 1_000L
+        val sleeps = mutableListOf<Long>()
+        val limiter = TrackerRateLimiter(
+            providerName = "TestTracker",
+            minIntervalMs = 200L,
+            maxBurst = 2,
+            defaultCooldownMs = 10_000L,
+            nowMs = { now },
+            sleepMs = { ms ->
+                sleeps += ms
+                now += ms
+            },
+        )
+
+        limiter.acquireSlot()
+        limiter.acquireSlot()
+        assertTrue(sleeps.isEmpty())
+
+        limiter.acquireSlot()
+        assertEquals(listOf(200L), sleeps)
+
+        val backoff = limiter.recordRateLimit(retryAfterHeader = "12")
+        assertEquals(12_000L, backoff)
+        assertEquals(12L, limiter.remainingCooldownSeconds())
+        assertFailsWith<TrackerRateLimitException> {
+            limiter.acquireSlot()
+        }
+
+        now += 12_500L
+        assertEquals(0L, limiter.remainingCooldownSeconds())
+        limiter.recordSuccess()
+        limiter.acquireSlot()
+    }
+
+    @Test
+    fun `mal stats offset helper and simkl activities parser extract pagination and delta stamps`() {
+        val malStats = MalApi.parseAnimeStats(
+            mapper.readTree(
+                """{"num_items_watching":4,"num_items_completed":32,"num_items_on_hold":2,"num_items_dropped":1,"num_items_plan_to_watch":9,"num_items":48}""",
+            ),
+        )
+        assertNotNull(malStats)
+        assertEquals(4, malStats.watching)
+        assertEquals(32, malStats.completed)
+        assertEquals(48, malStats.total)
+        assertEquals(100, MalApi.extractOffsetFromUrl("https://api.myanimelist.net/v2/users/@me/animelist?limit=50&offset=100"))
+
+        val activities = SimklApi.parseActivitiesTimestamps(
+            """
+            {
+              "anime": { "all": "2026-11-26T12:00:00Z" },
+              "tv_shows": { "all": "2026-11-25T10:00:00Z" },
+              "movies": { "all": "2026-11-24T08:00:00Z" }
+            }
+            """.trimIndent(),
+        )
+        assertEquals("2026-11-26T12:00:00Z", activities[SimklMediaKind.ANIME])
+        assertEquals("2026-11-25T10:00:00Z", activities[SimklMediaKind.SHOW])
+        assertEquals("2026-11-24T08:00:00Z", activities[SimklMediaKind.MOVIE])
+    }
+
+    @Test
+    fun `supported watch statuses and progress adjustments enforce movie and tracker semantics`() {
+        val simklMovieStatuses = UnifiedWatchStatus.supportedStatusesFor(TrackerIds.SIMKL, isMovie = true)
+        assertEquals(
+            listOf(
+                UnifiedWatchStatus.COMPLETED,
+                UnifiedWatchStatus.PLAN_TO_WATCH,
+                UnifiedWatchStatus.DROPPED,
+            ),
+            simklMovieStatuses,
+        )
+        assertFalse(UnifiedWatchStatus.WATCHING in simklMovieStatuses)
+        assertFalse(UnifiedWatchStatus.PAUSED in simklMovieStatuses)
+        assertFalse(UnifiedWatchStatus.REWATCHING in simklMovieStatuses)
+
+        val simklSeriesStatuses = UnifiedWatchStatus.supportedStatusesFor(TrackerIds.SIMKL, isMovie = false)
+        assertTrue(UnifiedWatchStatus.WATCHING in simklSeriesStatuses)
+        assertFalse(UnifiedWatchStatus.REWATCHING in simklSeriesStatuses)
+
+        assertEquals(
+            UnifiedWatchStatus.PLAN_TO_WATCH,
+            UnifiedWatchStatus.defaultUnaddedStatusFor(TrackerIds.SIMKL, isMovie = true),
+        )
+        assertEquals(
+            UnifiedWatchStatus.WATCHING,
+            UnifiedWatchStatus.defaultUnaddedStatusFor(TrackerIds.SIMKL, isMovie = false),
+        )
+
+        assertEquals(
+            0,
+            adjustedProgressForStatus(
+                currentProgress = 5,
+                targetStatus = UnifiedWatchStatus.PLAN_TO_WATCH,
+                isMovie = false,
+                ceiling = 12,
+            ),
+        )
+        assertEquals(
+            1,
+            adjustedProgressForStatus(
+                currentProgress = 0,
+                targetStatus = UnifiedWatchStatus.COMPLETED,
+                isMovie = true,
+                ceiling = 1,
+            ),
+        )
+        assertEquals(
+            0,
+            adjustedProgressForStatus(
+                currentProgress = 1,
+                targetStatus = UnifiedWatchStatus.PLAN_TO_WATCH,
+                isMovie = true,
+                ceiling = 1,
+            ),
+        )
+        assertEquals(
+            0,
+            adjustedProgressForStatus(
+                currentProgress = 1,
+                targetStatus = UnifiedWatchStatus.PAUSED,
+                isMovie = true,
+                ceiling = 1,
+            ),
+        )
+    }
+
+    @Test
+    fun `simkl guard blocks movie watching and not_found payload helper catches silent rejections`() {
+        val simkl = SimklTrackerProvider()
+        val movieBounds = ReleaseBounds(totalEpisodes = 1, format = "MOVIE")
+        val watchingMovie = simkl.validateStatusAndProgress(
+            bounds = movieBounds,
+            status = UnifiedWatchStatus.WATCHING,
+            progress = 0,
+        )
+        assertIs<GuardDecision.Blocked>(watchingMovie)
+
+        val rewatchingSeries = simkl.validateStatusAndProgress(
+            bounds = ReleaseBounds(totalEpisodes = 12, format = "SERIES"),
+            status = UnifiedWatchStatus.REWATCHING,
+            progress = 3,
+        )
+        assertIs<GuardDecision.Blocked>(rewatchingSeries)
+
+        val emptyRejection = SimklApi.hasSimklPayloadRejection(
+            """{"added":{"movies":1},"not_found":{"movies":[],"shows":[],"episodes":[]}}""",
+        )
+        assertNull(emptyRejection)
+
+        val movieNotFound = SimklApi.hasSimklPayloadRejection(
+            """{"not_found":{"movies":[{"ids":{"simkl":999}}]}}""",
+        )
+        assertNotNull(movieNotFound)
+        assertTrue(movieNotFound.contains("not_found[movies]"))
+
+        val explicitError = SimklApi.hasSimklPayloadRejection(
+            """{"error":"user_token_failed"}""",
+        )
+        assertEquals("user_token_failed", explicitError)
+
+        val htmlRejection = SimklApi.hasSimklPayloadRejection(
+            responseText = "<html><body>Not Found</body></html>",
+            expectedEnvelopeKey = "deleted",
+            requireNonZeroCount = true,
+        )
+        assertEquals("invalid_json_response", htmlRejection)
+
+        val missingDeletedKey = SimklApi.hasSimklPayloadRejection(
+            responseText = """{"ok":true}""",
+            expectedEnvelopeKey = "deleted",
+            requireNonZeroCount = true,
+        )
+        assertEquals("missing_deleted", missingDeletedKey)
+
+        val zeroDeleted = SimklApi.hasSimklPayloadRejection(
+            responseText = """{"deleted":{"movies":0,"shows":0,"episodes":0},"not_found":{"movies":[],"shows":[],"episodes":[]}}""",
+            expectedEnvelopeKey = "deleted",
+            requireNonZeroCount = true,
+        )
+        assertEquals("zero_deleted", zeroDeleted)
+
+        val oneDeleted = SimklApi.hasSimklPayloadRejection(
+            responseText = """{"deleted":{"movies":1,"shows":0,"episodes":0},"not_found":{"movies":[],"shows":[],"episodes":[]}}""",
+            expectedEnvelopeKey = "deleted",
+            requireNonZeroCount = true,
+        )
+        assertNull(oneDeleted)
+    }
+
+    @Test
+    fun `simkl movie in plan_to_watch reports zero progress even if last_watched_at is present`() {
+        val payload = """
+            {
+              "movies": [
+                {
+                  "status": "plantowatch",
+                  "last_watched_at": "2026-11-26T09:00:00Z",
+                  "user_rating": 0,
+                  "movie": {
+                    "title": "Sample Planned Movie",
+                    "year": 2024,
+                    "ids": { "simkl": 1001, "tmdb": 2001 }
+                  }
+                },
+                {
+                  "status": "completed",
+                  "user_rating": 9,
+                  "movie": {
+                    "title": "Sample Completed Movie",
+                    "year": 2023,
+                    "ids": { "simkl": 1002, "tmdb": 2002 }
+                  }
+                }
+              ]
+            }
+        """.trimIndent()
+
+        val parsed = SimklApi.parseAllItemsJson(payload, SimklMediaKind.MOVIE)
+        assertEquals(2, parsed.size)
+
+        val planned = parsed[0]
+        assertEquals(UnifiedWatchStatus.PLAN_TO_WATCH, planned.watchStatus)
+        assertEquals(0, planned.watchedEpisodesCount)
+        assertEquals(1, planned.totalEpisodesCount)
+
+        val completed = parsed[1]
+        assertEquals(UnifiedWatchStatus.COMPLETED, completed.watchStatus)
+        assertEquals(1, completed.watchedEpisodesCount)
+        assertEquals(1, completed.totalEpisodesCount)
     }
 }
 

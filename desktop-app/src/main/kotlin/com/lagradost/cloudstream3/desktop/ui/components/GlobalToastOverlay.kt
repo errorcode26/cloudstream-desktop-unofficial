@@ -241,6 +241,26 @@ private fun ToastCard(
                         ),
                         color = if (isAmoledMode) Color.White else MaterialTheme.colorScheme.onSurface,
                     )
+
+                    if (!toast.actionLabel.isNullOrBlank() && toast.onAction != null) {
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Surface(
+                            onClick = {
+                                toast.onAction.invoke()
+                                onDismiss()
+                            },
+                            shape = RoundedCornerShape(6.dp),
+                            color = visuals.accentColor.copy(alpha = 0.18f),
+                            border = BorderStroke(1.dp, visuals.accentColor.copy(alpha = 0.45f)),
+                        ) {
+                            Text(
+                                text = toast.actionLabel,
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                color = visuals.accentColor,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                            )
+                        }
+                    }
                 }
 
                 DesktopIconButton(

@@ -30,6 +30,7 @@ import com.lagradost.common.logging.AppLogger
 import com.lagradost.common.storage.DesktopDataStore
 import com.lagradost.common.storage.WatchHistory
 import com.lagradost.runtime.executor.SafePluginInvoker
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
@@ -891,7 +892,9 @@ class EmbeddedPlayerViewModel(
                         )
                     }
                 }
-            } catch (e: Throwable) {
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
                 AppLogger.w("EmbeddedPlayerViewModel", "Background metadata hydration failed: ${e.message}")
             }
         }

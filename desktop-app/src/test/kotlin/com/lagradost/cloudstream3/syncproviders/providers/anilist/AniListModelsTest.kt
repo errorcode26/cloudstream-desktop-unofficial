@@ -2,6 +2,7 @@ package com.lagradost.cloudstream3.syncproviders.providers.anilist
 
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 
 class AniListModelsTest {
 
@@ -42,7 +43,7 @@ class AniListModelsTest {
             ),
         )
 
-        val libraryItem = entry.toLibraryItem()
+        val libraryItem = assertNotNull(entry.toLibraryItem())
         assertEquals("Test Anime English", libraryItem.name)
         assertEquals("https://anilist.co/anime/12345/", libraryItem.url)
         assertEquals("12345", libraryItem.syncId)

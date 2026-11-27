@@ -31,6 +31,7 @@ fun DetailsEpisodeSection(
     onRemoveEpisodeWatched: (Episode) -> Unit,
     onToggleEpisodesStackedView: (Boolean) -> Unit,
     onSetEpisodeViewMode: (Int) -> Unit = {},
+    onSyncEpisodeToTracker: ((String, Episode) -> Unit)? = null,
     selectedSeason: Int? = null,
     onSeasonChange: ((Int) -> Unit)? = null,
 ) {
@@ -152,8 +153,20 @@ fun DetailsEpisodeSection(
                     }
                 }
             }
-            val isSeasonWatched = remember(currentSeasonEpisodes, historyLookup) {
-                EpisodeSectionState.isSeasonCompleted(currentSeasonEpisodes, historyLookup)
+            val releasedSeasonEpisodes = remember(
+                currentSeasonEpisodes,
+                provider.name,
+                uiState?.trackers,
+            ) {
+                EpisodeSectionState.filterReleasedEpisodes(
+                    episodes = currentSeasonEpisodes,
+                    providerName = provider.name,
+                    aniListCeilingEpisode = uiState?.trackers?.strictLocalReleaseCeiling,
+                    episodeOffset = 0,
+                )
+            }
+            val isSeasonWatched = remember(releasedSeasonEpisodes, historyLookup) {
+                EpisodeSectionState.isSeasonCompleted(releasedSeasonEpisodes, historyLookup)
             }
 
             Column(modifier = Modifier.fillMaxWidth()) {
@@ -167,6 +180,7 @@ fun DetailsEpisodeSection(
                         dubStatuses = dubStatuses,
                         selectedDub = selectedDub,
                         currentSeasonEpisodes = currentSeasonEpisodes,
+                        releasedEpisodesCount = releasedSeasonEpisodes.size,
                         isSeasonWatched = isSeasonWatched,
                         isAntiSpoiler = isAntiSpoiler,
                         isSortAscending = isSortAscending,
@@ -188,6 +202,7 @@ fun DetailsEpisodeSection(
                         dubStatuses = dubStatuses,
                         selectedDub = selectedDub,
                         currentSeasonEpisodes = currentSeasonEpisodes,
+                        releasedEpisodesCount = releasedSeasonEpisodes.size,
                         isSeasonWatched = isSeasonWatched,
                         isAntiSpoiler = isAntiSpoiler,
                         isSortAscending = isSortAscending,
@@ -229,6 +244,7 @@ fun DetailsEpisodeSection(
                             onToggleWatched = onToggleWatched,
                             onToggleSeasonWatched = onToggleSeasonWatched,
                             onRemoveEpisodeWatched = onRemoveEpisodeWatched,
+                            onSyncEpisodeToTracker = onSyncEpisodeToTracker,
                         )
 
                         if (currentMode != 0 && chunks.size > 1) {

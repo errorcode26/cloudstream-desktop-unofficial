@@ -13,7 +13,9 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 object ProfileManager {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val persistenceDispatcher = Dispatchers.IO.limitedParallelism(1)
+    private val scope = CoroutineScope(SupervisorJob() + persistenceDispatcher)
+    private val activeSaveJobs = java.util.concurrent.ConcurrentHashMap.newKeySet<kotlinx.coroutines.Job>()
     private val mapper = com.fasterxml.jackson.module.kotlin.jacksonObjectMapper()
         .configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
 
@@ -77,6 +79,7 @@ object ProfileManager {
             val resolvedActive = validProfiles.find { it.id == activeId } ?: validProfiles.first()
             _activeProfile.value = resolvedActive
             DesktopDataStore.activeProfileProvider = { activeProfileId }
+            com.lagradost.cloudstream3.syncproviders.AccountManager.reloadFromDataStore()
 
             val autoSignInPref = DesktopDataStore.getKey<Boolean>(PREF_AUTO_SIGN_IN)
             val pickerPref = DesktopDataStore.getKey<Boolean>(PREF_SHOW_PICKER_STARTUP)
@@ -97,13 +100,39 @@ object ProfileManager {
         }
     }
 
+    private fun launchTrackedIo(block: suspend () -> Unit) {
+        val job = scope.launch(persistenceDispatcher) {
+            block()
+        }
+        activeSaveJobs.add(job)
+        job.invokeOnCompletion { activeSaveJobs.remove(job) }
+    }
+
+    internal suspend fun awaitPendingSaves() {
+        while (true) {
+            val pending = activeSaveJobs.toList()
+            if (pending.isEmpty()) break
+            pending.forEach { it.join() }
+        }
+        DesktopDataStore.awaitPendingIoForTesting()
+    }
+
+    internal fun resetForTesting() {
+        _profiles.value = listOf(defaultProfile)
+        _activeProfile.value = defaultProfile
+        _isPickerOnStartup.value = true
+        _autoSignIn.value = false
+        _welcomeToast.value = null
+    }
+
     private fun saveProfilesInternal() {
-        val currentProfiles = _profiles.value
-        val currentActiveId = _activeProfile.value.id
-        val currentPicker = _isPickerOnStartup.value
-        val currentAutoSignIn = _autoSignIn.value
-        scope.launch(Dispatchers.IO) {
+        launchTrackedIo {
             try {
+                // Read current state inside serialized dispatcher so earlier jobs cannot clobber newer state.
+                val currentProfiles = _profiles.value
+                val currentActiveId = _activeProfile.value.id
+                val currentPicker = _isPickerOnStartup.value
+                val currentAutoSignIn = _autoSignIn.value
                 val json = mapper.writeValueAsString(currentProfiles)
                 DesktopDataStore.setKey(PREF_PROFILES, json)
                 DesktopDataStore.setKey(PREF_ACTIVE_ID, currentActiveId)
@@ -183,9 +212,10 @@ object ProfileManager {
         _profiles.update { list -> list.filter { it.id != id } }
 
         // Cascade delete profile data from SQLite database
-        scope.launch(Dispatchers.IO) {
+        launchTrackedIo {
             DesktopDataStore.clearAllWatchHistory(profileId = id)
             DesktopDataStore.clearAllBookmarks(profileId = id)
+            com.lagradost.cloudstream3.syncproviders.AccountManager.clearTrackerAccountsForProfile(id)
         }
 
         if (_activeProfile.value.id == id) {
@@ -200,7 +230,7 @@ object ProfileManager {
 
     fun switchProfile(id: Int, pin: String? = null): Boolean {
         val target = _profiles.value.find { it.id == id } ?: return false
-        if (target.hasPin && target.pinCode != pin) {
+        if (target.hasPin && target.pinCode != pin?.trim()) {
             AppLogger.i("Failed PIN verification for profile '${target.name}'")
             return false
         }
@@ -210,6 +240,7 @@ object ProfileManager {
         DesktopDataStore.notifyBookmarksChanged()
         com.lagradost.cloudstream3.desktop.ui.theme.AppearanceConfig.reloadFromDataStore()
         com.lagradost.cloudstream3.desktop.metadata.MetadataConfig.reloadFromDataStore()
+        com.lagradost.cloudstream3.syncproviders.AccountManager.reloadFromDataStore()
         triggerWelcomeToast(target)
         AppLogger.i("Switched active profile to '${target.name}' (ID: ${target.id})")
         return true

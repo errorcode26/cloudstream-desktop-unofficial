@@ -23,15 +23,20 @@ jobs:
     - name: Setup Gradle
       uses: gradle/actions/setup-gradle@v3
 
-    - name: Run Tests and Build
-      run: ./gradlew :plugin-runtime:test :player-abstraction:test :desktop-app:test :desktop-app:assemble --no-daemon
+    - name: Run Tests, Build, and Coverage
+      run: ./gradlew :common:test :plugin-runtime:test :player-abstraction:test :desktop-app:test :desktop-app:assemble jacocoTestReport --no-daemon
 
-    - name: Upload Test Reports
+    - name: Upload Test and Coverage Reports
       if: always()
       uses: actions/upload-artifact@v4
       with:
-        name: test-reports
+        name: test-and-coverage-reports
         path: |
+          common/build/reports/tests/
+          common/build/reports/jacoco/
           desktop-app/build/reports/tests/
+          desktop-app/build/reports/jacoco/
           plugin-runtime/build/reports/tests/
+          plugin-runtime/build/reports/jacoco/
           player-abstraction/build/reports/tests/
+          player-abstraction/build/reports/jacoco/

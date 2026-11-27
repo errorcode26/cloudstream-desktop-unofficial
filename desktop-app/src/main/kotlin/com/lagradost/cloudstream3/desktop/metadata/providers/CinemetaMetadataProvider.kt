@@ -6,6 +6,7 @@ import com.lagradost.cloudstream3.desktop.metadata.MetadataEnrichmentCallbacks
 import com.lagradost.cloudstream3.desktop.metadata.MetadataEnrichmentContext
 import com.lagradost.cloudstream3.desktop.metadata.MetadataMatch
 import com.lagradost.cloudstream3.desktop.metadata.MetadataProvider
+import com.lagradost.cloudstream3.desktop.metadata.RatingSource
 import com.lagradost.cloudstream3.desktop.metadata.stremio.StremioAddonClient
 import com.lagradost.cloudstream3.desktop.utils.StringUtils
 import com.lagradost.cloudstream3.desktop.utils.TitleUtils
@@ -243,8 +244,8 @@ object CinemetaMetadataProvider : MetadataProvider {
             if (backdrop != null) {
                 callbacks.onBackdropLoaded(backdrop)
             }
-            if (imdbRating != null) {
-                if (loaded.score == null) {
+            if (imdbRating != null && imdbRating > 0.0) {
+                if (loaded.score == null || loaded.score!!.toDouble(10) <= 0.0) {
                     loaded.score = com.lagradost.cloudstream3.Score.from10(imdbRating)
                 }
                 callbacks.onRatingsLoaded(imdbRating, null, null)
@@ -258,6 +259,7 @@ object CinemetaMetadataProvider : MetadataProvider {
             }
 
             if (!cinemetaData?.videos.isNullOrEmpty()) {
+                val imdbRatedEpisodes = LinkedHashMap<Pair<Int, Int>, RatingSource>()
                 allEpisodes.forEach { ep ->
                     val seasonToUse = ep.season ?: 1
                     val cinemetaEp = cinemetaData.videos.find { it.season == seasonToUse && it.episode == ep.episode }
@@ -281,13 +283,20 @@ object CinemetaMetadataProvider : MetadataProvider {
                         if (!cinemetaEp.thumbnail.isNullOrBlank()) {
                             ep.posterUrl = cinemetaEp.thumbnail
                         }
-                        if (cinemetaEp.imdbRating != null && ep.score == null) {
-                            val epRatingDouble = cinemetaEp.imdbRating.toDoubleOrNull()
-                            if (epRatingDouble != null) {
-                                ep.score = com.lagradost.cloudstream3.Score.from10(epRatingDouble)
+                        val epImdbDouble = cinemetaEp.imdbRating?.toDoubleOrNull()?.takeIf { it > 0.0 }
+                        val epFallbackDouble = cinemetaEp.rating?.toDoubleOrNull()?.takeIf { it > 0.0 }
+                        val epScoreDouble = epImdbDouble ?: epFallbackDouble
+                        if (epScoreDouble != null && (ep.score == null || ep.score!!.toDouble(10) <= 0.0)) {
+                            ep.score = com.lagradost.cloudstream3.Score.from10(epScoreDouble)
+                            val source = if (epImdbDouble != null) RatingSource.IMDB else RatingSource.PROVIDER
+                            ep.episode?.let { epNum ->
+                                imdbRatedEpisodes[seasonToUse to epNum] = source
                             }
                         }
                     }
+                }
+                if (imdbRatedEpisodes.isNotEmpty()) {
+                    callbacks.onEpisodeRatingSourcesLoaded(imdbRatedEpisodes)
                 }
                 callbacks.onEpisodeThumbnailsEnriched()
             }

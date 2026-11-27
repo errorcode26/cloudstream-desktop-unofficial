@@ -15,6 +15,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -24,6 +25,7 @@ import androidx.compose.ui.unit.sp
 import com.lagradost.cloudstream3.desktop.debrid.torbox.TorboxApiClient
 import com.lagradost.cloudstream3.desktop.debrid.torbox.TorboxDeviceAuthData
 import com.lagradost.cloudstream3.desktop.debrid.torbox.TorboxUserData
+import com.lagradost.cloudstream3.desktop.domain.tracking.repository.TrackingRepository
 import com.lagradost.cloudstream3.desktop.ui.badges.DesktopBadgeComponents
 import com.lagradost.cloudstream3.desktop.ui.components.CloudstreamCustomDialog
 import com.lagradost.cloudstream3.desktop.ui.components.DesktopButton
@@ -45,6 +47,7 @@ fun SettingsAccounts(
     viewModel: SettingsViewModel,
     onNavigate: (Config) -> Unit = {},
     onNavigateToSubScreen: (SettingsSubScreen) -> Unit = {},
+    trackingRepo: TrackingRepository = com.lagradost.cloudstream3.desktop.di.AppContainerHolder.container.trackingRepository,
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val scope = rememberCoroutineScope()
@@ -276,7 +279,6 @@ fun SettingsAccounts(
             SettingsGroupCard(title = "Trackers & Integrations") {
                 val registeredTrackers = remember { com.lagradost.cloudstream3.desktop.tracking.TrackerRegistry.all() }
                 val plannedTrackers = remember { com.lagradost.cloudstream3.desktop.tracking.TrackerRegistry.plannedTrackers }
-                val trackingRepo = remember { com.lagradost.cloudstream3.desktop.di.AppContainerHolder.container.trackingRepository }
                 val settingsVersion by trackingRepo.settingsVersion.collectAsState()
                 val thresholdPct = remember(settingsVersion) { trackingRepo.getAutoSyncThresholdPercent() }
 
@@ -347,6 +349,7 @@ fun SettingsAccounts(
                                                 trackingRepo.setAutoSyncEnabled(enabled, tracker.id)
                                             }
                                         },
+                                        modifier = Modifier.testTag("settings_accounts_auto_track_${tracker.id}"),
                                     )
                                 }
                                 if (isConnected) {
@@ -571,17 +574,6 @@ fun SettingsAccounts(
                             DesktopButton(
                                 onClick = {
                                     viewModel.onEvent(SettingsUiEvent.StartTorboxAuth)
-                                    return@DesktopButton
-                                    scope.launch(Dispatchers.IO) {
-                                        val auth = TorboxApiClient.startDeviceAuthorization()
-                                        // isStartingTorboxAuth = false
-                                        if (auth != null) {
-                                            // activeTorboxAuth = auth
-                                        } else {
-                                            // torboxFeedbackMessage = ...
-                                            // error */
-                                        }
-                                    }
                                 },
                                 enabled = !torboxState.isStartingAuth,
                             ) {
@@ -631,30 +623,7 @@ fun SettingsAccounts(
 
                             DesktopButton(
                                 onClick = {
-                                    viewModel.onEvent(SettingsUiEvent.ValidateTorboxKey(torboxKeyInput)); return@DesktopButton; val clean = torboxKeyInput.trim()
-                                    if (clean.isBlank()) {
-                                        // torboxFeedbackMessage = "API Key cannot be blank"
-                                        // error */
-                                        return@DesktopButton
-                                    }
-                                    // isValidatingTorboxKey = true
-                                    return@DesktopButton
-                                    scope.launch(Dispatchers.IO) {
-                                        val user = TorboxApiClient.getUser(clean)
-                                        // isValidatingTorboxKey = false
-                                        if (user != null) {
-                                            DesktopDataStore.setKey(DesktopDataStore.PREF_TORBOX_API_KEY, clean)
-                                            DesktopDataStore.setKey(DesktopDataStore.PREF_TORBOX_ENABLED, true)
-                                            viewModel.onEvent(SettingsUiEvent.OnUpdateString(DesktopDataStore.PREF_TORBOX_API_KEY, clean))
-                                            viewModel.onEvent(SettingsUiEvent.OnUpdateBoolean(DesktopDataStore.PREF_TORBOX_ENABLED, true))
-                                            // torboxUser = user
-                                            // torboxFeedbackMessage = "Connected successfully as ${user.email ?: "user"} (${user.planName})"
-                                            // no error
-                                        } else {
-                                            // torboxFeedbackMessage = "Invalid API Key or server unreachable"
-                                            // error */
-                                        }
-                                    }
+                                    viewModel.onEvent(SettingsUiEvent.ValidateTorboxKey(torboxKeyInput))
                                 },
                                 enabled = !torboxState.isValidatingKey,
                                 modifier = Modifier.height(56.dp),

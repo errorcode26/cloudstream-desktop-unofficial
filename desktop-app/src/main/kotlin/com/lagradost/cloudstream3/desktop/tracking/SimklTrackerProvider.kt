@@ -153,7 +153,7 @@ class SimklTrackerProvider(
         }
         val api = apiProvider()
         val items = runCatching {
-            api.getFullLibrary(auth, forceRefresh = false) { updated ->
+            api.getFullLibrary(auth, forceRefresh = api.requireLibraryRefresh) { updated ->
                 persistUpdatedAuth(repository, updated)
             }
         }.onFailure { if (it is CancellationException) throw it }
@@ -187,18 +187,69 @@ class SimklTrackerProvider(
         return Result.success(entries)
     }
 
+    override suspend fun fetchLibraryPage(
+        repository: TrackingRepository,
+        statusFilter: UnifiedWatchStatus?,
+        sortKey: String?,
+        cursor: String?,
+        pageSize: Int,
+    ): Result<TrackerLibraryPage> {
+        return fetchLibrary(repository).map { allEntries ->
+            val counts = HashMap<UnifiedWatchStatus, Int>()
+            for (entry in allEntries) {
+                counts[entry.status] = (counts[entry.status] ?: 0) + 1
+            }
+            val filtered = if (statusFilter == null) allEntries else allEntries.filter { it.status == statusFilter }
+            val sorted = when (sortKey) {
+                "RECENTLY_UPDATED" -> filtered.sortedByDescending { it.updatedAt }
+                "DATE_ADDED_ASC" -> filtered.sortedBy { it.updatedAt }
+                "ALPHA_ASC" -> filtered.sortedBy { it.title.lowercase() }
+                "ALPHA_DESC" -> filtered.sortedByDescending { it.title.lowercase() }
+                "SCORE_DESC" -> filtered.sortedWith(
+                    compareByDescending<UnifiedLibraryEntry> { it.score100 }.thenBy { it.title.lowercase() },
+                )
+                "YEAR_DESC" -> filtered.sortedWith(
+                    compareByDescending<UnifiedLibraryEntry> { it.seasonYear ?: 0 }.thenBy { it.title.lowercase() },
+                )
+                else -> filtered.sortedByDescending { it.updatedAt }
+            }
+            val offset = cursor?.toIntOrNull()?.coerceAtLeast(0) ?: 0
+            val limit = pageSize.coerceAtLeast(1)
+            val slice = if (offset >= sorted.size) emptyList() else sorted.subList(offset, minOf(offset + limit, sorted.size))
+            val nextOffset = offset + slice.size
+            TrackerLibraryPage(
+                entries = slice,
+                nextCursor = nextOffset.takeIf { it < sorted.size }?.toString(),
+                hasMore = nextOffset < sorted.size,
+                statusCounts = counts,
+                totalCount = allEntries.size,
+                supportsServerTabFilter = false,
+            )
+        }
+    }
+
     override fun requiresLibraryRefresh(): Boolean = apiProvider().requireLibraryRefresh
 
     override fun validateStatusAndProgress(
         bounds: ReleaseBounds,
         status: UnifiedWatchStatus,
         progress: Int?,
-    ): GuardDecision = with(AniListTrackerProvider) {
-        AniListReleaseGuard.validateStatusAndProgress(
-            bounds = bounds,
-            requestedStatus = status.toAniListStatusType(),
-            requestedProgress = progress,
-        )
+    ): GuardDecision {
+        if (status == UnifiedWatchStatus.REWATCHING) {
+            return GuardDecision.Blocked("SIMKL does not support a separate Rewatching list.")
+        }
+        if (bounds.format.equals("MOVIE", ignoreCase = true) &&
+            status in setOf(UnifiedWatchStatus.WATCHING, UnifiedWatchStatus.PAUSED)
+        ) {
+            return GuardDecision.Blocked("SIMKL movies support Plan to Watch, Completed, or Dropped.")
+        }
+        return with(AniListTrackerProvider) {
+            AniListReleaseGuard.validateStatusAndProgress(
+                bounds = bounds,
+                requestedStatus = status.toAniListStatusType(),
+                requestedProgress = progress,
+            )
+        }
     }
 
     override fun canSyncEpisode(

@@ -23,6 +23,8 @@ data class ToastMessage(
     val type: ToastType = ToastType.INFO,
     val durationMs: Long = 3500L,
     val timestamp: Long = System.currentTimeMillis(),
+    val actionLabel: String? = null,
+    val onAction: (() -> Unit)? = null,
 )
 
 /**
@@ -50,6 +52,8 @@ object AppToastManager {
         text: String,
         type: ToastType = ToastType.INFO,
         durationMs: Long = 3500L,
+        actionLabel: String? = null,
+        onAction: (() -> Unit)? = null,
     ) {
         if (text.isBlank()) return
         val now = System.currentTimeMillis()
@@ -65,7 +69,14 @@ object AppToastManager {
         }
 
         val id = nextId.getAndIncrement()
-        val message = ToastMessage(id = id, text = text, type = type, durationMs = durationMs)
+        val message = ToastMessage(
+            id = id,
+            text = text,
+            type = type,
+            durationMs = durationMs,
+            actionLabel = actionLabel,
+            onAction = onAction,
+        )
 
         _toasts.update { current ->
             // Keep at most 2 toasts visible at once for clean, unobtrusive presentation
@@ -90,6 +101,12 @@ object AppToastManager {
     }
 
     fun showInfo(text: String, durationMs: Long = 3500L) = showToast(text, ToastType.INFO, durationMs)
+    fun showInfoWithAction(
+        text: String,
+        durationMs: Long = 8000L,
+        actionLabel: String? = null,
+        onAction: (() -> Unit)? = null,
+    ) = showToast(text, ToastType.INFO, durationMs, actionLabel, onAction)
     fun showSuccess(text: String, durationMs: Long = 3500L) = showToast(text, ToastType.SUCCESS, durationMs)
     fun showWarning(text: String, durationMs: Long = 4000L) = showToast(text, ToastType.WARNING, durationMs)
     fun showError(text: String, durationMs: Long = 5000L) = showToast(text, ToastType.ERROR, durationMs)

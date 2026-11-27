@@ -305,6 +305,11 @@ fun main(args: Array<String> = emptyArray()) {
                         kotlinx.coroutines.delay(4_000L)
                         if (!com.lagradost.cloudstream3.desktop.init.SafeModeState.isSafeMode.value) {
                             com.lagradost.cloudstream3.desktop.init.warmupRemainingPluginsProgressively()
+                            runCatching {
+                                com.lagradost.cloudstream3.desktop.backup.DesktopBackupEngine.createDailyAutoBackupIfDue()
+                            }.onFailure { err ->
+                                AppLogger.w("Daily auto-backup skipped: ${err.message}")
+                            }
                         }
 
                         kotlinx.coroutines.delay(40_000L)

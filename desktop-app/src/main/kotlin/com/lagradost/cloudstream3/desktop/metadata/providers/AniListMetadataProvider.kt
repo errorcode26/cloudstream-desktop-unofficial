@@ -81,6 +81,9 @@ object AniListMetadataProvider : MetadataProvider {
         @JsonProperty("seasonYear") val seasonYear: Int?,
         @JsonProperty("format") val format: String?,
         @JsonProperty("status") val status: String?,
+        @JsonProperty("episodes") val episodes: Int? = null,
+        @JsonProperty("duration") val duration: Int? = null,
+        @JsonProperty("synonyms") val synonyms: List<String>? = null,
         @JsonProperty("genres") val genres: List<String>?,
         @JsonProperty("studios") val studios: AniListStudios?,
         @JsonProperty("trailer") val trailer: AniListTrailer?,
@@ -175,6 +178,7 @@ object AniListMetadataProvider : MetadataProvider {
                             native
                             userPreferred
                         }
+                        synonyms
                         bannerImage
                         coverImage {
                             extraLarge
@@ -184,6 +188,9 @@ object AniListMetadataProvider : MetadataProvider {
                         description(asHtml: false)
                         averageScore
                         seasonYear
+                        format
+                        episodes
+                        duration
                         genres
                     }
                 }
@@ -217,47 +224,38 @@ object AniListMetadataProvider : MetadataProvider {
             var bestScore = 0.0
 
             for (media in mediaList) {
-                val candidateTitles = listOfNotNull(
-                    media.title?.english,
-                    media.title?.romaji,
-                    media.title?.userPreferred,
-                )
+                val candidateTitles = buildList {
+                    media.title?.english?.let(::add)
+                    media.title?.romaji?.let(::add)
+                    media.title?.userPreferred?.let(::add)
+                    media.synonyms?.forEach { syn -> if (syn.isNotBlank()) add(syn) }
+                }.distinct()
 
-                for (candTitle in candidateTitles) {
-                    val cleanCand = candTitle.lowercase().removePrefix("the ").trim()
-                    val cleanQuery = cleanName.lowercase().removePrefix("the ").trim()
+                val score = scoreStrictCandidate(
+                    cleanQuery = cleanName,
+                    candidateTitles = candidateTitles,
+                    canonicalYear = targetYear,
+                    candidateYear = media.seasonYear,
+                    candidateFormat = media.format,
+                    requestedType = type,
+                ) ?: continue
 
-                    val strippedCand = cleanCand.replace(Regex("[^a-zA-Z0-9]"), "")
-                    val strippedQuery = cleanQuery.replace(Regex("[^a-zA-Z0-9]"), "")
-
-                    val isStrictMatch = strippedCand.equals(strippedQuery, ignoreCase = true)
-                    var score = StringUtils.similarity(strippedQuery, strippedCand)
-                    if (isStrictMatch) score = 1.0
-
-                    // Year validation if present
-                    if (targetYear != null && media.seasonYear != null) {
-                        if (Math.abs(media.seasonYear - targetYear) > 1) {
-                            continue
-                        }
-                    }
-
-                    if (score > bestScore && score >= 0.75) {
-                        bestScore = score
-                        bestMatch = media
-                        if (isStrictMatch) break
-                    }
+                if (score > bestScore) {
+                    bestScore = score
+                    bestMatch = media
+                    if (bestScore >= 1.0) break
                 }
-                if (bestScore >= 0.95) break
             }
 
             val match = bestMatch ?: return null
-            AppLogger.i(TAG, "✓ AniList Match: '${match.title?.userPreferred}' (ID: ${match.id}) score=$bestScore")
+            AppLogger.i(TAG, "✓ AniList Match: '${match.title?.userPreferred}' (ID: ${match.id}, MAL: ${match.idMal}) score=$bestScore")
 
             MetadataMatch(
                 providerId = id,
                 matchedTitle = match.title?.english ?: match.title?.romaji ?: match.title?.userPreferred ?: cleanName,
                 matchedYear = match.seasonYear ?: targetYear,
                 anilistId = match.id,
+                malId = match.idMal,
                 posterUrl = match.coverImage?.extraLarge ?: match.coverImage?.large,
                 backdropUrl = match.bannerImage,
                 description = match.description,
@@ -273,13 +271,59 @@ object AniListMetadataProvider : MetadataProvider {
         }
     }
 
+    internal fun isFormatCompatible(candidateFormat: String?, requestedType: TvType): Boolean {
+        val fmt = candidateFormat?.uppercase()?.trim() ?: return true
+        return when (requestedType) {
+            TvType.AnimeMovie -> fmt == "MOVIE" || fmt == "OVA" || fmt == "SPECIAL"
+            TvType.OVA -> fmt in setOf("OVA", "SPECIAL", "ONA")
+            TvType.Anime, TvType.TvSeries, TvType.Cartoon, TvType.AsianDrama -> fmt != "MOVIE"
+            else -> true
+        }
+    }
+
+    internal fun scoreStrictCandidate(
+        cleanQuery: String,
+        candidateTitles: List<String>,
+        canonicalYear: Int?,
+        candidateYear: Int?,
+        candidateFormat: String?,
+        requestedType: TvType,
+    ): Double? {
+        if (!isFormatCompatible(candidateFormat, requestedType)) return null
+        val isTv = requestedType != TvType.AnimeMovie
+        if (canonicalYear != null && candidateYear != null) {
+            val maxDiff = if (isTv) 1 else 2
+            if (kotlin.math.abs(candidateYear - canonicalYear) > maxDiff) return null
+        }
+
+        val cleanQueryNorm = cleanQuery.lowercase().removePrefix("the ").trim()
+        val strippedQuery = cleanQueryNorm.replace(Regex("[^a-zA-Z0-9]"), "")
+        if (strippedQuery.isBlank()) return null
+
+        var best = 0.0
+        for (candTitle in candidateTitles) {
+            if (!StringUtils.isTitleMatch(cleanQuery, candTitle, canonicalYear, candidateYear, isTv = isTv, minRecall = 0.60)) {
+                continue
+            }
+            val cleanCandNorm = candTitle.lowercase().removePrefix("the ").trim()
+            val strippedCand = cleanCandNorm.replace(Regex("[^a-zA-Z0-9]"), "")
+            val isStrict = strippedCand.equals(strippedQuery, ignoreCase = true)
+            val sim = if (isStrict) 1.0 else StringUtils.similarity(strippedQuery, strippedCand)
+            if (sim >= 0.75 && sim > best) {
+                best = sim
+            }
+        }
+        return best.takeIf { it >= 0.75 }
+    }
+
     override suspend fun enrich(
         loaded: LoadResponse,
         match: MetadataMatch?,
         context: MetadataEnrichmentContext,
         callbacks: MetadataEnrichmentCallbacks,
     ): Boolean {
-        val anilistId = match?.anilistId
+        val anilistId = context.directAnilistId
+            ?: match?.anilistId
             ?: resolve(loaded.name, loaded.year, loaded.type, context.rawUrl)?.anilistId
             ?: return false
 
@@ -303,6 +347,9 @@ object AniListMetadataProvider : MetadataProvider {
                     averageScore
                     season
                     seasonYear
+                    format
+                    episodes
+                    duration
                     status
                     genres
                     studios(isMain: true) {
@@ -394,12 +441,22 @@ object AniListMetadataProvider : MetadataProvider {
                 if (loaded.plot.isNullOrBlank() && !media.description.isNullOrBlank()) {
                     loaded.plot = TitleUtils.cleanPlot(media.description)
                 }
-                if (media.averageScore != null) {
-                    if (loaded.score == null) {
-                        loaded.score = Score.from10(media.averageScore / 10.0)
+                val avgScore = media.averageScore?.takeIf { it > 0 }
+                if (avgScore != null) {
+                    if (loaded.score == null || loaded.score!!.toDouble(10) <= 0.0) {
+                        loaded.score = Score.from10(avgScore / 10.0)
                     }
-                    callbacks.onRatingsLoaded(null, null, media.averageScore / 10.0)
+                    callbacks.onRatingsLoaded(null, null, avgScore / 10.0)
                 }
+                if (loaded.duration == null && media.duration != null && media.duration > 0) {
+                    loaded.duration = media.duration
+                }
+                callbacks.onIdentityResolved(
+                    context.directTmdbId,
+                    context.directImdbId,
+                    media.id,
+                    media.idMal ?: context.directMalId,
+                )
 
                 // Map Voice Actors with character roles (if enabled)
                 val actorsList = mutableListOf<ActorData>()
@@ -516,7 +573,7 @@ object AniListMetadataProvider : MetadataProvider {
                     null, // collectionName
                     null, // collectionBg
                     null, // seasonsCount
-                    null, // episodesCount
+                    media.episodes, // episodesCount
                     null, // seasonsMetadata
                     "ja", // originalLang
                     null, // releaseDate
@@ -526,7 +583,7 @@ object AniListMetadataProvider : MetadataProvider {
                     null, // revenue
                     null, // networks
                     media.seasonYear ?: loaded.year,
-                    loaded.duration,
+                    media.duration ?: loaded.duration,
                     media.genres,
                     actorsList,
                     aniListCompanies, // productionCompanies

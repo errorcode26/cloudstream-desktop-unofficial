@@ -49,6 +49,7 @@ fun RenderEpisodesSection(
     onToggleWatched: (Episode, Boolean) -> Unit,
     onToggleSeasonWatched: (List<Episode>, Boolean) -> Unit,
     onRemoveEpisodeWatched: (Episode) -> Unit,
+    onSyncEpisodeToTracker: ((String, Episode) -> Unit)? = null,
 ) {
     val handleMarkPreviousWatched: (Episode) -> Unit = { targetEp ->
         val targetIdx = allFilteredEpisodes.indexOfFirst { it.data == targetEp.data }
@@ -119,6 +120,7 @@ fun RenderEpisodesSection(
                                 onToggleWatched = onToggleWatched,
                                 onRemoveEpisodeWatched = onRemoveEpisodeWatched,
                                 onMarkPreviousWatched = if (canMarkPrevious) handleMarkPreviousWatched else null,
+                                onSyncEpisodeToTracker = onSyncEpisodeToTracker,
                             )
                         } else {
                             EpisodeCard(
@@ -145,6 +147,7 @@ fun RenderEpisodesSection(
                                 onToggleWatched = onToggleWatched,
                                 onRemoveEpisodeWatched = onRemoveEpisodeWatched,
                                 onMarkPreviousWatched = if (canMarkPrevious) handleMarkPreviousWatched else null,
+                                onSyncEpisodeToTracker = onSyncEpisodeToTracker,
                             )
                         }
                     }
@@ -212,6 +215,7 @@ fun RenderEpisodesSection(
                         onToggleWatched = onToggleWatched,
                         onRemoveEpisodeWatched = onRemoveEpisodeWatched,
                         onMarkPreviousWatched = if (canMarkPrevious) handleMarkPreviousWatched else null,
+                        onSyncEpisodeToTracker = onSyncEpisodeToTracker,
                     )
                 }
             }

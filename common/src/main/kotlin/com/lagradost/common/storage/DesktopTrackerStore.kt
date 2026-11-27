@@ -157,23 +157,23 @@ object DesktopTrackerStore {
         DesktopDataStore.withDbLock {
             runCatching {
                 val queries = DatabaseFactory.database.cloudstreamDBQueries
-                queries.insertTrackerSyncAudit(
-                    profileId = profileId,
-                    trackerId = trackerId,
-                    showName = showName,
-                    remoteMediaId = remoteMediaId,
-                    episodeNum = episodeNum,
-                    effectiveRemoteEpisode = effectiveRemoteEpisode,
-                    oldProgress = oldProgress,
-                    newProgress = newProgress,
-                    statusApplied = statusApplied,
-                    state = state,
-                    reason = reason,
-                    timestamp = timestamp,
-                )
-                // Retrieve the AUTOINCREMENT rowid of the row just inserted (DESC order → first = latest).
-                queries.selectTrackerSyncAudit(profileId, trackerId)
-                    .executeAsList().firstOrNull()?.id ?: -1L
+                queries.transactionWithResult<Long> {
+                    queries.insertTrackerSyncAudit(
+                        profileId = profileId,
+                        trackerId = trackerId,
+                        showName = showName,
+                        remoteMediaId = remoteMediaId,
+                        episodeNum = episodeNum,
+                        effectiveRemoteEpisode = effectiveRemoteEpisode,
+                        oldProgress = oldProgress,
+                        newProgress = newProgress,
+                        statusApplied = statusApplied,
+                        state = state,
+                        reason = reason,
+                        timestamp = timestamp,
+                    )
+                    queries.selectLastInsertRowId().executeAsOne()
+                }
             }.getOrElse {
                 AppLogger.e("DesktopTrackerStore: insertAuditRow failed", it)
                 -1L

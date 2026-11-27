@@ -20,6 +20,7 @@ sealed class Config {
         val autoPlay: Boolean = false,
         val targetSeason: Int? = null,
         val targetEpisodeId: String? = null,
+        val canonicalSeed: com.lagradost.cloudstream3.desktop.metadata.CanonicalMediaSeed? = null,
     ) : Config()
     data class CategoryGrid(
         val providerName: String,
@@ -56,5 +57,14 @@ sealed class Config {
         val enrichedActors: List<ActorData>? = null,
         val enrichedLogoUrl: String? = null,
         val enrichedBackdropUrl: String? = null,
+        val canonicalSeed: com.lagradost.cloudstream3.desktop.metadata.CanonicalMediaSeed? = null,
+        val resolvedAnilistId: Int? = null,
+        val resolvedMalId: Int? = null,
+        val resolvedYear: Int? = null,
+        val hasMultipleSeasons: Boolean = false,
+    ) : Config()
+    data class ProfileEdit(
+        val profileId: Int? = null,
+        val switchOnCreate: Boolean = false,
     ) : Config()
 }

@@ -484,6 +484,7 @@ fun DockProfileAvatar(
     isRight: Boolean = false,
     isHorizontal: Boolean = false,
     onOpenProfileManager: (() -> Unit)? = null,
+    onOpenCreateProfile: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val activeProfile by com.lagradost.cloudstream3.desktop.profile.ProfileManager.activeProfile.collectAsState()
@@ -493,7 +494,6 @@ fun DockProfileAvatar(
 
     var showProfileFlyout by remember { mutableStateOf(false) }
     var pinPromptProfile by remember { mutableStateOf<com.lagradost.cloudstream3.desktop.profile.Profile?>(null) }
-    var showCreateProfileDialog by remember { mutableStateOf(false) }
 
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
@@ -510,21 +510,6 @@ fun DockProfileAvatar(
             pinPromptProfile = null
         },
     )
-
-    if (showCreateProfileDialog) {
-        com.lagradost.cloudstream3.desktop.ui.screens.profile.ProfileEditDialog(
-            profile = null,
-            canDelete = false,
-            onDismiss = { showCreateProfileDialog = false },
-            onSave = { name, colorIndex, customAvatar, pin, isKids, autoSignIn ->
-                val newP = com.lagradost.cloudstream3.desktop.profile.ProfileManager.createProfile(name, colorIndex, customAvatar, pin, isKids)
-                com.lagradost.cloudstream3.desktop.profile.ProfileManager.switchProfile(newP.id)
-                if (autoSignIn) {
-                    com.lagradost.cloudstream3.desktop.profile.ProfileManager.setAutoSignIn(true)
-                }
-            },
-        )
-    }
 
     val dockItemShape = LocalDesktopButtonShapes.current.medium
 
@@ -681,44 +666,41 @@ fun DockProfileAvatar(
                 .border(1.dp, if (isLightMode) Color.Black.copy(alpha = 0.08f) else Color.White.copy(alpha = 0.12f), RoundedCornerShape(16.dp))
                 .padding(8.dp),
         ) {
-            val currProfile = activeProfile
-            if (currProfile != null) {
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)),
-                    modifier = Modifier.fillMaxWidth(),
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        com.lagradost.cloudstream3.desktop.profile.ProfileAvatar(
-                            profile = currProfile,
-                            size = 38.dp,
-                            shape = CircleShape,
-                            fontSize = 15.sp,
+                    com.lagradost.cloudstream3.desktop.profile.ProfileAvatar(
+                        profile = activeProfile,
+                        size = 38.dp,
+                        shape = CircleShape,
+                        fontSize = 15.sp,
+                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = activeProfile.name,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                         )
-                        Column(modifier = Modifier.weight(1f)) {
+                        Spacer(Modifier.height(2.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                            Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(Color(0xFF4CAF50)))
                             Text(
-                                text = currProfile.name,
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                maxLines = 1,
-                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                                text = if (activeProfile.isKids) "Kids Profile • Active" else "Active Profile",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.SemiBold,
                             )
-                            Spacer(Modifier.height(2.dp))
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                                Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(Color(0xFF4CAF50)))
-                                Text(
-                                    text = if (currProfile.isKids) "Kids Profile • Active" else "Active Profile",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    fontWeight = FontWeight.SemiBold,
-                                )
-                            }
                         }
                     }
                 }
@@ -809,7 +791,7 @@ fun DockProfileAvatar(
                 DesktopOutlinedButton(
                     onClick = {
                         showProfileFlyout = false
-                        showCreateProfileDialog = true
+                        onOpenCreateProfile?.invoke()
                     },
                     modifier = Modifier.weight(1f).height(36.dp),
                     shape = compactButtonShape,

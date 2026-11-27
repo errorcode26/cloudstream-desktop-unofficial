@@ -89,9 +89,9 @@ object SettingsSearchIndex {
         SettingsSearchEntry("Extension Repositories", LeafTab.EXTENSIONS, listOf("repositories", "repos", "plugins", "extensions", "sources", "url"), uiLabel = "Repositories"),
 
         // Extensions > Accounts tab
-        SettingsSearchEntry("AniList Tracker", LeafTab.ACCOUNTS, listOf("anilist", "tracker", "anime", "sync", "scrobble", "login"), uiLabel = "AniList"),
-        SettingsSearchEntry("MAL / MyAnimeList Tracker", LeafTab.ACCOUNTS, listOf("mal", "myanimelist", "tracker", "anime", "sync", "login"), uiLabel = "MAL"),
-        SettingsSearchEntry("SIMKL Tracker", LeafTab.ACCOUNTS, listOf("simkl", "tracker", "anime", "shows", "movies", "sync"), uiLabel = "SIMKL"),
+        SettingsSearchEntry("AniList Account & Sign-In", LeafTab.ACCOUNTS, listOf("anilist", "tracker", "anime", "sync", "scrobble", "login", "oauth"), subScreen = SettingsSubScreen.ACCOUNTS_ANILIST, uiLabel = "AniList Account"),
+        SettingsSearchEntry("MAL / MyAnimeList Tracker", LeafTab.ACCOUNTS, listOf("mal", "myanimelist", "tracker", "anime", "sync", "login"), subScreen = SettingsSubScreen.ACCOUNTS_MAL, uiLabel = "MyAnimeList Account"),
+        SettingsSearchEntry("SIMKL Tracker", LeafTab.ACCOUNTS, listOf("simkl", "tracker", "anime", "shows", "movies", "sync"), subScreen = SettingsSubScreen.ACCOUNTS_SIMKL, uiLabel = "SIMKL Account"),
         SettingsSearchEntry("Trakt Tracker", LeafTab.ACCOUNTS, listOf("trakt", "tracker", "movies", "shows", "sync", "scrobble"), uiLabel = "Trakt"),
         SettingsSearchEntry("Discord Rich Presence", LeafTab.ACCOUNTS, listOf("discord", "rpc", "rich presence", "status", "activity"), uiLabel = "Discord Rich Presence"),
         SettingsSearchEntry("Torbox Debrid", LeafTab.ACCOUNTS, listOf("torbox", "debrid", "torrent", "cloud", "api key", "login", "seedbox"), uiLabel = "Torbox Debrid"),
@@ -123,6 +123,7 @@ object SettingsSearchIndex {
         SettingsSearchEntry("Experimental & Scraper Engine", LeafTab.NETWORK, listOf("security", "cloudflare", "scraper", "solver", "captcha", "bypass"), uiLabel = "Experimental & Scraper Engine"),
 
         // Advanced tab
+        SettingsSearchEntry("Backup & Restore", LeafTab.ADVANCED, listOf("backup", "restore", "export", "import", "snapshot", "profiles", "history", "extensions", "repos", "database"), uiLabel = "Backup & Restore"),
         SettingsSearchEntry("Storage Directories", LeafTab.ADVANCED, listOf("storage", "directory", "path", "files", "data", "appdata", "roaming"), uiLabel = "Storage Directories"),
         SettingsSearchEntry("Clear Image Cache", LeafTab.ADVANCED, listOf("clear", "image", "cache", "storage", "disk", "free space"), uiLabel = "Clear Image Cache"),
         SettingsSearchEntry("Cloned Sites & Custom Provider URLs", LeafTab.ADVANCED, listOf("clone", "provider", "custom", "url", "override", "mirror", "domain"), uiLabel = "Cloned Sites & Custom URLs"),

@@ -6,10 +6,25 @@ import io.ktor.server.response.respondText
 
 internal object ProxyTrailerHandler {
 
+    private fun escapeHtmlAttr(value: String): String = buildString(value.length) {
+        for (ch in value) {
+            when (ch) {
+                '&' -> append("&amp;")
+                '"' -> append("&quot;")
+                '\'' -> append("&#39;")
+                '<' -> append("&lt;")
+                '>' -> append("&gt;")
+                else -> append(ch)
+            }
+        }
+    }
+
     suspend fun handleTrailer(call: ApplicationCall) {
-        val id = call.request.queryParameters["id"] ?: ""
-        val u = call.request.queryParameters["u"] ?: ""
-        val html = if (id.isNotBlank()) {
+        val rawId = call.request.queryParameters["id"] ?: ""
+        val rawUrl = call.request.queryParameters["u"] ?: ""
+        val id = escapeHtmlAttr(rawId)
+        val u = escapeHtmlAttr(rawUrl)
+        val html = if (rawId.isNotBlank()) {
             """
             <!DOCTYPE html>
             <html>

@@ -393,56 +393,26 @@ fun DetailsMetadata(
                                 }
                             }
 
-                            val imdbScore = uiState?.enrichedImdbRating
-                            val tmdbScore = uiState?.enrichedTmdbRating ?: if (imdbScore == null) data.score?.toFloat(10)?.toDouble() else null
-                            val anilistScore = uiState?.enrichedAniListRating
                             val finalTags = uiState?.enrichedTags ?: data.tags
+                            val hasFallbackScore = data.score?.toFloat(10)?.let { it > 0.0f } == true
+                            val hasAnyScore = (uiState?.enrichedImdbRating ?: 0.0) > 0.0 ||
+                                (uiState?.enrichedTmdbRating ?: 0.0) > 0.0 ||
+                                (uiState?.enrichedAniListRating ?: 0.0) > 0.0 ||
+                                hasFallbackScore
 
-                            if (imdbScore != null || tmdbScore != null || anilistScore != null || !finalTags.isNullOrEmpty()) {
+                            if (hasAnyScore || !finalTags.isNullOrEmpty()) {
                                 Spacer(modifier = Modifier.height(12.dp))
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = if (isNarrow) Arrangement.Center else Arrangement.spacedBy(16.dp),
-                                    modifier = if (isNarrow) Modifier.fillMaxWidth() else Modifier,
-                                ) {
-                                    if (imdbScore != null && imdbScore > 0.0) {
-                                        DesktopBadgeComponents.BrandedRatingBadge(
-                                            logoRes = "badges/rating_imdb.png",
-                                            scoreText = String.format(Locale.US, "%.1f", imdbScore),
-                                            textColor = Color(0xFFF5C518),
-                                            logoWidth = 40.dp,
-                                            tooltipText = "Open in IMDb (browser)",
-                                            onClick = { ExternalLinkHandler.launchSystemBrowser(RatingBadgeUrlResolver.getImdbUrl(data)) },
-                                            logoHeight = 20.dp,
-                                        )
-                                    }
-
-                                    if (tmdbScore != null && tmdbScore > 0.0) {
-                                        DesktopBadgeComponents.BrandedRatingBadge(
-                                            logoRes = "badges/rating_tmdb.png",
-                                            scoreText = String.format(Locale.US, "%.1f", tmdbScore),
-                                            textColor = Color(0xFF01B4E4),
-                                            logoWidth = 34.dp,
-                                            tooltipText = "Open in TMDb (browser)",
-                                            onClick = { ExternalLinkHandler.launchSystemBrowser(RatingBadgeUrlResolver.getTmdbUrl(data, uiState?.tmdbId)) },
-                                            logoHeight = 21.dp,
-                                        )
-                                    }
-
-                                    if (anilistScore != null && anilistScore > 0.0) {
-                                        DesktopBadgeComponents.BrandedRatingBadge(
-                                            logoRes = "badges/tracker_anilist.svg",
-                                            scoreText = "${(anilistScore * 10).toInt()}%",
-                                            textColor = Color(0xFF02A9FF),
-                                            logoWidth = 21.dp,
-                                            tooltipText = "Open in AniList (browser)",
-                                            onClick = { ExternalLinkHandler.launchSystemBrowser(RatingBadgeUrlResolver.getAniListUrl(data)) },
-                                            logoHeight = 21.dp,
-                                        )
-                                    }
-
+                                DesktopBadgeComponents.MediaRatingsRow(
+                                    data = data,
+                                    tmdbId = uiState?.tmdbId,
+                                    imdbScore = uiState?.enrichedImdbRating,
+                                    tmdbScore = uiState?.enrichedTmdbRating,
+                                    anilistScore = uiState?.enrichedAniListRating,
+                                    isCompact = false,
+                                    isCentered = isNarrow,
+                                    onOpenUrl = ExternalLinkHandler::launchSystemBrowser,
+                                ) { hasRatings ->
                                     if (!finalTags.isNullOrEmpty()) {
-                                        val hasRatings = (imdbScore != null && imdbScore > 0.0) || (tmdbScore != null && tmdbScore > 0.0) || (anilistScore != null && anilistScore > 0.0)
                                         Text(
                                             text = (if (hasRatings) "•   " else "") + finalTags.take(4).joinToString(", "),
                                             color = Color.White.copy(alpha = 0.72f),

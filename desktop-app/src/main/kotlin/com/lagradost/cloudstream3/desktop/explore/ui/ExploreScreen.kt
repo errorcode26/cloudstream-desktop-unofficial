@@ -160,6 +160,7 @@ fun ExploreScreen(
                             providerName = effect.providerName,
                             url = effect.url,
                             preloadedName = effect.title,
+                            canonicalSeed = effect.canonicalSeed,
                         ),
                     )
                 }
@@ -467,12 +468,14 @@ fun ExploreScreen(
                 viewModel.onEvent(ExploreUiEvent.SelectProviderMatch(match))
             },
             onOpenDetails = { providerName, url, title ->
+                val seed = uiState.selectedItemForMatch?.toCanonicalSeed()
                 viewModel.onEvent(ExploreUiEvent.CloseProviderPicker)
                 onNavigate(
                     Config.Details(
                         providerName = providerName,
                         url = url,
                         preloadedName = title,
+                        canonicalSeed = seed,
                     ),
                 )
             },
@@ -481,6 +484,7 @@ fun ExploreScreen(
                 onNavigate(Config.Extensions(initialTab = tab))
             },
             onOpenAddonMode = { item ->
+                val seed = item.toCanonicalSeed()
                 viewModel.onEvent(ExploreUiEvent.CloseProviderPicker)
                 onNavigate(
                     Config.Details(
@@ -489,6 +493,7 @@ fun ExploreScreen(
                         preloadedName = item.name,
                         preloadedPoster = item.posterUrl,
                         preloadedBg = item.backgroundUrl,
+                        canonicalSeed = seed,
                     ),
                 )
             },

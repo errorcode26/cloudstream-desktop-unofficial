@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.lagradost.cloudstream3.app
 import com.lagradost.cloudstream3.desktop.metadata.stremio.StremioAddonClient
+import com.lagradost.cloudstream3.desktop.ui.screens.details.TmdbEnrichmentService
 import com.lagradost.common.logging.AppLogger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -18,7 +19,6 @@ data class SearchSuggestionItem(
 object SearchSuggestionApi {
     private const val TAG = "SearchSuggestionApi"
     private const val TMDB_API_URL = "https://api.themoviedb.org/3/search/multi"
-    private const val TMDB_API_KEY = "e6333b32409e02a4a6eba6fb7ff866bb"
 
     // In-memory cache for suggestions
     private val memoryCache = ConcurrentHashMap<String, List<SearchSuggestionItem>>()
@@ -65,9 +65,9 @@ object SearchSuggestionApi {
         }
 
         // 2. Secondary multi-search catalog fallback
-        if (networkResults.size < 4) {
+        val apiKey = TmdbEnrichmentService.TMDB_API_KEY
+        if (networkResults.size < 4 && apiKey.isNotBlank()) {
             try {
-                val apiKey = com.lagradost.cloudstream3.desktop.metadata.MetadataConfig.customTmdbApiKey.value.takeIf { it.isNotBlank() } ?: TMDB_API_KEY
                 val response = app.get(
                     url = TMDB_API_URL,
                     params = mapOf(

@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -33,10 +35,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.lagradost.cloudstream3.MainAPI
 import com.lagradost.cloudstream3.SearchResponse
+import com.lagradost.cloudstream3.desktop.ui.DesktopDimens
 import com.lagradost.cloudstream3.desktop.ui.LocalSafeArea
 import com.lagradost.cloudstream3.desktop.ui.components.DesktopVerticalScrollbar
 import com.lagradost.cloudstream3.desktop.ui.components.PosterCard
@@ -54,10 +58,13 @@ fun ComposeCategoryGridScreen(
     val posterWidthDp by AppearanceConfig.posterWidthDp.collectAsState()
     val homeSpacingDp by AppearanceConfig.homeSpacingDp.collectAsState()
     val homeVerticalSpacingDp by AppearanceConfig.homeVerticalSpacingDp.collectAsState()
-    val dockPosition by AppearanceConfig.dockPosition.collectAsState()
+    val safeArea = LocalSafeArea.current
+    val layoutDirection = LocalLayoutDirection.current
 
-    val dockPaddingStart = if (dockPosition == com.lagradost.cloudstream3.desktop.ui.DockPosition.LEFT) 88.dp else 22.dp
-    val dockPaddingEnd = if (dockPosition == com.lagradost.cloudstream3.desktop.ui.DockPosition.RIGHT) 88.dp else 22.dp
+    val dockPaddingStart = safeArea.calculateStartPadding(layoutDirection) + DesktopDimens.TabInnerHorizontalPadding
+    val dockPaddingEnd = safeArea.calculateEndPadding(layoutDirection) + DesktopDimens.TabInnerHorizontalPadding
+    val topPadding = safeArea.calculateTopPadding().coerceAtLeast(68.dp) + DesktopDimens.TabInnerVerticalPadding
+    val bottomPadding = safeArea.calculateBottomPadding().coerceAtLeast(DesktopDimens.TabInnerVerticalPadding)
 
     val hasLandscapeItems = remember(items) {
         items.any { it.type == com.lagradost.cloudstream3.TvType.Live || it.posterHeaders?.containsKey("landscape") == true }
@@ -69,7 +76,7 @@ fun ComposeCategoryGridScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(top = LocalSafeArea.current.calculateTopPadding().coerceAtLeast(68.dp), bottom = 8.dp),
+            .padding(top = topPadding, bottom = bottomPadding),
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,

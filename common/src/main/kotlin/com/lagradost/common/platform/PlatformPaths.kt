@@ -83,12 +83,21 @@ object PlatformPaths {
     }
 
     /** The base application data directory, OS-aware. */
-    val appDataDir: File by lazy {
-        val customDirProp = System.getProperty("cloudstream.data.dir")
-        if (!customDirProp.isNullOrBlank()) {
-            return@lazy File(customDirProp).also { it.mkdirs() }
+    val appDataDir: File
+        get() {
+            val customDirProp = System.getProperty("cloudstream.data.dir")
+            if (!customDirProp.isNullOrBlank()) {
+                return File(customDirProp).also { it.mkdirs() }
+            }
+            if (System.getProperty("cloudstream.test.isolated") == "true") {
+                throw IllegalStateException(
+                    "Refusing defaultAppDataDir fallback while cloudstream.test.isolated=true; set cloudstream.data.dir.",
+                )
+            }
+            return defaultAppDataDir
         }
 
+    private val defaultAppDataDir: File by lazy {
         if (isPortable) {
             val appRoot = try {
                 val jvmHome = System.getProperty("java.home")
@@ -130,44 +139,40 @@ object PlatformPaths {
         get() = File(appDataDir, "data").also { if (!it.exists()) it.mkdirs() }
 
     /** Directory for SharedPreferences JSON files. */
-    val sharedPrefsDir: File by lazy {
-        File(appDataDir, "shared_prefs").also { it.mkdirs() }
-    }
+    val sharedPrefsDir: File
+        get() = File(appDataDir, "shared_prefs").also { it.mkdirs() }
 
     /** Directory for isolated AppContainer sandbox runtime, temp files, and worker data. */
-    val sandboxDir: File by lazy {
-        File(appDataDir, "Sandbox").also { it.mkdirs() }
-    }
+    val sandboxDir: File
+        get() = File(appDataDir, "Sandbox").also { it.mkdirs() }
 
     /** Directory for installed extensions/plugins. */
-    val extensionsDir: File by lazy {
-        File(appDataDir, "Extensions").also { it.mkdirs() }
-    }
+    val extensionsDir: File
+        get() = File(appDataDir, "Extensions").also { it.mkdirs() }
 
     /** Directory for cache files. */
-    val cacheDir: File by lazy {
-        File(appDataDir, "cache").also { it.mkdirs() }
-    }
+    val cacheDir: File
+        get() = File(appDataDir, "cache").also { it.mkdirs() }
 
     /** Directory for transpiled plugin JVM bytecode, security-patched jars, and translation markers. */
-    val pluginCacheDir: File by lazy {
-        File(cacheDir, "plugins").also { it.mkdirs() }
-    }
+    val pluginCacheDir: File
+        get() = File(cacheDir, "plugins").also { it.mkdirs() }
 
     /** Directory for log files. */
-    val logsDir: File by lazy {
-        File(appDataDir, "logs").also { it.mkdirs() }
-    }
+    val logsDir: File
+        get() = File(appDataDir, "logs").also { it.mkdirs() }
 
     /** Directory for extracted MPV shaders. */
-    val shadersDir: File by lazy {
-        File(appDataDir, "shaders").also { it.mkdirs() }
-    }
+    val shadersDir: File
+        get() = File(appDataDir, "shaders").also { it.mkdirs() }
 
     /** Directory for user-provided custom fonts. */
-    val fontsDir: File by lazy {
-        File(appDataDir, "fonts").also { it.mkdirs() }
-    }
+    val fontsDir: File
+        get() = File(appDataDir, "fonts").also { it.mkdirs() }
+
+    /** Directory for automatic and manual data/config backups. */
+    val backupsDir: File
+        get() = File(appDataDir, "backups").also { it.mkdirs() }
 
     /** Directory for video player screenshots. */
     val screenshotsDir: File
@@ -176,6 +181,9 @@ object PlatformPaths {
             if (!customPath.isNullOrBlank()) {
                 val f = File(customPath)
                 if (f.exists() || f.mkdirs()) return f
+            }
+            if (System.getProperty("cloudstream.test.isolated") == "true") {
+                return File(appDataDir, "screenshots").also { it.mkdirs() }
             }
             val userHome = System.getProperty("user.home") ?: ""
             val picturesDir = File(userHome, "Pictures")

@@ -81,7 +81,10 @@ fun DownloadsScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 24.dp, vertical = 16.dp),
+            .padding(
+                horizontal = com.lagradost.cloudstream3.desktop.ui.DesktopDimens.TabInnerHorizontalPadding,
+                vertical = com.lagradost.cloudstream3.desktop.ui.DesktopDimens.TabInnerVerticalPadding,
+            ),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         // Top Header

@@ -29,10 +29,15 @@ object AniListQueries {
                 media (id: ${"$"}id, search: ${"$"}search, type: ${"$"}type) {
                     id
                     idMal
+                    format
+                    status
+                    episodes
                     seasonYear
                     startDate { year month day }
                     title {
                         romaji
+                        english
+                        userPreferred
                     }
                     averageScore
                     meanScore
@@ -79,9 +84,7 @@ object AniListQueries {
         }
     """.trimIndent()
 
-    fun buildSeasonQuery(id: Int): String = """
-        query (${"$"}id: Int = $id) {
-            Media (id: ${"$"}id, type: ANIME) {
+    private const val SEASON_MEDIA_FIELDS: String = """
                 id
                 idMal
                 coverImage {
@@ -98,6 +101,8 @@ object AniListQueries {
                 }
                 duration
                 episodes
+                seasonYear
+                status
                 genres
                 synonyms
                 averageScore
@@ -143,6 +148,13 @@ object AniListQueries {
                         relationType(version: 2)
                         node {
                             id
+                            format
+                            seasonYear
+                            episodes
+                            title {
+                                romaji
+                                userPreferred
+                            }
                             coverImage {
                                 extraLarge
                                 large
@@ -178,6 +190,20 @@ object AniListQueries {
                     episode
                 }
                 format
+    """
+
+    fun buildSeasonQuery(id: Int): String = """
+        query (${"$"}id: Int = $id) {
+            Media (id: ${"$"}id, type: ANIME) {
+                $SEASON_MEDIA_FIELDS
+            }
+        }
+    """.trimIndent()
+
+    fun buildSeasonByMalIdQuery(malId: Int): String = """
+        query (${"$"}idMal: Int = $malId) {
+            Media (idMal: ${"$"}idMal, type: ANIME) {
+                $SEASON_MEDIA_FIELDS
             }
         }
     """.trimIndent()
@@ -187,7 +213,19 @@ object AniListQueries {
             Media (id: ${"$"}id, type: ANIME) {
                 id
                 episodes
+                format
+                status
+                seasonYear
                 isFavourite
+                coverImage {
+                    extraLarge
+                    large
+                    medium
+                }
+                nextAiringEpisode {
+                    timeUntilAiring
+                    episode
+                }
                 mediaListEntry {
                     progress
                     status
@@ -196,17 +234,13 @@ object AniListQueries {
                 title {
                     english
                     romaji
+                    userPreferred
                 }
             }
         }
     """.trimIndent()
 
-    fun buildFullListQuery(userId: Int, mediaType: String = "ANIME"): String = """
-        query (${"$"}userID: Int = $userId, ${"$"}MEDIA: MediaType = $mediaType) {
-            MediaListCollection (userId: ${"$"}userID, type: ${"$"}MEDIA) { 
-                lists {
-                    status
-                    entries {
+    private const val MEDIA_LIST_ENTRY_FIELDS: String = """
                         status
                         completedAt { year month day }
                         startedAt { year month day }
@@ -220,11 +254,15 @@ object AniListQueries {
                             season
                             seasonYear
                             format
+                            status
+                            isFavourite
+                            averageScore
                             episodes
                             chapters
                             title {
                                 english
                                 romaji
+                                userPreferred
                             }
                             coverImage { extraLarge large medium }
                             synonyms
@@ -233,11 +271,73 @@ object AniListQueries {
                                 episode
                             }
                         }
+    """
+
+    fun buildFullListQuery(
+        userId: Int,
+        mediaType: String = "ANIME",
+        chunk: Int? = null,
+        perChunk: Int = 500,
+    ): String {
+        val chunkArgs = if (chunk != null) ", chunk: $chunk, perChunk: ${perChunk.coerceIn(1, 500)}" else ""
+        return """
+        query (${"$"}userID: Int = $userId, ${"$"}MEDIA: MediaType = $mediaType) {
+            MediaListCollection (userId: ${"$"}userID, type: ${"$"}MEDIA$chunkArgs) { 
+                hasNextChunk
+                lists {
+                    status
+                    entries {
+                        $MEDIA_LIST_ENTRY_FIELDS
                     }
                 }
             }
         }
-    """.trimIndent()
+        """.trimIndent()
+    }
+
+    fun buildPagedListQuery(
+        userId: Int,
+        page: Int,
+        perPage: Int,
+        graphQlStatus: String? = null,
+        sortGraphQl: String = "UPDATED_TIME_DESC",
+        includeStatistics: Boolean = false,
+    ): String {
+        val statusArg = graphQlStatus?.let { ", status: $it" }.orEmpty()
+        val statsBlock = if (includeStatistics) {
+            """
+            User (id: $userId) {
+                statistics {
+                    anime {
+                        count
+                        statuses {
+                            status
+                            count
+                        }
+                    }
+                }
+            }
+            """.trimIndent()
+        } else {
+            ""
+        }
+        return """
+        query {
+            Page (page: ${page.coerceAtLeast(1)}, perPage: ${perPage.coerceIn(1, 100)}) {
+                pageInfo {
+                    total
+                    currentPage
+                    lastPage
+                    hasNextPage
+                }
+                mediaList (userId: $userId, type: ANIME$statusArg, sort: [$sortGraphQl]) {
+                    $MEDIA_LIST_ENTRY_FIELDS
+                }
+            }
+            $statsBlock
+        }
+        """.trimIndent()
+    }
 
     fun buildToggleLikeMutation(id: Int): String = """
         mutation (${"$"}animeId: Int = $id) {
@@ -275,10 +375,16 @@ object AniListQueries {
         status: String,
         score: Score?,
         progress: Int?,
+        clearScore: Boolean = false,
     ): String {
-        val scoreArg = if (score != null) ", ${"$" }scoreRaw: Int = ${score.toInt(100)}" else ""
+        val rawScore = when {
+            score != null -> score.toInt(100)
+            clearScore -> 0
+            else -> null
+        }
+        val scoreArg = if (rawScore != null) ", ${"$"}scoreRaw: Int = $rawScore" else ""
         val progressArg = if (progress != null) ", ${"$"}progress: Int = $progress" else ""
-        val scoreField = if (score != null) ", scoreRaw: ${"$"}scoreRaw" else ""
+        val scoreField = if (rawScore != null) ", scoreRaw: ${"$"}scoreRaw" else ""
         val progressField = if (progress != null) ", progress: ${"$"}progress" else ""
         return """
             mutation (${"$"}id: Int = $id, ${"$"}status: MediaListStatus = $status$scoreArg$progressArg) {

@@ -88,6 +88,8 @@ internal object ProxyImageHandler {
             } else {
                 call.respond(HttpStatusCode.NotFound)
             }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
         } catch (e: Exception) {
             AppLogger.e("Proxy:LocalStream", "Image proxy failed", e)
             call.respond(HttpStatusCode.InternalServerError)

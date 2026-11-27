@@ -2,9 +2,9 @@ package com.lagradost.cloudstream3.desktop.player.skip
 
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.lagradost.cloudstream3.app
+import com.lagradost.cloudstream3.desktop.ui.screens.details.TmdbEnrichmentService
 import com.lagradost.cloudstream3.utils.AppUtils.tryParseJson
 import com.lagradost.common.logging.AppLogger
-import com.lagradost.common.storage.DesktopDataStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.net.URLEncoder
@@ -15,7 +15,6 @@ object IntroDbProvider : ISkipProvider {
     override val name: String = "IntroDB (TV Shows)"
 
     private const val INTRODB_BASE_URL = "https://api.introdb.app"
-    private const val DEFAULT_TMDB_API_KEY = "3828864585df9d4f006c09403eb9a888"
 
     private val imdbIdCache = ConcurrentHashMap<String, String>()
 
@@ -285,7 +284,8 @@ object IntroDbProvider : ISkipProvider {
 
         // 2. Primary Official Resolver: TMDB search -> external_ids
         return try {
-            val key = DesktopDataStore.getKey<String>("tmdb_api_key")?.takeIf { it.isNotBlank() } ?: DEFAULT_TMDB_API_KEY
+            val key = TmdbEnrichmentService.TMDB_API_KEY
+            if (key.isBlank()) return null
             val encoded = URLEncoder.encode(clean, "UTF-8")
             val searchUrl = "https://api.themoviedb.org/3/search/tv?api_key=$key&query=$encoded&page=1"
             val searchResp = app.get(

@@ -5,9 +5,74 @@ import com.lagradost.cloudstream3.ActorData
 import com.lagradost.cloudstream3.LoadResponse
 import com.lagradost.cloudstream3.MainAPI
 import com.lagradost.cloudstream3.SearchResponse
+import com.lagradost.cloudstream3.desktop.metadata.RatingSource
+import com.lagradost.cloudstream3.desktop.tracking.MatchResolution
+import com.lagradost.cloudstream3.desktop.tracking.ReleaseBounds
+import com.lagradost.cloudstream3.desktop.tracking.TrackerBinding
+import com.lagradost.cloudstream3.desktop.tracking.TrackerDescriptor
+import com.lagradost.cloudstream3.desktop.tracking.TrackerMediaCandidate
+import com.lagradost.cloudstream3.desktop.tracking.UnifiedTrackerStatus
+import com.lagradost.cloudstream3.desktop.tracking.UnifiedWatchStatus
 import com.lagradost.cloudstream3.desktop.ui.base.UiState
 import com.lagradost.common.storage.DesktopBookmark
 import com.lagradost.common.storage.WatchHistory
+
+@Immutable
+data class DetailsTrackerEntryState(
+    val descriptor: TrackerDescriptor,
+    val isConnected: Boolean = false,
+    val isEligible: Boolean = false,
+    val showKey: String? = null,
+    val mappedSeason: Int = 1,
+    val resolution: MatchResolution? = null,
+    val boundEntry: TrackerBinding? = null,
+    val remoteStatus: UnifiedTrackerStatus? = null,
+    val releaseBounds: ReleaseBounds = ReleaseBounds(),
+    val isLoadingStatus: Boolean = false,
+    val isSaving: Boolean = false,
+    val syncingEpisodeNum: Int? = null,
+    val editStatus: UnifiedWatchStatus = UnifiedWatchStatus.WATCHING,
+    val editProgress: Int = 0,
+    val editScore: Int = 0,
+    val isFavourite: Boolean = false,
+    val editOffset: Int = 0,
+    val searchQuery: String = "",
+    val searchResults: List<TrackerMediaCandidate> = emptyList(),
+    val isSearching: Boolean = false,
+    val hasSearched: Boolean = false,
+    val showSearchDrawer: Boolean = false,
+    val isAutoSyncEnabled: Boolean = true,
+    val bindPolicy: com.lagradost.cloudstream3.desktop.tracking.TrackerBindPolicy =
+        com.lagradost.cloudstream3.desktop.tracking.TrackerBindPolicy.STRICT_AUTO_AND_PINNED,
+    val feedbackMessage: String? = null,
+    val feedbackIsError: Boolean = false,
+)
+
+@Immutable
+data class DetailsTrackersUiState(
+    val entries: Map<String, DetailsTrackerEntryState> = emptyMap(),
+    val isDrawerOpen: Boolean = false,
+    val activeProviderId: String? = null,
+) {
+    val availableTrackers: List<DetailsTrackerEntryState>
+        get() = entries.values.filter { it.isConnected && it.isEligible }
+
+    val activeEntry: DetailsTrackerEntryState?
+        get() = activeProviderId?.let { entries[it] }?.takeIf { it.isConnected && it.isEligible }
+            ?: availableTrackers.firstOrNull()
+
+    /**
+     * Strictest maximum local episode number allowed across all bound trackers
+     * after accounting for each tracker's episode offset.
+     */
+    val strictLocalReleaseCeiling: Int?
+        get() = entries.values
+            .filter { it.isConnected && it.boundEntry != null }
+            .mapNotNull { entry ->
+                entry.releaseBounds.ceilingEpisode?.let { ceiling -> ceiling - entry.editOffset }
+            }
+            .minOrNull()
+}
 
 @Immutable
 sealed interface EnrichmentPhase {
@@ -87,7 +152,12 @@ data class DetailsUiState(
     // Bumped each time episode thumbnail URLs are mutated in-place by enrichment.
     // Compose observes this to trigger recomposition of episode cards.
     val episodeThumbnailVersion: Int = 0,
+    val episodeRatingSources: Map<Pair<Int, Int>, RatingSource> = emptyMap(),
     val tmdbId: Int? = null,
+    val imdbId: String? = null,
+    val anilistId: Int? = null,
+    val malId: Int? = null,
+    val canonicalSeed: com.lagradost.cloudstream3.desktop.metadata.CanonicalMediaSeed? = null,
     val selectedSeason: Int? = null,
     val hasUserSelectedSeason: Boolean = false,
     val seasonCredits: Map<Int, List<ActorData>> = emptyMap(),
@@ -95,6 +165,7 @@ data class DetailsUiState(
     val activeTrailer: TrailerData? = null,
     val pendingExternalUrl: String? = null,
     val isRightColumnPinned: Boolean = false,
+    val trackers: DetailsTrackersUiState = DetailsTrackersUiState(),
 ) : UiState
 
 data class ProductionCompany(

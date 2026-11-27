@@ -2,6 +2,7 @@ package com.lagradost.cloudstream3.desktop.explore.search
 
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.lagradost.cloudstream3.app
+import com.lagradost.cloudstream3.desktop.explore.client.AniListCatalogClient
 import com.lagradost.cloudstream3.desktop.explore.client.ExploreCatalogDiscoverer
 import com.lagradost.cloudstream3.desktop.explore.models.ExploreItem
 import com.lagradost.cloudstream3.desktop.explore.models.ManifestCatalogDescriptor
@@ -108,6 +109,10 @@ object ExploreSearchEngine {
             rating = base.rating ?: other.rating,
             genres = if (base.genres.isNotEmpty()) base.genres else other.genres,
             posterShape = base.posterShape ?: other.posterShape,
+            anilistId = base.anilistId ?: other.anilistId,
+            malId = base.malId ?: other.malId,
+            tmdbId = base.tmdbId ?: other.tmdbId,
+            imdbId = base.imdbId ?: other.imdbId,
         )
     }
 
@@ -276,23 +281,7 @@ object ExploreSearchEngine {
             query (${'$'}search: String, ${'$'}perPage: Int) {
                 Page (page: 1, perPage: ${'$'}perPage) {
                     media (search: ${'$'}search, type: ANIME, sort: SEARCH_MATCH) {
-                        id
-                        idMal
-                        title {
-                            userPreferred
-                            english
-                            romaji
-                        }
-                        coverImage {
-                            extraLarge
-                            large
-                        }
-                        bannerImage
-                        averageScore
-                        seasonYear
-                        genres
-                        description(asHtml: false)
-                        format
+                        ${AniListCatalogClient.ANILIST_MEDIA_SELECTION}
                     }
                 }
             }
@@ -314,44 +303,8 @@ object ExploreSearchEngine {
                 timeout = 8000L,
             )
             val root = mapper.readTree(response.text)
-            val mediaArray = root["data"]?.get("Page")?.get("media") ?: return emptyList()
-            if (!mediaArray.isArray) return emptyList()
-
-            val items = mutableListOf<ExploreItem>()
-            for (node in mediaArray) {
-                val anilistId = node["id"]?.asInt() ?: continue
-                val idMal = node["idMal"]?.asInt()
-                val titleNode = node["title"]
-                val title = (
-                    titleNode?.get("userPreferred")?.asText()
-                        ?: titleNode?.get("english")?.asText()
-                        ?: titleNode?.get("romaji")?.asText()
-                    )?.takeIf { it.isNotBlank() } ?: continue
-
-                val coverNode = node["coverImage"]
-                val posterUrl = (coverNode?.get("extraLarge")?.asText() ?: coverNode?.get("large")?.asText())?.takeIf { it.isNotBlank() }
-                val bannerUrl = node["bannerImage"]?.asText()?.takeIf { it.isNotBlank() }
-                val score = node["averageScore"]?.asDouble()?.let { it / 10.0 }
-                val year = node["seasonYear"]?.asText()?.takeIf { it.isNotBlank() }
-                val desc = node["description"]?.asText()?.takeIf { it.isNotBlank() }
-                val genres = node["genres"]?.mapNotNull { it.asText() } ?: emptyList()
-                val format = node["format"]?.asText()?.lowercase() ?: "anime"
-
-                items.add(
-                    ExploreItem(
-                        id = if (idMal != null) "mal:$idMal" else "anilist:$anilistId",
-                        type = if (format == "movie") "movie" else "series",
-                        name = title,
-                        posterUrl = posterUrl,
-                        backgroundUrl = bannerUrl,
-                        releaseYear = year,
-                        description = desc,
-                        rating = score,
-                        genres = genres,
-                    ),
-                )
-            }
-            items
+            val mediaArray = root["data"]?.get("Page")?.get("media")
+            AniListCatalogClient.parseMediaItems(mediaArray, useMalPrefix = true)
         } catch (e: Exception) {
             AppLogger.w(TAG, "searchAnilist failed: ${e.message}")
             emptyList()

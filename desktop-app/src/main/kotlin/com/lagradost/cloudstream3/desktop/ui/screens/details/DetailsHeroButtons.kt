@@ -360,13 +360,26 @@ fun DetailsTrackersHeroCluster(
         firstBound != null -> {
             val remote = firstBound.remoteStatus
             val bound = firstBound.boundEntry
+            val isMovie = firstBound.releaseBounds.format.equals("MOVIE", ignoreCase = true) ||
+                bound?.remoteMediaId?.startsWith("movie:", ignoreCase = true) == true
             val total = remote?.totalEpisodes ?: bound?.expectedTotalEpisodes?.toInt()
             val prog = remote?.progress ?: firstBound.editProgress
             val tag = firstBound.descriptor.shortTag
             if (boundEntries.size > 1) {
-                if (total != null && total > 0) "${boundEntries.size} Trackers · $prog/$total" else "${boundEntries.size} Trackers · Ep $prog"
+                if (isMovie) {
+                    val statusLabel = remote?.status?.takeIf { it != com.lagradost.cloudstream3.desktop.tracking.UnifiedWatchStatus.NONE }?.label
+                    if (statusLabel != null) "${boundEntries.size} Trackers · $statusLabel" else "${boundEntries.size} Trackers"
+                } else if (total != null && total > 0) {
+                    "${boundEntries.size} Trackers · $prog/$total"
+                } else {
+                    "${boundEntries.size} Trackers · Ep $prog"
+                }
             } else {
                 when {
+                    isMovie -> {
+                        val statusLabel = remote?.status?.takeIf { it != com.lagradost.cloudstream3.desktop.tracking.UnifiedWatchStatus.NONE }?.label
+                        if (statusLabel != null) "$tag · $statusLabel" else firstBound.descriptor.displayName
+                    }
                     total != null && total > 0 -> "$tag $prog/$total"
                     prog > 0 -> "$tag Ep $prog"
                     else -> firstBound.descriptor.displayName
@@ -398,9 +411,18 @@ fun DetailsTrackersHeroCluster(
         boundEntries.forEach { entry ->
             val bound = entry.boundEntry ?: return@forEach
             val remote = entry.remoteStatus
+            val isMovie = entry.releaseBounds.format.equals("MOVIE", ignoreCase = true) ||
+                bound.remoteMediaId.startsWith("movie:", ignoreCase = true)
             val total = remote?.totalEpisodes ?: bound.expectedTotalEpisodes?.toInt()
             val prog = remote?.progress ?: entry.editProgress
-            val progText = if (total != null && total > 0) "$prog/$total" else "Ep $prog"
+            val progText = if (isMovie) {
+                remote?.status?.takeIf { it != com.lagradost.cloudstream3.desktop.tracking.UnifiedWatchStatus.NONE }?.label
+                    ?: if (prog >= 1) "Watched" else "Unwatched"
+            } else if (total != null && total > 0) {
+                "$prog/$total"
+            } else {
+                "Ep $prog"
+            }
             val autoTag = if (entry.isAutoSyncEnabled) "Auto-Track" else "Manual"
             add("${entry.descriptor.displayName}: ${bound.remoteTitle} ($progText · $autoTag)")
         }

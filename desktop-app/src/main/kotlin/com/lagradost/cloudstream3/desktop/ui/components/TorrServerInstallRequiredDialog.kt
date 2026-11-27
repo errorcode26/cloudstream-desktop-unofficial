@@ -124,7 +124,7 @@ fun TorrServerInstallRequiredDialog(
                     }
                 }
 
-                if (isDownloading && torrTask != null) {
+                if (torrTask?.status == TaskStatus.RUNNING) {
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Text(
                             text = "Downloading TorrServer: ${torrTask.downloadedMB} / ${torrTask.totalMB} (${torrTask.speedFormatted})",

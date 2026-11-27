@@ -12,7 +12,7 @@ object HomeHeroSpotlightStackMath {
     private const val COMPACT_HERO_HEIGHT_DP = 440f
 
     private const val MIN_ROW_HEIGHT_DP = 220f
-    private const val MAX_ROW_HEIGHT_DP = 276f
+    private const val MAX_ROW_HEIGHT_DP = 290f
     private const val COMPACT_ROW_HEIGHT_DP = 192f
 
     private const val POSTER_ASPECT_RATIO = 2f / 3f
@@ -23,12 +23,12 @@ object HomeHeroSpotlightStackMath {
      */
     fun calculateHeroHeight(rawWidth: Dp, rawHeight: Dp): Dp {
         if (rawWidth < 760.dp) return COMPACT_HERO_HEIGHT_DP.dp
-        return rawHeight.value.coerceAtLeast(MIN_DESKTOP_HERO_HEIGHT_DP).dp
+        return (rawHeight.value - 56f).coerceAtLeast(MIN_DESKTOP_HERO_HEIGHT_DP).dp
     }
 
     fun calculateRowHeight(heroHeight: Dp, isCompact: Boolean): Dp {
         if (isCompact) return COMPACT_ROW_HEIGHT_DP.dp
-        return (heroHeight.value * 0.30f)
+        return (heroHeight.value * 0.34f)
             .coerceIn(MIN_ROW_HEIGHT_DP, MAX_ROW_HEIGHT_DP)
             .dp
     }
@@ -53,36 +53,51 @@ object HomeHeroSpotlightStackMath {
     }
 
     fun queueScaleForPosition(queuePos: Int): Float {
-        return when (queuePos) {
-            0 -> 1.00f
-            1 -> 0.93f
-            2 -> 0.86f
-            3 -> 0.79f
-            else -> 0.72f
-        }
+        return 1.00f
     }
 
     fun queueDimAlphaForPosition(queuePos: Int): Float {
         return when (queuePos) {
             0 -> 0.00f
-            1 -> 0.20f
-            2 -> 0.36f
-            3 -> 0.52f
-            else -> 0.66f
+            1 -> 0.12f
+            2 -> 0.24f
+            3 -> 0.36f
+            else -> 0.48f
         }
     }
 
     fun queueOpacityForPosition(queuePos: Int): Float {
-        return when {
-            queuePos <= 2 -> 1.00f
-            queuePos == 3 -> 0.85f
-            queuePos == 4 -> 0.45f
-            else -> 0.0f
+        return when (queuePos) {
+            0 -> 1.00f
+            1 -> 1.00f
+            2 -> 0.96f
+            3 -> 0.86f
+            else -> 0.72f
         }
     }
 
     fun queueZIndexForPosition(queuePos: Int): Float {
         return (50f - queuePos * 8f).coerceAtLeast(1f)
+    }
+
+    fun queueShadowAlphaForPosition(queuePos: Int): Float {
+        return when (queuePos) {
+            0 -> 1.00f
+            1 -> 0.78f
+            2 -> 0.56f
+            3 -> 0.36f
+            else -> 0.20f
+        }
+    }
+
+    fun queueElevationForPosition(queuePos: Int): Float {
+        return when (queuePos) {
+            0 -> 22f
+            1 -> 16f
+            2 -> 12f
+            3 -> 8f
+            else -> 6f
+        }
     }
 
     /**

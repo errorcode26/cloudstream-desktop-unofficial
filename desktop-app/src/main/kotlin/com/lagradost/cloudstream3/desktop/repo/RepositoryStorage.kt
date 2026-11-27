@@ -17,9 +17,12 @@ import java.util.zip.ZipFile
  * plugin lists, and local JAR manifests.
  */
 internal object RepositoryStorage {
-    private val reposFile by lazy { File(PluginFileUtils.getExtensionsDir(), "repos.json") }
-    private val repoCacheFile by lazy { File(PluginFileUtils.getExtensionsDir(), "repo_cache.json") }
-    private val pluginsCacheFile by lazy { File(PluginFileUtils.getExtensionsDir(), "plugins_cache.json") }
+    private val reposFile: File
+        get() = File(PluginFileUtils.getExtensionsDir(), "repos.json")
+    private val repoCacheFile: File
+        get() = File(PluginFileUtils.getExtensionsDir(), "repo_cache.json")
+    private val pluginsCacheFile: File
+        get() = File(PluginFileUtils.getExtensionsDir(), "plugins_cache.json")
 
     val repoCache = ConcurrentHashMap<String, Repository>()
     val pluginsCache = ConcurrentHashMap<String, List<SitePlugin>>()

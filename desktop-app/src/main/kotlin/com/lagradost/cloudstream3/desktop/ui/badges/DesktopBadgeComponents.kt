@@ -44,6 +44,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lagradost.cloudstream3.LoadResponse
 import com.lagradost.cloudstream3.TvType
+import com.lagradost.cloudstream3.desktop.metadata.RatingSource
 import java.net.URLEncoder
 import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
@@ -692,6 +693,287 @@ object DesktopBadgeComponents {
                 fontWeight = FontWeight.Bold,
                 letterSpacing = 0.3.sp,
             )
+        }
+    }
+
+    fun trackerBadgeResource(trackerId: String): String = when (trackerId.lowercase(Locale.ROOT)) {
+        "mal" -> "badges/rating_mal.png"
+        "simkl" -> "badges/tracker_simkl.svg"
+        else -> "badges/tracker_anilist.svg"
+    }
+
+    /** Renders a sharp brand mark for AniList, MyAnimeList, or SIMKL using native resource aspect ratios. */
+    @Composable
+    fun TrackerBrandIcon(
+        trackerId: String,
+        size: androidx.compose.ui.unit.Dp = 16.dp,
+        modifier: Modifier = Modifier,
+        borderColor: Color? = null,
+    ) {
+        val isMal = trackerId.equals("mal", ignoreCase = true)
+        val width = if (isMal) size * 1.58f else size
+        val shape = RoundedCornerShape(4.dp)
+        Box(
+            modifier = modifier
+                .size(width = width, height = size)
+                .clip(shape)
+                .then(
+                    if (borderColor != null) {
+                        Modifier.border(1.dp, borderColor, shape)
+                    } else {
+                        Modifier
+                    },
+                ),
+            contentAlignment = Alignment.Center,
+        ) {
+            androidx.compose.foundation.Image(
+                painter = rememberSharpBadgePainter(trackerBadgeResource(trackerId)),
+                contentDescription = trackerId,
+                contentScale = androidx.compose.ui.layout.ContentScale.Fit,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+    }
+
+    @Composable
+    fun TrackerStackedIcons(
+        trackerIds: List<String>,
+        iconSize: androidx.compose.ui.unit.Dp = 16.dp,
+        modifier: Modifier = Modifier,
+    ) {
+        if (trackerIds.isEmpty()) return
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = modifier,
+        ) {
+            trackerIds.distinct().forEach { id ->
+                TrackerBrandIcon(
+                    trackerId = id,
+                    size = iconSize,
+                    borderColor = Color.Black.copy(alpha = 0.65f),
+                )
+            }
+        }
+    }
+
+    /**
+     * Renders an episode rating badge attributed strictly to the actual [RatingSource]
+     * that produced the score, falling back to a neutral gold star when unattributed.
+     */
+    @Composable
+    fun EpisodeRatingBadge(
+        score10p: Float,
+        source: RatingSource?,
+        modifier: Modifier = Modifier,
+        isNarrow: Boolean = false,
+        compact: Boolean = false,
+    ) {
+        if (score10p <= 0.0f) return
+        val formatted = String.format(Locale.US, "%.1f", score10p)
+        val bgAlpha = if (compact) 0.45f else 0.75f
+        val borderAlpha = if (compact) 0.15f else 0.18f
+        val hPad = when {
+            compact -> 6.dp
+            isNarrow -> 5.dp
+            else -> 6.5.dp
+        }
+        val vPad = if (compact) 2.5.dp else 3.dp
+        val spacing = if (compact) 5.dp else 4.5.dp
+        val textSize = when {
+            compact -> 12.sp
+            isNarrow -> 10.5.sp
+            else -> 11.5.sp
+        }
+
+        val brandLogo = when (source) {
+            RatingSource.IMDB -> Triple(
+                "badges/rating_imdb.png",
+                if (isNarrow && !compact) 29.dp else 33.dp,
+                if (isNarrow && !compact) 14.dp else 16.dp,
+            )
+            RatingSource.TMDB -> Triple(
+                "badges/rating_tmdb.png",
+                if (isNarrow && !compact) 25.dp else 28.dp,
+                if (isNarrow && !compact) 14.dp else 16.dp,
+            )
+            else -> null
+        }
+
+        Box(
+            modifier = modifier
+                .clip(RoundedCornerShape(6.dp))
+                .background(Color.Black.copy(alpha = bgAlpha))
+                .border(0.5.dp, Color.White.copy(alpha = borderAlpha), RoundedCornerShape(6.dp))
+                .padding(horizontal = hPad, vertical = vPad),
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(spacing),
+            ) {
+                if (brandLogo != null) {
+                    androidx.compose.foundation.Image(
+                        painter = rememberSharpBadgePainter(brandLogo.first),
+                        contentDescription = null,
+                        modifier = Modifier.size(width = brandLogo.second, height = brandLogo.third),
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Default.Star,
+                        contentDescription = null,
+                        tint = GoldStar,
+                        modifier = Modifier.size(if (isNarrow && !compact) 12.dp else 13.5.dp),
+                    )
+                }
+                Text(
+                    text = formatted,
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontSize = textSize,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 0.2.sp,
+                    ),
+                    color = if (brandLogo != null) Color.White else GoldText,
+                )
+            }
+        }
+    }
+
+    /**
+     * Renders verified title-level scores (IMDb, TMDb, AniList) without mislabeling
+     * fallback provider/TVmaze scores as TMDb.
+     */
+    @Composable
+    fun MediaRatingsRow(
+        data: LoadResponse,
+        tmdbId: Int?,
+        imdbScore: Double?,
+        tmdbScore: Double?,
+        anilistScore: Double?,
+        isCompact: Boolean,
+        isCentered: Boolean = false,
+        onOpenUrl: (String) -> Unit,
+        trailingContent: @Composable (hasRatings: Boolean) -> Unit = {},
+    ) {
+        val validImdb = imdbScore?.takeIf { it > 0.0 }
+        val validTmdb = tmdbScore?.takeIf { it > 0.0 }
+        val validAniList = anilistScore?.takeIf { it > 0.0 }
+        val fallbackScore = if (validImdb == null && validTmdb == null && validAniList == null) {
+            data.score?.toFloat(10)?.toDouble()?.takeIf { it > 0.0 }
+        } else {
+            null
+        }
+        val hasRatings = validImdb != null || validTmdb != null || validAniList != null || fallbackScore != null
+
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = if (isCentered) Arrangement.Center else Arrangement.spacedBy(if (isCompact) 8.dp else 16.dp),
+            modifier = if (isCentered) Modifier.fillMaxWidth() else Modifier,
+        ) {
+            if (validImdb != null) {
+                val url = RatingBadgeUrlResolver.getImdbUrl(data)
+                val formatted = String.format(Locale.US, "%.1f", validImdb)
+                if (isCompact) {
+                    CompactRatingBadge(
+                        logoRes = "badges/rating_imdb.png",
+                        scoreText = formatted,
+                        brandColor = Color(0xFFF5C518),
+                        logoWidth = 24.dp,
+                        logoHeight = 12.dp,
+                        tooltipText = "Open in IMDb (browser)",
+                        onClick = { onOpenUrl(url) },
+                    )
+                } else {
+                    BrandedRatingBadge(
+                        logoRes = "badges/rating_imdb.png",
+                        scoreText = formatted,
+                        textColor = Color(0xFFF5C518),
+                        logoWidth = 40.dp,
+                        logoHeight = 20.dp,
+                        tooltipText = "Open in IMDb (browser)",
+                        onClick = { onOpenUrl(url) },
+                    )
+                }
+            }
+            if (validTmdb != null) {
+                val url = RatingBadgeUrlResolver.getTmdbUrl(data, tmdbId)
+                val formatted = String.format(Locale.US, "%.1f", validTmdb)
+                if (isCompact) {
+                    CompactRatingBadge(
+                        logoRes = "badges/rating_tmdb.png",
+                        scoreText = formatted,
+                        brandColor = Color(0xFF01B4E4),
+                        logoWidth = 20.dp,
+                        logoHeight = 12.dp,
+                        tooltipText = "Open in TMDb (browser)",
+                        onClick = { onOpenUrl(url) },
+                    )
+                } else {
+                    BrandedRatingBadge(
+                        logoRes = "badges/rating_tmdb.png",
+                        scoreText = formatted,
+                        textColor = Color(0xFF01B4E4),
+                        logoWidth = 34.dp,
+                        logoHeight = 21.dp,
+                        tooltipText = "Open in TMDb (browser)",
+                        onClick = { onOpenUrl(url) },
+                    )
+                }
+            }
+            if (validAniList != null) {
+                val url = RatingBadgeUrlResolver.getAniListUrl(data)
+                val formatted = "${(validAniList * 10).toInt()}%"
+                if (isCompact) {
+                    CompactRatingBadge(
+                        logoRes = "badges/tracker_anilist.svg",
+                        scoreText = formatted,
+                        brandColor = Color(0xFF02A9FF),
+                        logoWidth = 14.dp,
+                        logoHeight = 14.dp,
+                        tooltipText = "Open in AniList (browser)",
+                        onClick = { onOpenUrl(url) },
+                    )
+                } else {
+                    BrandedRatingBadge(
+                        logoRes = "badges/tracker_anilist.svg",
+                        scoreText = formatted,
+                        textColor = Color(0xFF02A9FF),
+                        logoWidth = 21.dp,
+                        logoHeight = 21.dp,
+                        tooltipText = "Open in AniList (browser)",
+                        onClick = { onOpenUrl(url) },
+                    )
+                }
+            }
+            if (fallbackScore != null) {
+                Surface(
+                    shape = RoundedCornerShape(6.dp),
+                    color = GoldStar.copy(alpha = 0.14f),
+                    border = BorderStroke(1.dp, GoldStar.copy(alpha = 0.42f)),
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(if (isCompact) 4.dp else 5.dp),
+                        modifier = Modifier.padding(
+                            horizontal = if (isCompact) 6.dp else 8.dp,
+                            vertical = if (isCompact) 2.dp else 3.dp,
+                        ),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Star,
+                            contentDescription = null,
+                            tint = GoldStar,
+                            modifier = Modifier.size(if (isCompact) 12.dp else 16.dp),
+                        )
+                        Text(
+                            text = String.format(Locale.US, "%.1f", fallbackScore),
+                            color = GoldText,
+                            fontSize = if (isCompact) 11.sp else 15.5.sp,
+                            fontWeight = if (isCompact) FontWeight.Bold else FontWeight.ExtraBold,
+                        )
+                    }
+                }
+            }
+            trailingContent(hasRatings)
         }
     }
 }

@@ -41,7 +41,7 @@ object TvMazeMetadataProvider : MetadataProvider {
         @JsonProperty("show") val show: TvMazeShow?,
     )
 
-    private data class TvMazeShow(
+    internal data class TvMazeShow(
         @JsonProperty("id") val id: Int,
         @JsonProperty("name") val name: String?,
         @JsonProperty("type") val type: String?,
@@ -62,57 +62,57 @@ object TvMazeMetadataProvider : MetadataProvider {
         @JsonProperty("_embedded") val embedded: TvMazeEmbedded?,
     )
 
-    private data class TvMazeRating(
+    internal data class TvMazeRating(
         @JsonProperty("average") val average: Double?,
     )
 
-    private data class TvMazeNetwork(
+    internal data class TvMazeNetwork(
         @JsonProperty("id") val id: Int?,
         @JsonProperty("name") val name: String?,
         @JsonProperty("country") val country: TvMazeCountry?,
         @JsonProperty("officialSite") val officialSite: String?,
     )
 
-    private data class TvMazeCountry(
+    internal data class TvMazeCountry(
         @JsonProperty("name") val name: String?,
         @JsonProperty("code") val code: String?,
         @JsonProperty("timezone") val timezone: String?,
     )
 
-    private data class TvMazeImage(
+    internal data class TvMazeImage(
         @JsonProperty("medium") val medium: String?,
         @JsonProperty("original") val original: String?,
     )
 
-    private data class TvMazeExternals(
+    internal data class TvMazeExternals(
         @JsonProperty("imdb") val imdb: String?,
         @JsonProperty("thetvdb") val thetvdb: Int?,
     )
 
-    private data class TvMazeEmbedded(
+    internal data class TvMazeEmbedded(
         @JsonProperty("cast") val cast: List<TvMazeCastMember>?,
         @JsonProperty("episodes") val episodes: List<TvMazeEpisode>?,
         @JsonProperty("nextepisode") val nextepisode: TvMazeEpisode?,
     )
 
-    private data class TvMazeCastMember(
+    internal data class TvMazeCastMember(
         @JsonProperty("person") val person: TvMazePerson?,
         @JsonProperty("character") val character: TvMazeCharacter?,
     )
 
-    private data class TvMazePerson(
+    internal data class TvMazePerson(
         @JsonProperty("id") val id: Int?,
         @JsonProperty("name") val name: String?,
         @JsonProperty("image") val image: TvMazeImage?,
     )
 
-    private data class TvMazeCharacter(
+    internal data class TvMazeCharacter(
         @JsonProperty("id") val id: Int?,
         @JsonProperty("name") val name: String?,
         @JsonProperty("image") val image: TvMazeImage?,
     )
 
-    private data class TvMazeEpisode(
+    internal data class TvMazeEpisode(
         @JsonProperty("id") val id: Int?,
         @JsonProperty("name") val name: String?,
         @JsonProperty("season") val season: Int?,
@@ -320,10 +320,10 @@ object TvMazeMetadataProvider : MetadataProvider {
                         loaded.plot = cleanSummary
                     }
 
-                    // Hole-filling ratings & duration
-                    if (loaded.score == null && show.rating?.average != null) {
-                        loaded.score = Score.from10(show.rating.average)
-                        callbacks.onRatingsLoaded(null, null, show.rating.average)
+                    // Hole-filling ratings & duration (do not emit TVmaze score into AniList slot)
+                    val showRating = show.rating?.average?.takeIf { it > 0.0 }
+                    if (showRating != null && (loaded.score == null || loaded.score!!.toDouble(10) <= 0.0)) {
+                        loaded.score = Score.from10(showRating)
                     }
                     if (loaded.duration == null && (show.averageRuntime ?: show.runtime) != null) {
                         loaded.duration = show.averageRuntime ?: show.runtime
@@ -377,10 +377,12 @@ object TvMazeMetadataProvider : MetadataProvider {
                         }
                     }
 
-                    // 8. Enrich Episode Stills & Descriptions (non-destructive)
+                    // 8. Enrich Episode Stills, Ratings & Descriptions (non-destructive)
                     val tvmazeEpisodes = show.embedded?.episodes.orEmpty()
                     if (tvmazeEpisodes.isNotEmpty()) {
                         var anyThumbnailsEnriched = false
+                        var anyRatingsEnriched = false
+                        val tvMazeRatedEpisodes = LinkedHashMap<Pair<Int, Int>, RatingSource>()
 
                         val enrichEpisodeItem: (Episode) -> Unit = { existingEp ->
                             val epSeason = existingEp.season ?: 1
@@ -411,6 +413,14 @@ object TvMazeMetadataProvider : MetadataProvider {
                                 if (existingEp.runTime == null && tvmEp.runtime != null) {
                                     existingEp.runTime = tvmEp.runtime
                                 }
+                                val epRating = tvmEp.rating?.average?.takeIf { it > 0.0 }
+                                if (epRating != null && (existingEp.score == null || existingEp.score!!.toDouble(10) <= 0.0)) {
+                                    existingEp.score = Score.from10(epRating)
+                                    if (epNum > 0) {
+                                        tvMazeRatedEpisodes[epSeason to epNum] = RatingSource.TVMAZE
+                                    }
+                                    anyRatingsEnriched = true
+                                }
                             }
                         }
 
@@ -439,6 +449,7 @@ object TvMazeMetadataProvider : MetadataProvider {
                                         val epOverview = ep.summary?.let { cleanHtmlSummary(it) }
                                         val epStill = ep.image?.original ?: ep.image?.medium
                                         val descWithDate = "||DATE:$epAirDate||${epOverview ?: ""}"
+                                        val futureRating = ep.rating?.average?.takeIf { it > 0.0 }
                                         val synthetic = dummyApi.newEpisode("unreleased_s${epSeason}_e$epNum") {
                                             this.name = ep.name ?: "Episode $epNum"
                                             this.season = epSeason
@@ -446,7 +457,11 @@ object TvMazeMetadataProvider : MetadataProvider {
                                             this.posterUrl = epStill
                                             this.description = descWithDate
                                             this.runTime = ep.runtime
-                                            this.score = ep.rating?.average?.let { Score.from10(it) }
+                                            this.score = futureRating?.let { Score.from10(it) }
+                                        }
+                                        if (futureRating != null) {
+                                            tvMazeRatedEpisodes[epSeason to epNum] = RatingSource.TVMAZE
+                                            anyRatingsEnriched = true
                                         }
                                         newUnreleased.add(synthetic)
                                     }
@@ -465,7 +480,10 @@ object TvMazeMetadataProvider : MetadataProvider {
                             }
                         }
 
-                        if (anyThumbnailsEnriched) {
+                        if (tvMazeRatedEpisodes.isNotEmpty()) {
+                            callbacks.onEpisodeRatingSourcesLoaded(tvMazeRatedEpisodes)
+                        }
+                        if (anyThumbnailsEnriched || anyRatingsEnriched) {
                             callbacks.onEpisodeThumbnailsEnriched()
                         }
                     }

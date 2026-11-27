@@ -2,6 +2,7 @@ package com.lagradost.cloudstream3.desktop.ui.screens.details
 
 import com.lagradost.cloudstream3.AnimeLoadResponse
 import com.lagradost.cloudstream3.Episode
+import com.lagradost.cloudstream3.LoadResponse
 import com.lagradost.cloudstream3.MainAPI
 import com.lagradost.cloudstream3.TvSeriesLoadResponse
 import com.lagradost.cloudstream3.TvType
@@ -20,6 +21,7 @@ import com.lagradost.cloudstream3.desktop.tracking.TrackerProvider
 import com.lagradost.cloudstream3.desktop.tracking.TrackerRegistry
 import com.lagradost.cloudstream3.desktop.tracking.TrackerStatusUpdate
 import com.lagradost.cloudstream3.desktop.tracking.UnifiedWatchStatus
+import com.lagradost.cloudstream3.desktop.tracking.adjustedProgressForStatus
 import com.lagradost.cloudstream3.desktop.tracking.buildTrackerShowKey
 import com.lagradost.cloudstream3.desktop.ui.screens.details.contract.DetailsTrackerEntryState
 import com.lagradost.cloudstream3.desktop.ui.screens.details.contract.DetailsUiEffect
@@ -372,13 +374,19 @@ class DetailsTrackerCoordinator(
                         status = effectiveStatus,
                         fallbackTotalEpisodes = bound.expectedTotalEpisodes?.toInt(),
                     )
+                    val isMovie = isMovieEntry(state.response, bound.remoteMediaId, bounds)
                     val resolvedWatchStatus = effectiveStatus?.status?.takeIf { it != UnifiedWatchStatus.NONE }
-                        ?: UnifiedWatchStatus.WATCHING
+                        ?: UnifiedWatchStatus.defaultUnaddedStatusFor(trackerProvider.id, isMovie)
+                    val initialProgress = if (effectiveStatus == null || effectiveStatus.status == UnifiedWatchStatus.NONE) {
+                        0
+                    } else {
+                        effectiveStatus.progress
+                    }
                     copy(
                         remoteStatus = effectiveStatus,
                         releaseBounds = bounds,
                         editStatus = resolvedWatchStatus,
-                        editProgress = effectiveStatus?.progress ?: 0,
+                        editProgress = initialProgress,
                         editScore = effectiveStatus?.score100 ?: 0,
                         isFavourite = effectiveStatus?.isFavourite == true,
                         isLoadingStatus = false,
@@ -593,15 +601,34 @@ class DetailsTrackerCoordinator(
     }
 
     fun toggleFavorite(providerId: String) {
-        val entry = getState().trackers.entries[providerId] ?: return
+        val state = getState()
+        val entry = state.trackers.entries[providerId] ?: return
         val trackerProvider = registry.get(providerId) ?: return
         val remoteId = entry.boundEntry?.remoteMediaId ?: return
         if (!trackerProvider.descriptor.supportsFavorites) return
         val nextFav = !entry.isFavourite
+        val showTitle = entry.boundEntry.remoteTitle.ifBlank { state.response?.name ?: preloadedName.orEmpty() }
 
         updateEntry(providerId) { copy(isSaving = true, feedbackMessage = null) }
         scope.launch(Dispatchers.IO) {
             val ok = trackerProvider.toggleFavorite(trackingRepository, remoteId) == true
+            if (ok) {
+                val curProgress = (entry.remoteStatus?.progress ?: entry.editProgress).toLong()
+                trackingRepository.recordAudit(
+                    profileId = DesktopDataStore.activeProfileId.toLong(),
+                    trackerId = providerId,
+                    showName = showTitle,
+                    remoteMediaId = remoteId,
+                    episodeNum = curProgress,
+                    effectiveRemoteEpisode = curProgress,
+                    oldProgress = curProgress,
+                    newProgress = curProgress,
+                    statusApplied = (entry.remoteStatus?.status ?: entry.editStatus).name,
+                    state = SyncState.SENT,
+                    reason = if (nextFav) "Added to ${trackerProvider.descriptor.displayName} favorites" else "Removed from ${trackerProvider.descriptor.displayName} favorites",
+                    timestamp = System.currentTimeMillis(),
+                )
+            }
             updateEntry(providerId) {
                 copy(
                     isSaving = false,
@@ -910,11 +937,28 @@ class DetailsTrackerCoordinator(
     }
 
     fun updateRemoteStatus(providerId: String, status: UnifiedWatchStatus) {
+        val currentResponse = getState().response
         updateEntry(providerId) {
-            val ceiling = releaseBounds.ceilingEpisode
-            val clampedProgress = if (ceiling != null && editProgress > ceiling) ceiling else editProgress
-            copy(editStatus = status, editProgress = clampedProgress, feedbackMessage = null)
+            val isMovie = isMovieEntry(currentResponse, boundEntry?.remoteMediaId, releaseBounds)
+            val nextProgress = adjustedProgressForStatus(
+                currentProgress = editProgress,
+                targetStatus = status,
+                isMovie = isMovie,
+                ceiling = releaseBounds.ceilingEpisode,
+            )
+            copy(editStatus = status, editProgress = nextProgress, feedbackMessage = null)
         }
+    }
+
+    private fun isMovieEntry(
+        response: LoadResponse?,
+        remoteMediaId: String?,
+        bounds: ReleaseBounds?,
+    ): Boolean {
+        if (bounds?.format.equals("MOVIE", ignoreCase = true)) return true
+        if (remoteMediaId?.trim()?.startsWith("movie:", ignoreCase = true) == true) return true
+        val type = response?.type ?: return false
+        return type == TvType.Movie || type == TvType.AnimeMovie || type == TvType.Live
     }
 
     fun updateRemoteProgress(providerId: String, progress: Int) {

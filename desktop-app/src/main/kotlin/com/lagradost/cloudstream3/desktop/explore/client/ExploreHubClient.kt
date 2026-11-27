@@ -314,23 +314,7 @@ object ExploreHubClient {
             query (${'$'}page: Int, ${'$'}perPage: Int, ${'$'}sort: [MediaSort], ${'$'}genre: String) {
                 Page(page: ${'$'}page, perPage: ${'$'}perPage) {
                     media(type: ANIME, sort: ${'$'}sort, genre: ${'$'}genre) {
-                        id
-                        idMal
-                        title {
-                            userPreferred
-                            english
-                            romaji
-                        }
-                        coverImage {
-                            extraLarge
-                            large
-                        }
-                        bannerImage
-                        averageScore
-                        seasonYear
-                        genres
-                        description(asHtml: false)
-                        format
+                        ${AniListCatalogClient.ANILIST_MEDIA_SELECTION}
                     }
                 }
             }
@@ -358,43 +342,8 @@ object ExploreHubClient {
                 cacheTime = 60 * 6,
             )
             val root = mapper.readTree(response.text)
-            val mediaArray = root["data"]?.get("Page")?.get("media") ?: return@withContext emptyList()
-            if (!mediaArray.isArray) return@withContext emptyList()
-
-            val items = mutableListOf<ExploreItem>()
-            for (node in mediaArray) {
-                val anilistId = node["id"]?.asInt() ?: continue
-                val titleNode = node["title"]
-                val title = (
-                    titleNode?.get("userPreferred")?.asText()
-                        ?: titleNode?.get("english")?.asText()
-                        ?: titleNode?.get("romaji")?.asText()
-                    )?.takeIf { it.isNotBlank() } ?: continue
-
-                val coverNode = node["coverImage"]
-                val posterUrl = (coverNode?.get("extraLarge")?.asText() ?: coverNode?.get("large")?.asText())?.takeIf { it.isNotBlank() }
-                val bannerUrl = node["bannerImage"]?.asText()?.takeIf { it.isNotBlank() }
-                val score = node["averageScore"]?.asDouble()?.let { it / 10.0 }
-                val year = node["seasonYear"]?.asText()?.takeIf { it.isNotBlank() }
-                val desc = node["description"]?.asText()?.takeIf { it.isNotBlank() }
-                val genres = node["genres"]?.mapNotNull { it.asText() } ?: emptyList()
-                val format = node["format"]?.asText()?.lowercase() ?: "series"
-
-                items.add(
-                    ExploreItem(
-                        id = "anilist:$anilistId",
-                        type = if (format == "movie") "movie" else "series",
-                        name = title,
-                        posterUrl = posterUrl,
-                        backgroundUrl = bannerUrl,
-                        releaseYear = year,
-                        description = desc,
-                        rating = score,
-                        genres = genres,
-                    ),
-                )
-            }
-            items
+            val mediaArray = root["data"]?.get("Page")?.get("media")
+            AniListCatalogClient.parseMediaItems(mediaArray, useMalPrefix = false)
         } catch (e: Exception) {
             AppLogger.e(TAG, "fetchAnilistShelfRow error: ${e.message}")
             emptyList()

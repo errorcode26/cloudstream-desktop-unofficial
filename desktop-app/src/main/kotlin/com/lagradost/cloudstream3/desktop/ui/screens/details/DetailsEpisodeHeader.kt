@@ -138,6 +138,7 @@ fun DetailsEpisodeCompactHeader(
     dubStatuses: List<DubStatus>,
     selectedDub: DubStatus?,
     currentSeasonEpisodes: List<Episode>,
+    releasedEpisodesCount: Int = currentSeasonEpisodes.size,
     isSeasonWatched: Boolean,
     isAntiSpoiler: Boolean,
     isSortAscending: Boolean,
@@ -240,9 +241,14 @@ fun DetailsEpisodeCompactHeader(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            if (currentSeasonEpisodes.isNotEmpty()) {
+            if (currentSeasonEpisodes.isNotEmpty() && releasedEpisodesCount > 0) {
+                val badgeText = when {
+                    isSeasonWatched -> "✓ Watched"
+                    releasedEpisodesCount < currentSeasonEpisodes.size -> "Mark Released ($releasedEpisodesCount)"
+                    else -> "Mark Watched"
+                }
                 DesktopActionBadge(
-                    text = if (isSeasonWatched) "✓ Watched" else "Mark Watched",
+                    text = badgeText,
                     onClick = { onToggleSeasonWatched(currentSeasonEpisodes, !isSeasonWatched) },
                     isActive = isSeasonWatched,
                     activeColor = Color(0xFF4ADE80),
@@ -306,6 +312,7 @@ fun DetailsEpisodeDesktopHeader(
     dubStatuses: List<DubStatus>,
     selectedDub: DubStatus?,
     currentSeasonEpisodes: List<Episode>,
+    releasedEpisodesCount: Int = currentSeasonEpisodes.size,
     isSeasonWatched: Boolean,
     isAntiSpoiler: Boolean,
     isSortAscending: Boolean,
@@ -387,9 +394,14 @@ fun DetailsEpisodeDesktopHeader(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            if (currentSeasonEpisodes.isNotEmpty()) {
+            if (currentSeasonEpisodes.isNotEmpty() && releasedEpisodesCount > 0) {
+                val badgeText = when {
+                    isSeasonWatched -> "✓ Season Watched"
+                    releasedEpisodesCount < currentSeasonEpisodes.size -> "Mark Released ($releasedEpisodesCount/${currentSeasonEpisodes.size})"
+                    else -> "Mark Season Watched"
+                }
                 DesktopActionBadge(
-                    text = if (isSeasonWatched) "✓ Season Watched" else "Mark Season Watched",
+                    text = badgeText,
                     onClick = { onToggleSeasonWatched(currentSeasonEpisodes, !isSeasonWatched) },
                     isActive = isSeasonWatched,
                     activeColor = Color(0xFF4ADE80),

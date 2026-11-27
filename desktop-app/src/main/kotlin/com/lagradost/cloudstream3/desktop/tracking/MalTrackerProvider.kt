@@ -168,6 +168,98 @@ class MalTrackerProvider(
         return Result.success(unified)
     }
 
+    override suspend fun fetchLibraryPage(
+        repository: TrackingRepository,
+        statusFilter: UnifiedWatchStatus?,
+        sortKey: String?,
+        cursor: String?,
+        pageSize: Int,
+    ): Result<TrackerLibraryPage> {
+        val auth = repository.getAccountsForProvider(id)?.firstOrNull()
+        if (auth == null || auth.token.accessToken.isNullOrBlank()) {
+            return Result.failure(IllegalStateException("MyAnimeList is not connected"))
+        }
+        val offset = cursor?.toIntOrNull()?.coerceAtLeast(0) ?: 0
+        val statusParam = when (statusFilter) {
+            UnifiedWatchStatus.WATCHING, UnifiedWatchStatus.REWATCHING -> "watching"
+            UnifiedWatchStatus.COMPLETED -> "completed"
+            UnifiedWatchStatus.PLAN_TO_WATCH -> "plan_to_watch"
+            UnifiedWatchStatus.PAUSED -> "on_hold"
+            UnifiedWatchStatus.DROPPED -> "dropped"
+            else -> null
+        }
+        val sortParam = when (sortKey) {
+            "SCORE_DESC" -> "list_score"
+            "ALPHA_ASC", "ALPHA_DESC" -> "anime_title"
+            "YEAR_DESC" -> "anime_start_date"
+            else -> "list_updated_at"
+        }
+        val api = apiProvider()
+        val pageResult = runCatching {
+            api.getUserAnimeListPage(
+                auth = auth,
+                statusParam = statusParam,
+                sortParam = sortParam,
+                offset = offset,
+                limit = pageSize.coerceIn(1, 200),
+                includeStats = offset == 0,
+                persistAuth = { updated -> persistUpdatedAuth(repository, updated) },
+            )
+        }.onFailure { if (it is CancellationException) throw it }
+            .getOrElse { err ->
+                return Result.failure(
+                    IllegalStateException(err.message ?: "Unable to load MyAnimeList library right now."),
+                )
+            }
+
+        api.requireLibraryRefresh = false
+        val seenIds = HashSet<String>()
+        val unified = pageResult.nodes.mapNotNull { item ->
+            val remoteId = item.id.toString()
+            if (!seenIds.add(remoteId)) return@mapNotNull null
+            val listStatus = item.myListStatus
+            val entryStatus = listStatus?.toUnifiedStatus() ?: UnifiedWatchStatus.NONE
+            if (statusFilter != null && entryStatus != statusFilter) return@mapNotNull null
+            UnifiedLibraryEntry(
+                providerId = id,
+                remoteMediaId = remoteId,
+                malId = item.id,
+                title = item.englishTitle ?: item.title,
+                format = item.normalizedFormat,
+                mediaStatus = item.normalizedAirStatus,
+                seasonYear = item.startSeasonYear,
+                posterUrl = item.posterUrl,
+                progress = listStatus?.numEpisodesWatched ?: 0,
+                totalEpisodes = item.knownEpisodes,
+                score100 = (listStatus?.score ?: 0).coerceIn(0, 10) * 10,
+                averageScore = item.meanScore100,
+                isFavourite = false,
+                updatedAt = listStatus?.updatedAtEpochSec ?: 0L,
+                status = entryStatus,
+                releaseBounds = evaluateMalBounds(item, fallbackTotalEpisodes = null),
+            )
+        }
+        val statusCounts = pageResult.stats?.let { stats ->
+            mapOf(
+                UnifiedWatchStatus.WATCHING to stats.watching,
+                UnifiedWatchStatus.COMPLETED to stats.completed,
+                UnifiedWatchStatus.PAUSED to stats.onHold,
+                UnifiedWatchStatus.DROPPED to stats.dropped,
+                UnifiedWatchStatus.PLAN_TO_WATCH to stats.planToWatch,
+            )
+        }
+        return Result.success(
+            TrackerLibraryPage(
+                entries = unified,
+                nextCursor = pageResult.nextOffset?.takeIf { pageResult.hasMore }?.toString(),
+                hasMore = pageResult.hasMore,
+                statusCounts = statusCounts,
+                totalCount = pageResult.stats?.total,
+                supportsServerTabFilter = true,
+            ),
+        )
+    }
+
     override fun requiresLibraryRefresh(): Boolean = apiProvider().requireLibraryRefresh
 
     override fun validateStatusAndProgress(

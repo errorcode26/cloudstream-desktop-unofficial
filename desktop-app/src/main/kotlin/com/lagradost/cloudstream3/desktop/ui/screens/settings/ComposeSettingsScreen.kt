@@ -12,8 +12,6 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.rememberScrollbarAdapter
-import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -84,6 +82,9 @@ enum class SettingsSubScreen(val title: String) {
     KEYBOARD_SHORTCUTS("Keyboard Shortcuts & Hotkeys"),
     INTEGRATIONS_TMDB("TMDB Engine Studio"),
     INTEGRATIONS_ANIME("Anime Engines Studio"),
+    ACCOUNTS_ANILIST("AniList Account"),
+    ACCOUNTS_MAL("MyAnimeList Account"),
+    ACCOUNTS_SIMKL("SIMKL Account"),
 }
 
 object SettingsSession {
@@ -129,8 +130,8 @@ fun ComposeSettingsScreen(
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
             val isCompactHeight = maxHeight < 780.dp
             val isCompactWidth = maxWidth < 1000.dp
-            val screenHorizontalPadding = if (isCompactWidth) 14.dp else 24.dp
-            val screenVerticalPadding = if (isCompactHeight) 10.dp else 20.dp
+            val screenHorizontalPadding = if (isCompactWidth) 6.dp else com.lagradost.cloudstream3.desktop.ui.DesktopDimens.TabInnerHorizontalPadding
+            val screenVerticalPadding = if (isCompactHeight) 6.dp else com.lagradost.cloudstream3.desktop.ui.DesktopDimens.TabInnerVerticalPadding
             val titleBottomPadding = if (isCompactHeight) 10.dp else 20.dp
             val searchBottomPadding = if (isCompactHeight) 8.dp else 14.dp
             val itemVerticalPadding = if (isCompactHeight) 5.dp else 9.dp
@@ -231,8 +232,8 @@ fun ComposeSettingsScreen(
                                         }
                                     }
                                 }
-                                VerticalScrollbar(
-                                    adapter = rememberScrollbarAdapter(searchScrollState),
+                                com.lagradost.cloudstream3.desktop.ui.components.DesktopVerticalScrollbar(
+                                    scrollState = searchScrollState,
                                     modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
                                 )
                             }
@@ -275,8 +276,8 @@ fun ComposeSettingsScreen(
                                     )
                                 }
                             }
-                            VerticalScrollbar(
-                                adapter = rememberScrollbarAdapter(navScrollState),
+                            com.lagradost.cloudstream3.desktop.ui.components.DesktopVerticalScrollbar(
+                                scrollState = navScrollState,
                                 modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
                             )
                         }
@@ -356,6 +357,24 @@ fun ComposeSettingsScreen(
                                             SettingsSubScreen.KEYBOARD_SHORTCUTS -> SettingsShortcutsScreen()
                                             SettingsSubScreen.INTEGRATIONS_TMDB -> SettingsTmdbScreen()
                                             SettingsSubScreen.INTEGRATIONS_ANIME -> SettingsAnimeScreen()
+                                            SettingsSubScreen.ACCOUNTS_ANILIST,
+                                            SettingsSubScreen.ACCOUNTS_MAL,
+                                            SettingsSubScreen.ACCOUNTS_SIMKL -> {
+                                                val trackerId = when (currentSubScreen) {
+                                                    SettingsSubScreen.ACCOUNTS_MAL -> com.lagradost.cloudstream3.desktop.tracking.TrackerIds.MAL
+                                                    SettingsSubScreen.ACCOUNTS_SIMKL -> com.lagradost.cloudstream3.desktop.tracking.TrackerIds.SIMKL
+                                                    else -> com.lagradost.cloudstream3.desktop.tracking.TrackerIds.ANILIST
+                                                }
+                                                val trackerAccountVm = remember(trackerId) {
+                                                    com.lagradost.cloudstream3.desktop.ui.screens.library.LibraryTrackerViewModel(trackerId = trackerId)
+                                                }
+                                                DisposableEffect(trackerAccountVm) {
+                                                    onDispose { trackerAccountVm.dispose() }
+                                                }
+                                                com.lagradost.cloudstream3.desktop.ui.screens.library.dialogs.SettingsTrackerAccountScreen(
+                                                    viewModel = trackerAccountVm,
+                                                )
+                                            }
                                         }
                                     }
                                 }
@@ -380,7 +399,11 @@ fun ComposeSettingsScreen(
                                         -> SettingsSubtitleEditorScreen(viewModel = settingsViewModel)
                                         LeafTab.DOWNLOADS -> SettingsPlayerDownloadsScreen(viewModel = settingsViewModel)
                                         LeafTab.ADVANCED -> SettingsAdvancedScreen(viewModel = settingsViewModel)
-                                        LeafTab.ACCOUNTS -> SettingsAccounts(viewModel = settingsViewModel)
+                                        LeafTab.ACCOUNTS -> SettingsAccounts(
+                                            viewModel = settingsViewModel,
+                                            onNavigate = onNavigate,
+                                            onNavigateToSubScreen = { activeSubScreen = it },
+                                        )
                                         LeafTab.INTEGRATIONS -> SettingsIntegrations(onNavigateToSubScreen = { activeSubScreen = it })
                                         LeafTab.ADDON_CATALOGS -> SettingsExploreCatalogsScreen() /*
                                         LeafTab.EXTENSIONS,

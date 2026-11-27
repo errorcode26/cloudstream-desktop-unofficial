@@ -18,20 +18,23 @@ class HomeHeroSpotlightStackMathTest {
     }
 
     @Test
-    fun testQueueDepthCurves_MonotonicScaleDimOpacityAndZOrder() {
+    fun testQueueDepthCurves_UniformScaleMonotonicFadeShadowAndZOrder() {
         val scales = (0..4).map { HomeHeroSpotlightStackMath.queueScaleForPosition(it) }
         val dims = (0..4).map { HomeHeroSpotlightStackMath.queueDimAlphaForPosition(it) }
+        val shadowAlphas = (0..4).map { HomeHeroSpotlightStackMath.queueShadowAlphaForPosition(it) }
         val zIndices = (0..4).map { HomeHeroSpotlightStackMath.queueZIndexForPosition(it) }
 
         assertEquals(1.0f, scales[0], 0.001f)
         assertEquals(0.0f, dims[0], 0.001f)
+        assertEquals(1.0f, shadowAlphas[0], 0.001f)
         for (i in 0 until 4) {
-            assertTrue(scales[i] > scales[i + 1], "Scale must strictly decrease at pos $i")
+            assertEquals(1.0f, scales[i + 1], 0.001f, "Stack cards keep uniform size at pos ${i + 1}")
             assertTrue(dims[i] < dims[i + 1], "Dimming must strictly increase at pos $i")
+            assertTrue(shadowAlphas[i] > shadowAlphas[i + 1], "Cast shadow alpha must decrease at pos $i")
             assertTrue(zIndices[i] > zIndices[i + 1], "zIndex must strictly decrease at pos $i")
         }
-        assertTrue(HomeHeroSpotlightStackMath.queueOpacityForPosition(3) in 0.7f..1.0f)
-        assertTrue(HomeHeroSpotlightStackMath.queueOpacityForPosition(4) in 0.3f..0.6f)
+        assertTrue(HomeHeroSpotlightStackMath.queueOpacityForPosition(3) in 0.8f..0.95f)
+        assertTrue(HomeHeroSpotlightStackMath.queueOpacityForPosition(4) in 0.65f..0.8f)
     }
 
     @Test
@@ -59,7 +62,12 @@ class HomeHeroSpotlightStackMathTest {
 
         val desktopHero = HomeHeroSpotlightStackMath.calculateHeroHeight(1440.dp, 900.dp)
         val desktopRow = HomeHeroSpotlightStackMath.calculateRowHeight(desktopHero, isCompact = false)
-        assertEquals(900f, desktopHero.value, 0.01f)
-        assertTrue(desktopRow.value in 220f..276f)
+        assertEquals(844f, desktopHero.value, 0.01f)
+        assertTrue(desktopRow.value in 220f..290f)
+
+        val largeHero = HomeHeroSpotlightStackMath.calculateHeroHeight(1920.dp, 1080.dp)
+        val largeRow = HomeHeroSpotlightStackMath.calculateRowHeight(largeHero, isCompact = false)
+        assertEquals(1024f, largeHero.value, 0.01f)
+        assertEquals(290f, largeRow.value, 0.01f)
     }
 }

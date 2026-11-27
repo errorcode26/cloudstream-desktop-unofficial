@@ -25,6 +25,7 @@ import com.lagradost.cloudstream3.desktop.ui.components.AppToastManager
 import com.lagradost.cloudstream3.desktop.ui.components.DesktopButton
 import com.lagradost.cloudstream3.desktop.ui.components.DesktopFilledTonalButton
 import com.lagradost.cloudstream3.desktop.ui.components.DesktopOutlinedButton
+import com.lagradost.cloudstream3.desktop.ui.screens.details.TmdbEnrichmentService
 import com.lagradost.cloudstream3.desktop.ui.theme.AppearanceConfig
 
 /**
@@ -110,7 +111,11 @@ fun SettingsIntegrations(
             enabled = tmdbEnabled,
             onToggle = { MetadataConfig.setTmdbEnabled(it) },
             badges = listOf(
-                if (customTmdbKey.isNotBlank()) "Custom API Key" else "Built-in API Key",
+                when {
+                    customTmdbKey.isNotBlank() -> "Custom API Key"
+                    TmdbEnrichmentService.hasBakedApiKey() -> "Built-in API Key"
+                    else -> "API Key Required"
+                },
                 "Lang: $tmdbLanguage",
             ),
             buttonLabel = "Configure TMDB Studio",
@@ -326,7 +331,15 @@ fun SettingsTmdbScreen() {
                         value = editingTmdbKey,
                         onValueChange = { editingTmdbKey = it },
                         label = { Text("Custom V3 API Key (Optional)") },
-                        placeholder = { Text("Leave blank to use CloudStream's high-speed default key") },
+                        placeholder = {
+                            Text(
+                                if (TmdbEnrichmentService.hasBakedApiKey()) {
+                                    "Leave blank to use build-configured key"
+                                } else {
+                                    "Enter your TMDB v3 API key"
+                                },
+                            )
+                        },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(10.dp),
@@ -346,9 +359,17 @@ fun SettingsTmdbScreen() {
                         },
                     )
                     Text(
-                        text = if (customTmdbKey.isBlank()) "✓ Using built-in high-speed TMDB API key." else "✓ Using your custom user TMDB API key.",
+                        text = when {
+                            customTmdbKey.isNotBlank() -> "✓ Using your custom user TMDB API key."
+                            TmdbEnrichmentService.hasBakedApiKey() -> "✓ Using build-configured TMDB API key."
+                            else -> "No TMDB key configured in this build. Enter a custom TMDB v3 API key above or set tmdb.key in local.properties."
+                        },
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary,
+                        color = if (customTmdbKey.isNotBlank() || TmdbEnrichmentService.hasBakedApiKey()) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.error
+                        },
                     )
                 }
             }

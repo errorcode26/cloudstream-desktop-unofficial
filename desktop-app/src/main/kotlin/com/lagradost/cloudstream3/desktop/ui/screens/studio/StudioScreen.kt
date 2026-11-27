@@ -29,9 +29,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.lagradost.cloudstream3.TvType
-import com.lagradost.cloudstream3.desktop.ui.components.DesktopBackButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopDrilldownScaffold
 import com.lagradost.cloudstream3.desktop.ui.components.LocalDesktopTheme
-import com.lagradost.cloudstream3.desktop.ui.components.WindowControlsPill
 import com.lagradost.cloudstream3.desktop.ui.navigation.Config
 import com.lagradost.cloudstream3.desktop.explore.models.ExploreItem
 import com.lagradost.cloudstream3.desktop.explore.ui.ExploreProviderDialog
@@ -57,70 +56,108 @@ fun StudioScreen(
         viewModel.loadStudio(name, companyId, isNetwork)
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(theme.Background),
+    DesktopDrilldownScaffold(
+        onBack = onBack,
+        backgroundOverlay = {
+            val ambientLogo = uiState.studioDetail?.logoUrl ?: logoUrl
+            if (!ambientLogo.isNullOrBlank()) {
+                AsyncImage(
+                    model = ambientLogo,
+                    contentDescription = null,
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .blur(120.dp)
+                        .graphicsLayer(alpha = 0.08f),
+                )
+            }
+        },
+        dialogs = {
+            uiState.selectedItemForMatch?.let { selectedItem ->
+                val exploreItem = remember(selectedItem) {
+                    ExploreItem(
+                        id = selectedItem.tmdbId.toString(),
+                        type = if (selectedItem.mediaType == TvType.TvSeries) "series" else "movie",
+                        name = selectedItem.title,
+                        posterUrl = selectedItem.posterUrl,
+                        backgroundUrl = selectedItem.backdropUrl,
+                        releaseYear = selectedItem.releaseYear,
+                        description = selectedItem.overview,
+                        rating = selectedItem.voteAverage,
+                    )
+                }
+                ExploreProviderDialog(
+                    item = exploreItem,
+                    matches = uiState.providerMatches,
+                    isSearching = uiState.isSearchingProviders,
+                    onDismissRequest = { viewModel.onEvent(StudioUiEvent.CloseProviderPicker) },
+                    onOpenAddonMode = { item ->
+                        viewModel.onEvent(StudioUiEvent.CloseProviderPicker)
+                        onNavigate(
+                            Config.Details(
+                                providerName = "Stremio",
+                                url = "stremio://${item.type}/${item.id}",
+                                preloadedName = item.name,
+                                preloadedPoster = item.posterUrl,
+                                preloadedBg = item.backgroundUrl,
+                            ),
+                        )
+                    },
+                    onOpenDetails = { providerName, url, title ->
+                        viewModel.onEvent(StudioUiEvent.CloseProviderPicker)
+                        onNavigate(
+                            Config.Details(
+                                providerName = providerName,
+                                url = url,
+                                preloadedName = title,
+                                preloadedPoster = selectedItem.posterUrl,
+                                preloadedBg = selectedItem.backdropUrl,
+                            ),
+                        )
+                    },
+                )
+            }
+        },
     ) {
-        // Ambient backdrop glow from studio logo / artwork
-        val ambientLogo = uiState.studioDetail?.logoUrl ?: logoUrl
-        if (!ambientLogo.isNullOrBlank()) {
-            AsyncImage(
-                model = ambientLogo,
-                contentDescription = null,
-                contentScale = ContentScale.Fit,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .blur(120.dp)
-                    .graphicsLayer(alpha = 0.08f),
-            )
-        }
-
-        // Main Content Area
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(top = 64.dp, start = 24.dp, end = 24.dp, bottom = 16.dp),
-        ) {
-            if (uiState.isLoading) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center,
+        if (uiState.isLoading) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center,
+            ) {
+                CircularProgressIndicator(
+                    color = theme.Accent,
+                    modifier = Modifier.size(48.dp),
+                )
+            }
+        } else if (uiState.error != null && uiState.studioDetail == null) {
+            Column(
+                modifier = Modifier.fillMaxSize(),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Icon(
+                    imageVector = if (uiState.isNetwork) Icons.Default.Tv else Icons.Default.Business,
+                    contentDescription = null,
+                    modifier = Modifier.size(64.dp),
+                    tint = theme.TextMuted.copy(alpha = 0.5f),
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = uiState.error ?: "No information available",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = theme.TextMuted,
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                com.lagradost.cloudstream3.desktop.ui.components.DesktopButton(
+                    onClick = { viewModel.onEvent(StudioUiEvent.Retry) },
+                    colors = ButtonDefaults.buttonColors(containerColor = theme.Accent),
                 ) {
-                    CircularProgressIndicator(
-                        color = theme.Accent,
-                        modifier = Modifier.size(48.dp),
-                    )
+                    Text("Retry", color = Color.White)
                 }
-            } else if (uiState.error != null && uiState.studioDetail == null) {
-                Column(
-                    modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.Center,
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    Icon(
-                        imageVector = if (uiState.isNetwork) Icons.Default.Tv else Icons.Default.Business,
-                        contentDescription = null,
-                        modifier = Modifier.size(64.dp),
-                        tint = theme.TextMuted.copy(alpha = 0.5f),
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        text = uiState.error ?: "No information available",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = theme.TextMuted,
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    com.lagradost.cloudstream3.desktop.ui.components.DesktopButton(
-                        onClick = { viewModel.onEvent(StudioUiEvent.Retry) },
-                        colors = ButtonDefaults.buttonColors(containerColor = theme.Accent),
-                    ) {
-                        Text("Retry", color = Color.White)
-                    }
-                }
-            } else {
-                val detail = uiState.studioDetail ?: return@Box
-                BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+            }
+        } else {
+            val detail = uiState.studioDetail ?: return@DesktopDrilldownScaffold
+            BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
                     if (maxWidth >= 900.dp) {
                         // Desktop Split-View
                         Row(
@@ -178,69 +215,7 @@ fun StudioScreen(
                 }
             }
         }
-
-        // Floating Top Action Layer (Corner-anchored, matching DetailsScreen)
-        Row(
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .fillMaxWidth()
-                .padding(start = 16.dp, end = 16.dp, top = 7.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            DesktopBackButton(onClick = onBack)
-            WindowControlsPill(isHome = false, isCompact = false)
-        }
-
-        // Multi-Provider Stream Match Resolver Dialog
-        uiState.selectedItemForMatch?.let { selectedItem ->
-
-            val exploreItem = remember(selectedItem) {
-                ExploreItem(
-                    id = selectedItem.tmdbId.toString(),
-                    type = if (selectedItem.mediaType == TvType.TvSeries) "series" else "movie",
-                    name = selectedItem.title,
-                    posterUrl = selectedItem.posterUrl,
-                    backgroundUrl = selectedItem.backdropUrl,
-                    releaseYear = selectedItem.releaseYear,
-                    description = selectedItem.overview,
-                    rating = selectedItem.voteAverage,
-                )
-            }
-            ExploreProviderDialog(
-                item = exploreItem,
-
-                matches = uiState.providerMatches,
-                isSearching = uiState.isSearchingProviders,
-                onDismissRequest = { viewModel.onEvent(StudioUiEvent.CloseProviderPicker) },
-                onOpenAddonMode = { item ->
-                    viewModel.onEvent(StudioUiEvent.CloseProviderPicker)
-                    onNavigate(
-                        Config.Details(
-                            providerName = "Stremio",
-                            url = "stremio://${item.type}/${item.id}",
-                            preloadedName = item.name,
-                            preloadedPoster = item.posterUrl,
-                            preloadedBg = item.backgroundUrl,
-                        ),
-                    )
-                },
-                onOpenDetails = { providerName, url, title ->
-                    viewModel.onEvent(StudioUiEvent.CloseProviderPicker)
-                    onNavigate(
-                        Config.Details(
-                            providerName = providerName,
-                            url = url,
-                            preloadedName = title,
-                            preloadedPoster = selectedItem.posterUrl,
-                            preloadedBg = selectedItem.backdropUrl,
-                        ),
-                    )
-                },
-            )
-        }
     }
-}
 
 @Composable
 private fun StudioHeroSidebar(

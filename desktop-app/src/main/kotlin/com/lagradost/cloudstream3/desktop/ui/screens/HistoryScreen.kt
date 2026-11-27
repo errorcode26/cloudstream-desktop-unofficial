@@ -111,7 +111,10 @@ fun ComposeHistoryScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                        .padding(
+                            horizontal = com.lagradost.cloudstream3.desktop.ui.DesktopDimens.TabInnerHorizontalPadding,
+                            vertical = com.lagradost.cloudstream3.desktop.ui.DesktopDimens.TabInnerVerticalPadding,
+                        ),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {

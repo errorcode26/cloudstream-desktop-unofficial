@@ -119,6 +119,54 @@ class RateLimitInterceptor(private val minDelayMs: Long = 500L) : okhttp3.Interc
     }
 }
 
+private class DiceBearPacerInterceptor(
+    private val minIntervalMs: Long = 115L,
+) : okhttp3.Interceptor {
+    private val paceLock = Any()
+    private var nextAllowedMs = 0L
+
+    override fun intercept(chain: okhttp3.Interceptor.Chain): okhttp3.Response {
+        val request = chain.request()
+        val isDiceBearPng = request.url.host.equals("api.dicebear.com", ignoreCase = true) &&
+            request.url.encodedPath.contains("/png", ignoreCase = true)
+        if (!isDiceBearPng) {
+            return chain.proceed(request)
+        }
+
+        paceRequest()
+        var response = chain.proceed(request)
+        if (response.code == 429) {
+            val retryAfterSec = response.header("Retry-After")?.toLongOrNull()
+            response.close()
+            val backoffMs = ((retryAfterSec ?: 1L) * 1000L).coerceIn(500L, 3000L)
+            try {
+                Thread.sleep(backoffMs)
+            } catch (_: InterruptedException) {
+                Thread.currentThread().interrupt()
+            }
+            paceRequest()
+            response = chain.proceed(request)
+        }
+        return response
+    }
+
+    private fun paceRequest() {
+        val waitUntil = synchronized(paceLock) {
+            val scheduled = maxOf(System.currentTimeMillis(), nextAllowedMs)
+            nextAllowedMs = scheduled + minIntervalMs
+            scheduled
+        }
+        val sleepMs = waitUntil - System.currentTimeMillis()
+        if (sleepMs > 0L) {
+            try {
+                Thread.sleep(sleepMs)
+            } catch (_: InterruptedException) {
+                Thread.currentThread().interrupt()
+            }
+        }
+    }
+}
+
 /**
  * Automatically retries GET requests once if they fail with a "Connection reset" SocketException.
  * This hides the "first time fail, works on retry" provider quirk from the user.
@@ -514,6 +562,7 @@ object NetworkConfig {
             .apply {
                 interceptors().removeAll { it is RateLimitInterceptor || it is DevNetworkInterceptor }
             }
+            .addInterceptor(DiceBearPacerInterceptor())
             .addInterceptor(
                 okhttp3.Interceptor { chain ->
                     var request = chain.request()

@@ -48,6 +48,9 @@ class DefaultRootComponent(
                 is Config.Studio -> com.lagradost.cloudstream3.desktop.discord.DiscordRpcManager.updateBrowsing(if (config.isNetwork) "Network" else "Studio", config.name)
                 is Config.FullCast -> com.lagradost.cloudstream3.desktop.discord.DiscordRpcManager.updateBrowsing("Cast & Crew", config.mediaTitle)
                 is Config.Links -> com.lagradost.cloudstream3.desktop.discord.DiscordRpcManager.updateBrowsing("Streams", config.history.showName)
+                is Config.ProfileEdit -> com.lagradost.cloudstream3.desktop.discord.DiscordRpcManager.updateBrowsing(
+                    if (config.profileId == null) "Create Profile" else "Edit Profile",
+                )
             }
         }
     }
@@ -108,6 +111,12 @@ class DefaultRootComponent(
             )
             is Config.Links -> RootComponent.Child.Links(
                 com.lagradost.cloudstream3.desktop.ui.navigation.components.LinksComponent(
+                    componentContext = componentContext,
+                    config = config,
+                ),
+            )
+            is Config.ProfileEdit -> RootComponent.Child.ProfileEdit(
+                com.lagradost.cloudstream3.desktop.ui.navigation.components.ProfileEditComponent(
                     componentContext = componentContext,
                     config = config,
                 ),

@@ -411,6 +411,11 @@ class LinksViewModel : BaseMviViewModel<LinksUiState, LinksUiEvent, LinksUiEffec
                 enrichedActors = event.enrichedActors,
                 enrichedLogoUrl = event.enrichedLogoUrl,
                 enrichedBackdropUrl = event.enrichedBackdropUrl,
+                canonicalSeed = event.canonicalSeed,
+                resolvedAnilistId = event.resolvedAnilistId,
+                resolvedMalId = event.resolvedMalId,
+                resolvedYear = event.resolvedYear,
+                hasMultipleSeasons = event.hasMultipleSeasons,
             )
             sendEffect(LinksUiEffect.LaunchEmbeddedPlayer(launchData))
             updateState { copy(statusText = "Playing in embedded player: ${link.name}") }

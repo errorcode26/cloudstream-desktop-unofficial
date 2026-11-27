@@ -1,9 +1,15 @@
 package com.lagradost.cloudstream3.desktop.ui.screens.profile
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -34,7 +40,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lagradost.cloudstream3.desktop.profile.Profile
 import com.lagradost.cloudstream3.desktop.profile.ProfileAvatar
-import com.lagradost.cloudstream3.desktop.ui.DesktopAppShell
 import com.lagradost.cloudstream3.desktop.ui.components.DesktopButton
 import com.lagradost.cloudstream3.desktop.ui.components.DesktopOutlinedButton
 import com.lagradost.cloudstream3.desktop.ui.components.PinCodeDialog
@@ -68,43 +73,33 @@ fun ProfileSelectScreen(
         },
     )
 
-    // Profile Edit / Create Modal
-    if (uiState.editingProfile != null || uiState.isCreatingNew) {
-        ProfileEditDialog(
-            profile = uiState.editingProfile,
-            canDelete = uiState.profiles.size > 1,
-            onDismiss = { viewModel.onEvent(ProfileUiEvent.OnDismissEdit) },
-            onSave = { name, colorIndex, customAvatar, pin, isKids, autoSignIn ->
-                viewModel.onEvent(
-                    ProfileUiEvent.OnSaveProfile(
-                        name = name,
-                        colorIndex = colorIndex,
-                        customAvatar = customAvatar,
-                        pin = pin,
-                        isKids = isKids,
-                        autoSignIn = autoSignIn,
-                    ),
+    AnimatedContent(
+        targetState = Pair(uiState.isCreatingNew, uiState.editingProfile?.id),
+        transitionSpec = {
+            (fadeIn(tween(220)) + scaleIn(initialScale = 0.98f, animationSpec = tween(220))) togetherWith
+                fadeOut(tween(180))
+        },
+        label = "profile_select_editor_transition",
+    ) { (isCreating, editingProfileId) ->
+        if (isCreating || editingProfileId != null) {
+            val editViewModel = remember(isCreating, editingProfileId) {
+                ProfileEditViewModel(
+                    profileId = if (isCreating) null else editingProfileId,
+                    switchOnSaveWhenCreated = false,
                 )
-            },
-            onDelete = {
-                uiState.editingProfile?.let { viewModel.onEvent(ProfileUiEvent.OnDeleteProfile(it.id)) }
-            },
-        )
-    }
-
-    // Inherit the global app shell wallpaper, ambient glows, and theme backdrop
-    DesktopAppShell(
-        onNavigate = {},
-        showDock = false,
-        showTopBar = false,
-        applySafePadding = false,
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.40f)),
-            contentAlignment = Alignment.Center,
-        ) {
+            }
+            DisposableEffect(editViewModel) {
+                onDispose { editViewModel.dispose() }
+            }
+            ProfileEditScreen(
+                viewModel = editViewModel,
+                onBack = { viewModel.onEvent(ProfileUiEvent.OnDismissEdit) },
+            )
+        } else {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center,
+            ) {
             Column(
                 modifier = Modifier
                     .widthIn(max = 900.dp)
@@ -211,7 +206,7 @@ fun ProfileSelectScreen(
                             colors = ButtonDefaults.outlinedButtonColors(
                                 containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
                             ),
-                            border = ButtonDefaults.outlinedButtonBorder.copy(
+                            border = ButtonDefaults.outlinedButtonBorder(enabled = true).copy(
                                 brush = Brush.linearGradient(listOf(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f), MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))),
                             ),
                             contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp),
@@ -223,6 +218,7 @@ fun ProfileSelectScreen(
                     }
                 }
             }
+        }
         }
     }
 }

@@ -207,4 +207,19 @@ class DetailsViewModelTest {
         vm.onEvent(DetailsUiEvent.OnToggleEpisodeWatched(ep, isWatched = false))
         assertNull(vm.uiState.value.watchHistory[ep.data])
     }
+
+    @Test
+    fun testOnOpenAndDismissTrackerDrawer() {
+        val vm = DetailsViewModel(
+            provider = testApi,
+            url = "https://details.example.com/show/42",
+        ).also { activeVm = it }
+
+        assertFalse(vm.uiState.value.trackers.isDrawerOpen)
+        vm.onEvent(DetailsUiEvent.OnOpenTrackerDrawer())
+        assertTrue(vm.uiState.value.trackers.isDrawerOpen)
+
+        vm.onEvent(DetailsUiEvent.OnDismissTrackerDrawer)
+        assertFalse(vm.uiState.value.trackers.isDrawerOpen)
+    }
 }

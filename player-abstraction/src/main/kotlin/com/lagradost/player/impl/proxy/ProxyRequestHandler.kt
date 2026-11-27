@@ -112,11 +112,8 @@ internal object ProxyRequestHandler {
             }
 
             // Local File Interception: bypass network stack for local subtitle paths
-            val isLocalFilePath = url.length >= 2 && (
-                (url[1] == ':' && url[2] == '\\') ||
-                    (url[1] == ':' && url[2] == '/') ||
-                    url.startsWith("/")
-                )
+            val isLocalFilePath = (url.length >= 3 && url[1] == ':' && (url[2] == '\\' || url[2] == '/')) ||
+                url.startsWith("/")
             if (isLocalFilePath) {
                 val file = File(url)
                 if (!file.exists() || !file.isFile) {
@@ -301,7 +298,7 @@ internal object ProxyRequestHandler {
                     if (rawInitBytes == null) {
                         try {
                             val initReqBuilder = Request.Builder().url(initUrl)
-                            mergedHeaders.forEach { (k, v) -> initReqBuilder.header(k, v) }
+                            mergedHeaders.forEach { (k, v) -> initReqBuilder.safeHeader(k, v) }
                             val initResp = client.newCall(initReqBuilder.build()).await()
                             if (initResp.isSuccessful) {
                                 val fetchedRaw = initResp.body?.source()?.readByteArray()
@@ -551,6 +548,8 @@ internal object ProxyRequestHandler {
                 )
                 return
             }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
         } catch (e: Exception) {
             val isChannelClosed = e is io.ktor.utils.io.ClosedWriteChannelException ||
                 e.cause is io.ktor.utils.io.ClosedWriteChannelException ||

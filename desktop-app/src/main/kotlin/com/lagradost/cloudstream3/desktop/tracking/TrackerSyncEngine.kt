@@ -486,6 +486,8 @@ class TrackerSyncEngine(
                         progress = effectiveEp,
                     )
                 }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 repository.updateAuditState(auditRowId, SyncState.FAILED, e.message ?: "Network exception")
                 notifyAll("$trackerLabel sync failed for '$displayTitle' Ep $effectiveEp", isWarning = true)

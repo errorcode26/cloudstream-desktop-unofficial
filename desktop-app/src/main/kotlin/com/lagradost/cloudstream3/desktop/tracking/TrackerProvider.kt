@@ -26,7 +26,35 @@ enum class UnifiedWatchStatus(val label: String) {
             DROPPED,
             REWATCHING,
         )
+
+        fun supportedStatusesFor(providerId: String, isMovie: Boolean): List<UnifiedWatchStatus> =
+            editableStatuses.filter { status ->
+                when {
+                    providerId == TrackerIds.SIMKL && isMovie ->
+                        status == PLAN_TO_WATCH || status == COMPLETED || status == DROPPED
+                    providerId == TrackerIds.SIMKL -> status != REWATCHING
+                    else -> true
+                }
+            }
+
+        fun defaultUnaddedStatusFor(providerId: String, isMovie: Boolean): UnifiedWatchStatus =
+            if (isMovie) PLAN_TO_WATCH else WATCHING
     }
+}
+
+fun adjustedProgressForStatus(
+    currentProgress: Int,
+    targetStatus: UnifiedWatchStatus,
+    isMovie: Boolean,
+    ceiling: Int?,
+): Int {
+    val base = when {
+        targetStatus == UnifiedWatchStatus.PLAN_TO_WATCH -> 0
+        isMovie && targetStatus == UnifiedWatchStatus.COMPLETED -> 1
+        isMovie && currentProgress > 0 && targetStatus != UnifiedWatchStatus.COMPLETED -> 0
+        else -> currentProgress.coerceAtLeast(0)
+    }
+    return if (ceiling != null && base > ceiling) ceiling else base
 }
 
 fun SyncWatchType.toUnifiedWatchStatus(): UnifiedWatchStatus = when (this) {
@@ -123,6 +151,16 @@ data class UnifiedLibraryEntry(
         get() = "$providerId:$remoteMediaId"
 }
 
+@Immutable
+data class TrackerLibraryPage(
+    val entries: List<UnifiedLibraryEntry>,
+    val nextCursor: String? = null,
+    val hasMore: Boolean = false,
+    val statusCounts: Map<UnifiedWatchStatus, Int>? = null,
+    val totalCount: Int? = null,
+    val supportsServerTabFilter: Boolean = false,
+)
+
 /**
  * Provider-agnostic interface implemented by each remote tracking integration
  * (AniList today, MyAnimeList / SIMKL / Trakt incrementally).
@@ -192,7 +230,37 @@ interface TrackerProvider {
 
     suspend fun fetchLibrary(repository: TrackingRepository): Result<List<UnifiedLibraryEntry>>
 
+    suspend fun fetchLibraryPage(
+        repository: TrackingRepository,
+        statusFilter: UnifiedWatchStatus? = null,
+        sortKey: String? = null,
+        cursor: String? = null,
+        pageSize: Int = DEFAULT_LIBRARY_PAGE_SIZE,
+    ): Result<TrackerLibraryPage> = fetchLibrary(repository).map { allEntries ->
+        val counts = HashMap<UnifiedWatchStatus, Int>()
+        for (entry in allEntries) {
+            counts[entry.status] = (counts[entry.status] ?: 0) + 1
+        }
+        val filtered = if (statusFilter == null) allEntries else allEntries.filter { it.status == statusFilter }
+        val offset = cursor?.toIntOrNull()?.coerceAtLeast(0) ?: 0
+        val limit = pageSize.coerceAtLeast(1)
+        val slice = if (offset >= filtered.size) emptyList() else filtered.subList(offset, minOf(offset + limit, filtered.size))
+        val nextOffset = offset + slice.size
+        TrackerLibraryPage(
+            entries = slice,
+            nextCursor = nextOffset.takeIf { it < filtered.size }?.toString(),
+            hasMore = nextOffset < filtered.size,
+            statusCounts = counts,
+            totalCount = allEntries.size,
+            supportsServerTabFilter = false,
+        )
+    }
+
     fun requiresLibraryRefresh(): Boolean = false
+
+    companion object {
+        const val DEFAULT_LIBRARY_PAGE_SIZE = 50
+    }
 
     fun validateStatusAndProgress(
         bounds: ReleaseBounds,

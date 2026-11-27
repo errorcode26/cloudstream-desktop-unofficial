@@ -86,6 +86,7 @@ fun DetailsTrackerDrawerHost(
     currentSeasonEpisodes: List<Episode>,
     onEvent: (DetailsUiEvent) -> Unit,
     modifier: Modifier = Modifier,
+    isMovieLike: Boolean = false,
 ) {
     Box(modifier = modifier.fillMaxSize().zIndex(90f)) {
         AnimatedVisibility(
@@ -117,6 +118,7 @@ fun DetailsTrackerDrawerHost(
                 showName = showName,
                 trackersState = trackersState,
                 currentSeasonEpisodes = currentSeasonEpisodes,
+                isMovieLike = isMovieLike,
                 onEvent = onEvent,
             )
         }
@@ -130,6 +132,7 @@ private fun DetailsTrackerDrawerPanel(
     currentSeasonEpisodes: List<Episode>,
     onEvent: (DetailsUiEvent) -> Unit,
     modifier: Modifier = Modifier,
+    isMovieLike: Boolean = false,
 ) {
     val theme = LocalDesktopTheme.current
     val chipShape = LocalDesktopButtonShapes.current.compact
@@ -190,8 +193,11 @@ private fun DetailsTrackerDrawerPanel(
                             fontWeight = FontWeight.Bold,
                             color = theme.TextPrimary,
                         )
+                        val activeIsMovie = isMovieLike ||
+                            entry?.releaseBounds?.format.equals("MOVIE", ignoreCase = true) ||
+                            entry?.boundEntry?.remoteMediaId?.startsWith("movie:", ignoreCase = true) == true
                         Text(
-                            text = "$showName • Season ${entry?.mappedSeason ?: 1}",
+                            text = if (activeIsMovie) "$showName • Movie" else "$showName • Season ${entry?.mappedSeason ?: 1}",
                             style = MaterialTheme.typography.labelSmall,
                             color = theme.TextMuted,
                             maxLines = 1,
@@ -228,12 +234,20 @@ private fun DetailsTrackerDrawerPanel(
                                 TrackerIds.SIMKL -> "SIMKL"
                                 else -> "AniList"
                             }
+                            val tabIsMovie = isMovieLike ||
+                                trackerEntry.releaseBounds.format.equals("MOVIE", ignoreCase = true) ||
+                                trackerEntry.boundEntry?.remoteMediaId?.startsWith("movie:", ignoreCase = true) == true
                             val tabBadge = when {
                                 trackerEntry.resolution is MatchResolution.BlockedByUser -> "Off"
                                 trackerEntry.boundEntry != null -> {
-                                    val prog = trackerEntry.remoteStatus?.progress ?: trackerEntry.editProgress
-                                    val tot = trackerEntry.remoteStatus?.totalEpisodes ?: trackerEntry.boundEntry.expectedTotalEpisodes?.toInt()
-                                    if (tot != null && tot > 0) "$prog/$tot" else "Ep $prog"
+                                    if (tabIsMovie) {
+                                        trackerEntry.remoteStatus?.status?.takeIf { it != UnifiedWatchStatus.NONE }?.label
+                                            ?: if (trackerEntry.editProgress >= 1) "Watched" else "Linked"
+                                    } else {
+                                        val prog = trackerEntry.remoteStatus?.progress ?: trackerEntry.editProgress
+                                        val tot = trackerEntry.remoteStatus?.totalEpisodes ?: trackerEntry.boundEntry.expectedTotalEpisodes?.toInt()
+                                        if (tot != null && tot > 0) "$prog/$tot" else "Ep $prog"
+                                    }
                                 }
                                 trackerEntry.searchResults.isNotEmpty() -> "Match Found"
                                 trackerEntry.bindPolicy == TrackerBindPolicy.MANUAL_PIN_ONLY -> "Manual"
@@ -359,10 +373,14 @@ private fun DetailsTrackerDrawerPanel(
                             onChangeMatch = { onEvent(DetailsUiEvent.OnToggleTrackerSearch(providerId)) },
                         )
 
-                        // Watch Status (2x3 grid)
+                        val isMovieEntry = isMovieLike ||
+                            bounds.format.equals("MOVIE", ignoreCase = true) ||
+                            bound.remoteMediaId.startsWith("movie:", ignoreCase = true)
+
+                        // Watch Status grid
                         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             Text("Watch Status", style = MaterialTheme.typography.labelMedium, color = theme.TextMuted)
-                            UnifiedWatchStatus.editableStatuses.chunked(3).forEach { rowStatuses ->
+                            UnifiedWatchStatus.supportedStatusesFor(providerId, isMovieEntry).chunked(3).forEach { rowStatuses ->
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -411,7 +429,7 @@ private fun DetailsTrackerDrawerPanel(
                             }
                         }
 
-                        // Episode Progress Card with Animated Track + Stepper
+                        // Progress Card
                         Surface(
                             shape = RoundedCornerShape(12.dp),
                             color = theme.SurfaceElevated.copy(alpha = 0.45f),
@@ -419,86 +437,130 @@ private fun DetailsTrackerDrawerPanel(
                             modifier = Modifier.fillMaxWidth(),
                         ) {
                             Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                val ceiling = bounds.ceilingEpisode
-                                val totalForBar = (bounds.totalEpisodes ?: bounds.ceilingEpisode ?: 0).coerceAtLeast(1)
-                                val targetFrac = if ((bounds.totalEpisodes ?: 0) > 0 || (bounds.ceilingEpisode ?: 0) > 0) {
-                                    (entry.editProgress.toFloat() / totalForBar.toFloat()).coerceIn(0f, 1f)
-                                } else {
-                                    if (entry.editProgress > 0) 0.5f else 0f
-                                }
-                                val animFrac by animateFloatAsState(
-                                    targetValue = targetFrac,
-                                    animationSpec = tween(260),
-                                    label = "progressFill",
-                                )
-
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    Text("Episode Progress", style = MaterialTheme.typography.labelMedium, color = theme.TextMuted)
-                                    val totalLabel = bounds.totalEpisodes?.let { " / $it" } ?: ""
-                                    Text(
-                                        text = "Ep ${entry.editProgress}$totalLabel",
-                                        style = MaterialTheme.typography.titleSmall,
-                                        fontWeight = FontWeight.Bold,
-                                        color = brandColor,
-                                    )
-                                }
-
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(6.dp)
-                                        .clip(CircleShape)
-                                        .background(theme.Divider.copy(alpha = 0.35f)),
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxWidth(animFrac)
-                                            .fillMaxHeight()
-                                            .background(brandColor, CircleShape),
-                                    )
-                                }
-
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
+                                if (isMovieEntry) {
+                                    val isMovieWatched = entry.editProgress >= 1
                                     Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
                                         verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                                     ) {
-                                        DesktopOutlinedButton(
-                                            onClick = { onEvent(DetailsUiEvent.OnSetTrackerRemoteProgress(providerId, entry.editProgress - 1)) },
-                                            enabled = entry.editProgress > 0 && !entry.isSaving,
-                                            contentPadding = PaddingValues(horizontal = 10.dp),
-                                            modifier = Modifier.height(34.dp),
-                                        ) {
-                                            Icon(Icons.Default.Remove, contentDescription = "Decrease episode", modifier = Modifier.size(15.dp))
-                                        }
-                                        DesktopOutlinedButton(
-                                            onClick = { onEvent(DetailsUiEvent.OnSetTrackerRemoteProgress(providerId, entry.editProgress + 1)) },
-                                            enabled = !bounds.isNotYetReleased && (ceiling == null || entry.editProgress < ceiling) && !entry.isSaving,
-                                            contentPadding = PaddingValues(horizontal = 10.dp),
-                                            modifier = Modifier.height(34.dp),
-                                        ) {
-                                            Icon(Icons.Default.Add, contentDescription = "Increase episode", modifier = Modifier.size(15.dp))
-                                        }
+                                        Text("Movie Progress", style = MaterialTheme.typography.labelMedium, color = theme.TextMuted)
+                                        Text(
+                                            text = if (isMovieWatched) "Watched" else "Unwatched",
+                                            style = MaterialTheme.typography.titleSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (isMovieWatched) brandColor else theme.TextMuted,
+                                        )
+                                    }
+                                    DesktopOutlinedButton(
+                                        onClick = {
+                                            val nextWatched = !isMovieWatched
+                                            if (nextWatched) {
+                                                if (entry.editStatus == UnifiedWatchStatus.PLAN_TO_WATCH) {
+                                                    onEvent(DetailsUiEvent.OnSetTrackerRemoteStatus(providerId, UnifiedWatchStatus.COMPLETED))
+                                                } else {
+                                                    onEvent(DetailsUiEvent.OnSetTrackerRemoteProgress(providerId, 1))
+                                                }
+                                            } else {
+                                                if (entry.editStatus == UnifiedWatchStatus.COMPLETED) {
+                                                    onEvent(DetailsUiEvent.OnSetTrackerRemoteStatus(providerId, UnifiedWatchStatus.PLAN_TO_WATCH))
+                                                } else {
+                                                    onEvent(DetailsUiEvent.OnSetTrackerRemoteProgress(providerId, 0))
+                                                }
+                                            }
+                                        },
+                                        enabled = !entry.isSaving && (!bounds.isNotYetReleased || isMovieWatched),
+                                        modifier = Modifier.fillMaxWidth().height(36.dp),
+                                    ) {
+                                        Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(15.dp))
+                                        Spacer(Modifier.width(6.dp))
+                                        Text(
+                                            text = if (isMovieWatched) "Mark as Unwatched" else "Mark as Watched",
+                                            fontSize = 12.sp,
+                                        )
+                                    }
+                                } else {
+                                    val ceiling = bounds.ceilingEpisode
+                                    val totalForBar = (bounds.totalEpisodes ?: bounds.ceilingEpisode ?: 0).coerceAtLeast(1)
+                                    val targetFrac = if ((bounds.totalEpisodes ?: 0) > 0 || (bounds.ceilingEpisode ?: 0) > 0) {
+                                        (entry.editProgress.toFloat() / totalForBar.toFloat()).coerceIn(0f, 1f)
+                                    } else {
+                                        if (entry.editProgress > 0) 0.5f else 0f
+                                    }
+                                    val animFrac by animateFloatAsState(
+                                        targetValue = targetFrac,
+                                        animationSpec = tween(260),
+                                        label = "progressFill",
+                                    )
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        Text("Episode Progress", style = MaterialTheme.typography.labelMedium, color = theme.TextMuted)
+                                        val totalLabel = bounds.totalEpisodes?.let { " / $it" } ?: ""
+                                        Text(
+                                            text = "Ep ${entry.editProgress}$totalLabel",
+                                            style = MaterialTheme.typography.titleSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = brandColor,
+                                        )
                                     }
 
-                                    if (currentSeasonEpisodes.isNotEmpty() && !bounds.isNotYetReleased) {
-                                        DesktopOutlinedButton(
-                                            onClick = { onEvent(DetailsUiEvent.OnSyncReleasedEpisodesToTracker(providerId, currentSeasonEpisodes)) },
-                                            enabled = !entry.isSaving,
-                                            contentPadding = PaddingValues(horizontal = 10.dp),
-                                            modifier = Modifier.height(34.dp),
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(6.dp)
+                                            .clip(CircleShape)
+                                            .background(theme.Divider.copy(alpha = 0.35f)),
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth(animFrac)
+                                                .fillMaxHeight()
+                                                .background(brandColor, CircleShape),
+                                        )
+                                    }
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
                                         ) {
-                                            Icon(Icons.Default.Sync, contentDescription = null, modifier = Modifier.size(14.dp))
-                                            Spacer(Modifier.width(5.dp))
-                                            Text("Sync Aired", fontSize = 12.sp)
+                                            DesktopOutlinedButton(
+                                                onClick = { onEvent(DetailsUiEvent.OnSetTrackerRemoteProgress(providerId, entry.editProgress - 1)) },
+                                                enabled = entry.editProgress > 0 && !entry.isSaving,
+                                                contentPadding = PaddingValues(horizontal = 10.dp),
+                                                modifier = Modifier.height(34.dp),
+                                            ) {
+                                                Icon(Icons.Default.Remove, contentDescription = "Decrease episode", modifier = Modifier.size(15.dp))
+                                            }
+                                            DesktopOutlinedButton(
+                                                onClick = { onEvent(DetailsUiEvent.OnSetTrackerRemoteProgress(providerId, entry.editProgress + 1)) },
+                                                enabled = !bounds.isNotYetReleased && (ceiling == null || entry.editProgress < ceiling) && !entry.isSaving,
+                                                contentPadding = PaddingValues(horizontal = 10.dp),
+                                                modifier = Modifier.height(34.dp),
+                                            ) {
+                                                Icon(Icons.Default.Add, contentDescription = "Increase episode", modifier = Modifier.size(15.dp))
+                                            }
+                                        }
+
+                                        if (currentSeasonEpisodes.isNotEmpty() && !bounds.isNotYetReleased) {
+                                            DesktopOutlinedButton(
+                                                onClick = { onEvent(DetailsUiEvent.OnSyncReleasedEpisodesToTracker(providerId, currentSeasonEpisodes)) },
+                                                enabled = !entry.isSaving,
+                                                contentPadding = PaddingValues(horizontal = 10.dp),
+                                                modifier = Modifier.height(34.dp),
+                                            ) {
+                                                Icon(Icons.Default.Sync, contentDescription = null, modifier = Modifier.size(14.dp))
+                                                Spacer(Modifier.width(5.dp))
+                                                Text("Sync Aired", fontSize = 12.sp)
+                                            }
                                         }
                                     }
                                 }

@@ -31,7 +31,7 @@ import androidx.compose.ui.unit.sp
 import com.lagradost.cloudstream3.desktop.profile.Profile
 import com.lagradost.cloudstream3.desktop.profile.ProfileAvatar
 import com.lagradost.cloudstream3.desktop.profile.ProfileManager
-import com.lagradost.cloudstream3.desktop.ui.screens.profile.ProfileEditDialog
+import com.lagradost.cloudstream3.desktop.ui.navigation.Config
 import com.lagradost.cloudstream3.desktop.ui.theme.AppearanceConfig
 import com.lagradost.cloudstream3.desktop.ui.theme.ClockDisplayMode
 import com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes
@@ -278,6 +278,7 @@ fun TopBar(
                                             isExpanded = false,
                                             isHorizontal = true,
                                             onOpenProfileManager = onOpenProfileManager,
+                                            onOpenCreateProfile = { onNavigate(Config.ProfileEdit(profileId = null, switchOnCreate = true)) },
                                         )
                                     }
                                 }
@@ -303,7 +304,10 @@ fun TopBar(
                         )
                     }
 
-                    TopBarProfilePill(onOpenProfileManager = onOpenProfileManager)
+                    TopBarProfilePill(
+                        onOpenProfileManager = onOpenProfileManager,
+                        onNavigate = onNavigate,
+                    )
 
                     FullscreenToggleButton()
                 }
@@ -315,6 +319,7 @@ fun TopBar(
 @Composable
 private fun TopBarProfilePill(
     onOpenProfileManager: (() -> Unit)? = null,
+    onNavigate: (Config) -> Unit = {},
 ) {
     val showProfile by AppearanceConfig.topBarShowProfile.collectAsState()
     if (!showProfile) return
@@ -327,7 +332,6 @@ private fun TopBarProfilePill(
     var pinPromptProfile by remember { mutableStateOf<Profile?>(null) }
     var enteredPin by remember { mutableStateOf("") }
     var pinError by remember { mutableStateOf(false) }
-    var showCreateProfileDialog by remember { mutableStateOf(false) }
 
     // PIN prompt modal
     PinCodeDialog(
@@ -341,21 +345,6 @@ private fun TopBarProfilePill(
             pinPromptProfile = null
         },
     )
-
-    if (showCreateProfileDialog) {
-        ProfileEditDialog(
-            profile = null,
-            canDelete = false,
-            onDismiss = { showCreateProfileDialog = false },
-            onSave = { name, colorIndex, customAvatar, pin, isKids, autoSignIn ->
-                val newP = ProfileManager.createProfile(name, colorIndex, customAvatar, pin, isKids)
-                ProfileManager.switchProfile(newP.id)
-                if (autoSignIn) {
-                    ProfileManager.setAutoSignIn(true)
-                }
-            },
-        )
-    }
 
     val isLightMode = LocalDesktopTheme.current.isLightMode
     val buttonBg = if (isLightMode) Color.White.copy(alpha = 0.85f) else Color(0xFF1E1E24).copy(alpha = 0.50f)
@@ -557,7 +546,7 @@ private fun TopBarProfilePill(
                     .fillMaxWidth()
                     .clickable(interactionSource = addInteraction, indication = null) {
                         showProfileFlyout = false
-                        showCreateProfileDialog = true
+                        onNavigate(Config.ProfileEdit(profileId = null, switchOnCreate = true))
                     },
             ) {
                 Row(
