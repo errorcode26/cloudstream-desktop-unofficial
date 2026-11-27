@@ -4,6 +4,10 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -28,6 +32,7 @@ import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import coil3.request.crossfade
 import com.lagradost.cloudstream3.*
+import com.lagradost.cloudstream3.desktop.ui.components.desktopFocusableCard
 import com.lagradost.cloudstream3.desktop.ui.components.shimmerBackground
 import com.lagradost.common.storage.WatchHistory
 
@@ -54,7 +59,10 @@ fun EpisodeListItem(
     onMarkPreviousWatched: ((Episode) -> Unit)? = null,
     onSyncEpisodeToTracker: ((String, Episode) -> Unit)? = null,
 ) {
-    var isHovered by remember { mutableStateOf(false) }
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
+    val isFocused by interactionSource.collectIsFocusedAsState()
+    val isActiveVisual = isHovered || isFocused
 
     val currentHistory by rememberUpdatedState(history)
     val currentData by rememberUpdatedState(data)
@@ -96,11 +104,44 @@ fun EpisodeListItem(
     val activeHistory = uiState?.activeLinkData?.third
     val isActiveForPanel = isPanelOpen && activeHistory != null && ep.matchesHistory(activeHistory)
 
+    val cardShape = RoundedCornerShape(16.dp)
+    val onActivateEpisode: () -> Unit = {
+        val hasCachedLinks = com.lagradost.cloudstream3.desktop.ui.screens.player.LinkCache.get(ep.data) != null
+        if (isEpisodeLocked && !hasCachedLinks) {
+            if (releaseStatus.isMissingFromProvider) {
+                val msg = releaseStatus.statusBadgeText ?: "Episode is not available on ${currentProvider.name}."
+                com.lagradost.cloudstream3.desktop.ui.components.AppToastManager.showWarning(msg)
+            } else {
+                val dateText = releaseStatus.formattedDate ?: releaseStatus.statusBadgeText ?: "a future date"
+                com.lagradost.cloudstream3.desktop.ui.components.AppToastManager.showInfo("Episode is unreleased (Scheduled for $dateText)")
+            }
+        } else {
+            currentOnPlay(ep)
+        }
+    }
+    val onShowEpisodeMenu: () -> Unit = {
+        val latestHistory = currentHistory
+        com.lagradost.cloudstream3.desktop.ui.components.GlobalContextMenuState.showForEpisode(
+            episode = ep,
+            loadResponse = currentData,
+            history = latestHistory,
+            provider = currentProvider,
+            isAntiSpoiler = isAntiSpoiler,
+            enableDownloadButtons = enableDownloadButtons,
+            onPlay = currentOnPlay,
+            onDownload = currentOnDownload,
+            onToggleWatched = currentOnToggleWatched,
+            onRemoveEpisodeWatched = currentOnRemoveEpisodeWatched,
+            onMarkPreviousWatched = currentOnMarkPreviousWatched,
+        )
+    }
+    val currentOnActivateEpisode by rememberUpdatedState(onActivateEpisode)
+
     val cardBg = if (isActiveForPanel) {
         heroColor.copy(alpha = 0.18f)
     } else if (isEpisodeLocked) {
         baseColor.copy(alpha = (uiCardOpacity * 0.7f).coerceAtLeast(0.35f))
-    } else if (isHovered) {
+    } else if (isActiveVisual) {
         baseColor.copy(alpha = (uiCardOpacity + 0.15f).coerceAtMost(1f))
     } else {
         baseColor.copy(alpha = uiCardOpacity)
@@ -109,7 +150,7 @@ fun EpisodeListItem(
         heroColor
     } else if (isEpisodeLocked) {
         Color(0xFFFFB74D).copy(alpha = 0.35f)
-    } else if (isHovered) {
+    } else if (isActiveVisual) {
         heroColor.copy(alpha = 0.55f)
     } else if (isLatest) {
         heroColor.copy(alpha = 0.35f)
@@ -118,60 +159,36 @@ fun EpisodeListItem(
     }
 
     Surface(
-        shape = RoundedCornerShape(16.dp),
+        shape = cardShape,
         color = cardBg,
         border = BorderStroke(if (isActiveForPanel) 2.dp else 1.dp, borderColor),
         modifier = modifier
             .fillMaxWidth()
+            .clip(cardShape)
+            .hoverable(interactionSource)
+            .desktopFocusableCard(
+                interactionSource = interactionSource,
+                shape = cardShape,
+                onClick = { currentOnActivateEpisode() },
+                onSecondaryClick = if (isContextMenuEnabled) onShowEpisodeMenu else null,
+            )
             .pointerInput(ep, isContextMenuEnabled) {
                 awaitPointerEventScope {
                     while (true) {
                         val event = awaitPointerEvent()
-                        when (event.type) {
-                            androidx.compose.ui.input.pointer.PointerEventType.Enter -> isHovered = true
-                            androidx.compose.ui.input.pointer.PointerEventType.Exit -> isHovered = false
-                            androidx.compose.ui.input.pointer.PointerEventType.Release -> {
-                                if (event.button == androidx.compose.ui.input.pointer.PointerButton.Secondary) {
-                                    if (!event.changes.any { it.isConsumed }) {
-                                        if (isContextMenuEnabled) {
-                                            val latestHistory = currentHistory
-                                            com.lagradost.cloudstream3.desktop.ui.components.GlobalContextMenuState.showForEpisode(
-                                                episode = ep,
-                                                loadResponse = currentData,
-                                                history = latestHistory,
-                                                provider = currentProvider,
-                                                isAntiSpoiler = isAntiSpoiler,
-                                                enableDownloadButtons = enableDownloadButtons,
-                                                onPlay = currentOnPlay,
-                                                onDownload = currentOnDownload,
-                                                onToggleWatched = currentOnToggleWatched,
-                                                onRemoveEpisodeWatched = currentOnRemoveEpisodeWatched,
-                                                onMarkPreviousWatched = currentOnMarkPreviousWatched,
-                                            )
-                                        }
-                                    }
-                                }
-                            }
+                        if (event.type == androidx.compose.ui.input.pointer.PointerEventType.Release &&
+                            event.button == androidx.compose.ui.input.pointer.PointerButton.Secondary &&
+                            !event.changes.any { it.isConsumed } &&
+                            isContextMenuEnabled
+                        ) {
+                            onShowEpisodeMenu()
                         }
                     }
                 }
             }
             .pointerInput(ep, isEpisodeLocked) {
                 detectTapGestures(
-                    onTap = {
-                        val hasCachedLinks = com.lagradost.cloudstream3.desktop.ui.screens.player.LinkCache.get(ep.data) != null
-                        if (isEpisodeLocked && !hasCachedLinks) {
-                            if (releaseStatus.isMissingFromProvider) {
-                                val msg = releaseStatus.statusBadgeText ?: "Episode is not available on ${provider.name}."
-                                com.lagradost.cloudstream3.desktop.ui.components.AppToastManager.showWarning(msg)
-                            } else {
-                                val dateText = releaseStatus.formattedDate ?: releaseStatus.statusBadgeText ?: "a future date"
-                                com.lagradost.cloudstream3.desktop.ui.components.AppToastManager.showInfo("Episode is unreleased (Scheduled for $dateText)")
-                            }
-                        } else {
-                            onPlay(ep)
-                        }
-                    },
+                    onTap = { currentOnActivateEpisode() },
                 )
             },
     ) {
@@ -283,7 +300,7 @@ fun EpisodeListItem(
                             }
                         }
                     }
-                } else if (isHovered) {
+                } else if (isActiveVisual) {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
@@ -346,7 +363,7 @@ fun EpisodeListItem(
                         style = MaterialTheme.typography.titleMedium.copy(fontSize = 20.sp, fontWeight = FontWeight.Bold),
                         color = if (isEpisodeLocked) {
                             Color.White.copy(alpha = 0.75f)
-                        } else if (isHovered) {
+                        } else if (isActiveVisual) {
                             heroColor
                         } else {
                             Color.White

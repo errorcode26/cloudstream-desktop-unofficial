@@ -11,6 +11,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -42,6 +43,7 @@ import com.lagradost.cloudstream3.desktop.ui.badges.CardMetadataConfig
 import com.lagradost.cloudstream3.desktop.ui.badges.CardTitleSanitizer
 import com.lagradost.cloudstream3.desktop.ui.badges.DesktopBadgeComponents
 import com.lagradost.cloudstream3.desktop.ui.components.LocalDesktopTheme
+import com.lagradost.cloudstream3.desktop.ui.components.desktopInteractiveFocus
 import com.lagradost.cloudstream3.desktop.ui.components.getTextShadow
 import com.lagradost.cloudstream3.desktop.ui.components.posterDepthEffect
 import com.lagradost.cloudstream3.desktop.ui.components.posterHoverEffect
@@ -86,6 +88,8 @@ internal fun ExplorePosterCard(
 
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
+    val isFocused by interactionSource.collectIsFocusedAsState()
+    val isActiveVisual = isHovered || isFocused
 
     val hasProgress = watchHistory != null && watchHistory.position > 0L && watchHistory.duration > 0L
     val isCompleted = watchHistory != null && watchHistory.duration > 0L && PlayerLinkHandler.isCompleted(watchHistory.position, watchHistory.duration)
@@ -119,7 +123,7 @@ internal fun ExplorePosterCard(
     ) {
         Box {
             // Ambient primary glow bloom on hover (matching Home's PosterCard)
-            if (isHovered && posterHoverGlowEnabled) {
+            if (isActiveVisual && posterHoverGlowEnabled) {
                 Box(
                     modifier = Modifier
                         .matchParentSize()
@@ -131,8 +135,12 @@ internal fun ExplorePosterCard(
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .posterHoverEffect(shape)
+                    .posterHoverEffect(shape, isFocused = isFocused)
                     .clip(shape)
+                    .desktopInteractiveFocus(
+                        interactionSource = interactionSource,
+                        shape = shape,
+                    )
                     .hoverable(interactionSource)
                     .clickable(interactionSource = interactionSource, indication = null, onClick = onClick),
                 shape = shape,
@@ -154,7 +162,7 @@ internal fun ExplorePosterCard(
 
                     // Dark scrim on hover
                     androidx.compose.animation.AnimatedVisibility(
-                        visible = isHovered,
+                        visible = isActiveVisual,
                         enter = fadeIn(tween(200)),
                         exit = fadeOut(tween(200)),
                         modifier = Modifier.fillMaxSize(),
@@ -168,7 +176,7 @@ internal fun ExplorePosterCard(
 
                     // Frosted glass play button (matching Home's 56dp aesthetic)
                     androidx.compose.animation.AnimatedVisibility(
-                        visible = isHovered,
+                        visible = isActiveVisual,
                         enter = fadeIn(tween(200)) + scaleIn(initialScale = 0.8f, animationSpec = tween(200)),
                         exit = fadeOut(tween(200)) + scaleOut(targetScale = 0.8f, animationSpec = tween(200)),
                         modifier = Modifier.align(Alignment.Center),
@@ -192,7 +200,7 @@ internal fun ExplorePosterCard(
 
                     // Inside Title Overlay (on hover if posterTitlePosition == INSIDE)
                     androidx.compose.animation.AnimatedVisibility(
-                        visible = isHovered && posterTitlePosition == PosterTitlePosition.INSIDE,
+                        visible = isActiveVisual && posterTitlePosition == PosterTitlePosition.INSIDE,
                         modifier = Modifier.align(Alignment.BottomCenter),
                         enter = fadeIn(),
                         exit = fadeOut(),

@@ -9,6 +9,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
@@ -45,6 +46,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
+import com.lagradost.cloudstream3.desktop.ui.components.desktopInteractiveFocus
+import com.lagradost.cloudstream3.desktop.ui.components.handleEscapeKey
 
 @Composable
 fun DetailsScreenshotsSection(
@@ -251,15 +254,18 @@ private fun MosaicCell(
 
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
+    val isFocused by interactionSource.collectIsFocusedAsState()
+    val isActiveVisual = isHovered || isFocused
 
     val scale by animateFloatAsState(
-        targetValue = if (isHovered) 1.025f else 1.0f,
+        targetValue = if (isActiveVisual) 1.025f else 1.0f,
         animationSpec = tween(durationMillis = 200, easing = FastOutSlowInEasing),
     )
 
     Box(
         modifier = modifier
             .hoverable(interactionSource)
+            .desktopInteractiveFocus(interactionSource = interactionSource, shape = RoundedCornerShape(10.dp))
             .clickable(interactionSource = interactionSource, indication = null) { onClick() },
     ) {
         AsyncImage(
@@ -274,7 +280,7 @@ private fun MosaicCell(
                 },
         )
         // Subtle hover brightness lift and edge vignette
-        if (isHovered) {
+        if (isActiveVisual) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -310,6 +316,7 @@ fun ScreenshotLightbox(
             .fillMaxSize()
             .background(Color(0xFF09090B).copy(alpha = 0.97f))
             .focusRequester(focusRequester)
+            .handleEscapeKey { onDismiss() }
             .onKeyEvent { event ->
                 if (event.type == KeyEventType.KeyDown) {
                     when (event.key) {
@@ -319,10 +326,6 @@ fun ScreenshotLightbox(
                         }
                         Key.DirectionLeft, Key.A -> {
                             if (currentIndex > 0) currentIndex--
-                            true
-                        }
-                        Key.Escape -> {
-                            onDismiss()
                             true
                         }
                         else -> false
@@ -568,16 +571,19 @@ private fun NavArrow(
 
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
+    val isFocused by interactionSource.collectIsFocusedAsState()
+    val isActiveVisual = isHovered || isFocused
     val navShape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.icon
 
     Surface(
         shape = navShape,
-        color = if (isHovered) Color.White.copy(alpha = 0.18f) else Color.White.copy(alpha = 0.08f),
-        border = BorderStroke(1.dp, Color.White.copy(alpha = if (isHovered) 0.25f else 0.12f)),
+        color = if (isActiveVisual) Color.White.copy(alpha = 0.18f) else Color.White.copy(alpha = 0.08f),
+        border = BorderStroke(1.dp, Color.White.copy(alpha = if (isActiveVisual) 0.25f else 0.12f)),
         modifier = modifier
             .size(46.dp)
             .clip(navShape)
             .hoverable(interactionSource)
+            .desktopInteractiveFocus(interactionSource = interactionSource, shape = navShape)
             .clickable(interactionSource = interactionSource, indication = null) { onClick() },
     ) {
         Box(contentAlignment = Alignment.Center) {

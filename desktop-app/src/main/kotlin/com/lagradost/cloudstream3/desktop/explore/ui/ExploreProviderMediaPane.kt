@@ -7,6 +7,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -38,6 +39,7 @@ import com.lagradost.cloudstream3.desktop.stremio.matchesType
 import com.lagradost.cloudstream3.desktop.ui.PremiumIcons
 import com.lagradost.cloudstream3.desktop.ui.badges.DesktopBadgeComponents
 import com.lagradost.cloudstream3.desktop.ui.components.LocalDesktopTheme
+import com.lagradost.cloudstream3.desktop.ui.components.desktopInteractiveFocus
 import com.lagradost.common.storage.WatchHistory
 import com.lagradost.player.impl.PlayerLinkHandler
 
@@ -663,22 +665,25 @@ private fun ExploreProviderAddonCta(
     val theme = LocalDesktopTheme.current
     val buttonInteractionSource = remember { MutableInteractionSource() }
     val isButtonHovered by buttonInteractionSource.collectIsHoveredAsState()
+    val isButtonFocused by buttonInteractionSource.collectIsFocusedAsState()
+    val isActiveVisual = isButtonHovered || isButtonFocused
+    val ctaShape = RoundedCornerShape(14.dp)
 
     val cardBg = if (!hasStreamAddons) {
-        if (isButtonHovered) {
+        if (isActiveVisual) {
             if (theme.isAmoled) Color(0xFF1E170A) else Color(0xFF2A2112)
         } else {
             if (theme.isAmoled) Color(0xFF141006) else Color(0xFF1F1A10)
         }
-    } else if (isButtonHovered) {
+    } else if (isActiveVisual) {
         if (theme.isAmoled) Color(0xFF1C1F28) else Color(0xFF242733)
     } else {
         if (theme.isAmoled) Color(0xFF12141A) else Color(0xFF181A22)
     }
 
     val cardBorder = if (!hasStreamAddons) {
-        if (isButtonHovered) Color(0xFFF59E0B).copy(alpha = 0.55f) else Color(0xFFF59E0B).copy(alpha = 0.30f)
-    } else if (isButtonHovered) {
+        if (isActiveVisual) Color(0xFFF59E0B).copy(alpha = 0.55f) else Color(0xFFF59E0B).copy(alpha = 0.30f)
+    } else if (isActiveVisual) {
         MaterialTheme.colorScheme.primary.copy(alpha = 0.65f)
     } else {
         Color.White.copy(alpha = 0.14f)
@@ -691,14 +696,15 @@ private fun ExploreProviderAddonCta(
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Surface(
-            shape = RoundedCornerShape(14.dp),
+            shape = ctaShape,
             color = cardBg,
             border = BorderStroke(1.dp, cardBorder),
-            shadowElevation = if (isButtonHovered) 6.dp else 0.dp,
+            shadowElevation = if (isActiveVisual) 6.dp else 0.dp,
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(14.dp))
+                .clip(ctaShape)
                 .hoverable(buttonInteractionSource)
+                .desktopInteractiveFocus(interactionSource = buttonInteractionSource, shape = ctaShape)
                 .clickable(
                     enabled = true,
                     interactionSource = buttonInteractionSource,

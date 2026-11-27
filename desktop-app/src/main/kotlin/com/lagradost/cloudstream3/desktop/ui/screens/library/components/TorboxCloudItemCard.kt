@@ -8,6 +8,7 @@ import androidx.compose.foundation.TooltipArea
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -29,6 +30,7 @@ import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import com.lagradost.cloudstream3.desktop.debrid.torbox.TorboxApiClient
 import com.lagradost.cloudstream3.desktop.debrid.torbox.TorboxTorrentData
+import com.lagradost.cloudstream3.desktop.ui.components.desktopFocusableCard
 import com.lagradost.common.logging.AppLogger
 import com.lagradost.common.storage.DesktopDataStore
 import com.lagradost.common.storage.WatchHistory
@@ -81,16 +83,30 @@ internal fun TorboxCloudItemCard(
         MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
     }
 
+    val cardShape = RoundedCornerShape(12.dp)
+    val isFocused by interactionSource.collectIsFocusedAsState()
+    val isHighlighted = isHovered || isFocused
+
     Card(
-        shape = RoundedCornerShape(12.dp),
+        shape = cardShape,
         colors = CardDefaults.cardColors(containerColor = cardBg),
-        border = BorderStroke(1.dp, borderColor),
-        elevation = CardDefaults.cardElevation(defaultElevation = if (isHovered) 6.dp else 1.dp),
+        border = BorderStroke(if (isFocused) 2.dp else 1.dp, if (isFocused) MaterialTheme.colorScheme.primary else borderColor),
+        elevation = CardDefaults.cardElevation(defaultElevation = if (isHighlighted) 6.dp else 1.dp),
         modifier = modifier
             .fillMaxWidth()
             .heightIn(min = 180.dp)
-            .clip(RoundedCornerShape(12.dp))
+            .clip(cardShape)
             .hoverable(interactionSource)
+            .desktopFocusableCard(
+                interactionSource = interactionSource,
+                shape = cardShape,
+                showRing = false,
+                onClick = onCardClick,
+                onSecondaryClick = {
+                    contextMenuOffset = DpOffset.Zero
+                    showContextMenu = true
+                },
+            )
             .pointerInput(item.id) {
                 awaitPointerEventScope {
                     while (true) {

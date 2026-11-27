@@ -50,8 +50,10 @@ import com.lagradost.cloudstream3.desktop.ui.components.CloudstreamCustomDialog
 import com.lagradost.cloudstream3.desktop.ui.components.DesktopBackButton
 import com.lagradost.cloudstream3.desktop.ui.components.DesktopVerticalScrollbar
 import com.lagradost.cloudstream3.desktop.ui.components.DesktopThemeColors.*
+import com.lagradost.cloudstream3.desktop.ui.components.FocusLayerBoundary
 import com.lagradost.cloudstream3.desktop.ui.components.LocalDesktopTheme
 import com.lagradost.cloudstream3.desktop.ui.components.WindowControlsPill
+import com.lagradost.cloudstream3.desktop.ui.components.handleEscapeKey
 import com.lagradost.cloudstream3.desktop.ui.navigation.Config
 import com.lagradost.cloudstream3.desktop.ui.screens.details.*
 import com.lagradost.cloudstream3.desktop.ui.screens.details.contract.DetailsUiEffect
@@ -199,7 +201,15 @@ fun ComposeDetailsScreen(
         val isAmoled = LocalDesktopTheme.current.isAmoled
 
         BoxWithConstraints(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .handleEscapeKey {
+                    when {
+                        uiState.trackers.isDrawerOpen -> viewModel.onEvent(DetailsUiEvent.OnDismissTrackerDrawer)
+                        isPanelOpen -> viewModel.onEvent(DetailsUiEvent.OnCloseLinksPanel)
+                        else -> onBack()
+                    }
+                },
         ) {
             val rootMaxWidth = maxWidth
             val currentStage = remember(isLoading, response, fetchFailed) {
@@ -363,21 +373,31 @@ fun ComposeDetailsScreen(
 
             // Hoisted Floating Top Action Layer (Corner-anchored)
             if (currentStage != com.lagradost.cloudstream3.desktop.ui.components.ScreenStage.LOADING) {
-                Row(
+                FocusLayerBoundary(
+                    active = !uiState.trackers.isDrawerOpen &&
+                        !isPanelOpen &&
+                        uiState.activeTrailer == null &&
+                        uiState.pendingExternalUrl == null,
+                    restoreFocus = false,
                     modifier = Modifier
                         .align(Alignment.TopCenter)
                         .fillMaxWidth()
-                        .padding(start = 16.dp, end = 16.dp, top = 7.dp)
                         .zIndex(100f),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
-                    DesktopBackButton(onClick = onBack)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = 16.dp, end = 16.dp, top = 7.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        DesktopBackButton(onClick = onBack)
 
-                    WindowControlsPill(
-                        isHome = false,
-                        isCompact = rootMaxWidth < 600.dp,
-                    )
+                        WindowControlsPill(
+                            isHome = false,
+                            isCompact = rootMaxWidth < 600.dp,
+                        )
+                    }
                 }
             }
         }
@@ -460,27 +480,28 @@ fun DetailsContent(
         }
 
         BoxWithConstraints(
-            modifier = Modifier
-                .fillMaxSize()
-                .onPreviewKeyEvent { event ->
-                    if (isTrackerDrawerOpen && event.key == Key.Escape && event.type == KeyEventType.KeyUp) {
-                        onEvent(DetailsUiEvent.OnDismissTrackerDrawer)
-                        true
-                    } else {
-                        false
-                    }
-                },
+            modifier = Modifier.fillMaxSize(),
         ) {
         val viewportHeight = maxHeight
         val viewportWidth = maxWidth
         val isWindowCompact = viewportWidth < 600.dp
         val isLinksPanelOpen = uiState?.isPanelOpen == true
+        val mainLayerActive = !isTrackerDrawerOpen &&
+            !isLinksPanelOpen &&
+            lightboxIndex == null &&
+            uiState?.activeTrailer == null &&
+            uiState?.pendingExternalUrl == null
         val backdropDimModifier = if (isLinksPanelOpen) {
             Modifier.blur(45.dp).graphicsLayer { alpha = 0.20f }
         } else {
             Modifier
         }
 
+        FocusLayerBoundary(
+            active = mainLayerActive,
+            restoreFocus = true,
+            modifier = Modifier.fillMaxSize(),
+        ) {
         DetailsBackdrop(
             provider = provider,
             data = data,
@@ -816,6 +837,7 @@ fun DetailsContent(
             listState = scrollState,
             modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
         )
+        } // end FocusLayerBoundary(mainLayerActive)
 
         val lightboxScreenshots = screenshots
         var lastValidLightboxIndex by remember { mutableStateOf(0) }

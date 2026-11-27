@@ -10,6 +10,7 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -30,6 +31,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton
+import com.lagradost.cloudstream3.desktop.ui.components.FocusLayerBoundary
+import com.lagradost.cloudstream3.desktop.ui.components.desktopInteractiveFocus
+import com.lagradost.cloudstream3.desktop.ui.components.handleEscapeKey
 import com.lagradost.cloudstream3.desktop.ui.navigation.Config
 import com.lagradost.cloudstream3.desktop.ui.screens.settings.appearance.*
 
@@ -127,7 +131,13 @@ fun ComposeSettingsScreen(
     if (activeSubScreen == SettingsSubScreen.POSTER_EDITOR) {
         SettingsPosterEditorScreen(onBack = { activeSubScreen = null })
     } else {
-        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        BoxWithConstraints(
+            modifier = Modifier
+                .fillMaxSize()
+                .handleEscapeKey(enabled = activeSubScreen != null) {
+                    activeSubScreen = null
+                },
+        ) {
             val isCompactHeight = maxHeight < 780.dp
             val isCompactWidth = maxWidth < 1000.dp
             val screenHorizontalPadding = if (isCompactWidth) 6.dp else com.lagradost.cloudstream3.desktop.ui.DesktopDimens.TabInnerHorizontalPadding
@@ -204,6 +214,8 @@ fun ComposeSettingsScreen(
                                     results.forEach { result ->
                                         val breadcrumb = if (result.subScreen != null) "${result.tab.title} > ${result.subScreen.title}" else result.tab.title
 
+                                        val resultInteraction = remember { MutableInteractionSource() }
+                                        val resultShape = MaterialTheme.shapes.medium
                                         Surface(
                                             onClick = {
                                                 selectedLeaf = result.tab
@@ -211,9 +223,16 @@ fun ComposeSettingsScreen(
                                                 SettingsSession.highlightedSetting = result.uiLabel
                                                 searchQuery = ""
                                             },
-                                            shape = MaterialTheme.shapes.medium,
+                                            interactionSource = resultInteraction,
+                                            shape = resultShape,
                                             color = Color.Transparent,
-                                            modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(bottom = 4.dp)
+                                                .desktopInteractiveFocus(
+                                                    interactionSource = resultInteraction,
+                                                    shape = resultShape,
+                                                ),
                                         ) {
                                             Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
                                                 Text(
@@ -308,6 +327,11 @@ fun ComposeSettingsScreen(
                             },
                             label = "SettingsSubScreenTransition",
                         ) { currentSubScreen ->
+                            FocusLayerBoundary(
+                                active = (currentSubScreen == activeSubScreen),
+                                restoreFocus = false,
+                                modifier = Modifier.fillMaxSize(),
+                            ) {
                             if (currentSubScreen != null) {
                                 Column(modifier = Modifier.fillMaxSize()) {
                                     Row(
@@ -388,6 +412,11 @@ fun ComposeSettingsScreen(
                                     label = "SettingsLeafTransition",
                                     modifier = Modifier.fillMaxSize(),
                                 ) { currentLeaf ->
+                                    FocusLayerBoundary(
+                                        active = (currentLeaf == selectedLeaf),
+                                        restoreFocus = false,
+                                        modifier = Modifier.fillMaxSize(),
+                                    ) {
                                     when (currentLeaf) {
                                         LeafTab.APPEARANCE -> SettingsAppearanceScreen(onNavigateToSubScreen = { activeSubScreen = it })
                                         LeafTab.LAYOUT -> SettingsAppearanceLayoutScreen(onNavigateToSubScreen = { activeSubScreen = it })
@@ -426,7 +455,9 @@ fun ComposeSettingsScreen(
                                         LeafTab.EFFECTS -> SettingsAppearanceEffectsScreen()
                                         LeafTab.SHORTCUTS -> SettingsShortcutsScreen()
                                     }
+                                    }
                                 }
+                            }
                             }
                         }
                     }
@@ -444,11 +475,16 @@ private fun SidebarLeafItem(
     verticalPadding: androidx.compose.ui.unit.Dp = 9.dp,
     onClick: () -> Unit,
 ) {
+    val itemInteraction = remember { MutableInteractionSource() }
+    val itemShape = RoundedCornerShape(10.dp)
     Surface(
         onClick = onClick,
-        shape = RoundedCornerShape(10.dp),
+        interactionSource = itemInteraction,
+        shape = itemShape,
         color = if (isSelected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .desktopInteractiveFocus(interactionSource = itemInteraction, shape = itemShape),
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = verticalPadding),

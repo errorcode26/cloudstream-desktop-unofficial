@@ -11,6 +11,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -186,18 +187,20 @@ fun DockItem(
 ) {
     val itemInteraction = remember { MutableInteractionSource() }
     val isHovered by itemInteraction.collectIsHoveredAsState()
+    val isFocused by itemInteraction.collectIsFocusedAsState()
+    val isActiveVisual = isHovered || isFocused
 
     val theme = LocalDesktopTheme.current
     val iconTint = when {
         selected -> MaterialTheme.colorScheme.primary
-        isHovered -> theme.TextPrimary
+        isActiveVisual -> theme.TextPrimary
         else -> theme.TextMuted
     }
     val bgAlpha by animateFloatAsState(
-        targetValue = if (isHovered) 1f else 0f,
+        targetValue = if (isActiveVisual) 1f else 0f,
         label = "dockItemBgAlpha",
     )
-    val targetScale = if (isHovered && isHorizontal) 1.15f else 1f
+    val targetScale = if (isActiveVisual && isHorizontal) 1.15f else 1f
     val scale by animateFloatAsState(
         targetValue = targetScale,
         animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
@@ -217,6 +220,7 @@ fun DockItem(
                 },
             )
             .clip(dockItemShape)
+            .desktopInteractiveFocus(interactionSource = itemInteraction, shape = dockItemShape)
             .hoverable(itemInteraction)
             .clickable(
                 interactionSource = itemInteraction,
@@ -304,7 +308,7 @@ fun DockItem(
 
                 if (showLabel) {
                     AnimatedVisibility(
-                        visible = isHovered,
+                        visible = isActiveVisual,
                         enter = fadeIn() + expandVertically() + slideInVertically { it / 2 },
                         exit = fadeOut() + shrinkVertically() + slideOutVertically { it / 2 },
                     ) {
@@ -360,14 +364,14 @@ fun DockItem(
                                 text = label,
                                 color = if (selected) {
                                     MaterialTheme.colorScheme.primary
-                                } else if (isHovered) {
+                                } else if (isActiveVisual) {
                                     theme.TextPrimary
                                 } else {
                                     theme.TextMuted
                                 },
                                 fontWeight = if (selected) {
                                     FontWeight.Bold
-                                } else if (isHovered) {
+                                } else if (isActiveVisual) {
                                     FontWeight.SemiBold
                                 } else {
                                     FontWeight.Medium
@@ -438,14 +442,14 @@ fun DockItem(
                                 text = label,
                                 color = if (selected) {
                                     MaterialTheme.colorScheme.primary
-                                } else if (isHovered) {
+                                } else if (isActiveVisual) {
                                     theme.TextPrimary
                                 } else {
                                     theme.TextMuted
                                 },
                                 fontWeight = if (selected) {
                                     FontWeight.Bold
-                                } else if (isHovered) {
+                                } else if (isActiveVisual) {
                                     FontWeight.SemiBold
                                 } else {
                                     FontWeight.Medium
@@ -497,6 +501,8 @@ fun DockProfileAvatar(
 
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
+    val isFocused by interactionSource.collectIsFocusedAsState()
+    val isActiveVisual = isHovered || isFocused
 
     // PIN prompt modal
     PinCodeDialog(
@@ -515,29 +521,22 @@ fun DockProfileAvatar(
 
     Box(modifier = modifier) {
         Surface(
-            modifier = if (isHorizontal) {
-                Modifier
-                    .size(42.dp)
-                    .clip(dockItemShape)
-                    .hoverable(interactionSource)
-                    .clickable(
-                        interactionSource = interactionSource,
-                        indication = null,
-                        onClick = { showProfileFlyout = true },
-                    )
-            } else {
-                Modifier
-                    .height(48.dp)
-                    .fillMaxWidth()
-                    .clip(dockItemShape)
-                    .hoverable(interactionSource)
-                    .clickable(
-                        interactionSource = interactionSource,
-                        indication = null,
-                        onClick = { showProfileFlyout = true },
-                    )
-            },
-            color = if (isHovered) Color.White.copy(alpha = 0.08f) else Color.Transparent,
+            modifier = (
+                if (isHorizontal) {
+                    Modifier.size(42.dp)
+                } else {
+                    Modifier.height(48.dp).fillMaxWidth()
+                }
+                )
+                .clip(dockItemShape)
+                .desktopInteractiveFocus(interactionSource = interactionSource, shape = dockItemShape)
+                .hoverable(interactionSource)
+                .clickable(
+                    interactionSource = interactionSource,
+                    indication = null,
+                    onClick = { showProfileFlyout = true },
+                ),
+            color = if (isActiveVisual) Color.White.copy(alpha = 0.08f) else Color.Transparent,
             shape = dockItemShape,
         ) {
             if (isHorizontal) {
@@ -547,7 +546,7 @@ fun DockProfileAvatar(
                 ) {
                     Surface(
                         shape = CircleShape,
-                        border = BorderStroke(1.5.dp, if (isHovered) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.25f)),
+                        border = BorderStroke(1.5.dp, if (isActiveVisual) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.25f)),
                         color = Color.Transparent,
                     ) {
                         com.lagradost.cloudstream3.desktop.profile.ProfileAvatar(
@@ -576,7 +575,7 @@ fun DockProfileAvatar(
                             ) {
                                 Text(
                                     text = activeProfile.name,
-                                    color = if (isHovered) theme.TextPrimary else theme.TextMuted,
+                                    color = if (isActiveVisual) theme.TextPrimary else theme.TextMuted,
                                     fontWeight = FontWeight.SemiBold,
                                     fontSize = 13.5.sp,
                                     maxLines = 1,
@@ -722,12 +721,16 @@ fun DockProfileAvatar(
                 otherProfiles.forEach { profile ->
                     val rowInteractionSource = remember { MutableInteractionSource() }
                     val isRowHovered by rowInteractionSource.collectIsHoveredAsState()
+                    val isRowFocused by rowInteractionSource.collectIsFocusedAsState()
+                    val rowShape = RoundedCornerShape(10.dp)
 
                     Surface(
-                        shape = RoundedCornerShape(10.dp),
-                        color = if (isRowHovered) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f) else Color.Transparent,
+                        shape = rowShape,
+                        color = if (isRowHovered || isRowFocused) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f) else Color.Transparent,
                         modifier = Modifier
                             .fillMaxWidth()
+                            .clip(rowShape)
+                            .desktopInteractiveFocus(interactionSource = rowInteractionSource, shape = rowShape)
                             .clickable(interactionSource = rowInteractionSource, indication = null) {
                                 showProfileFlyout = false
                                 if (profile.hasPin) {

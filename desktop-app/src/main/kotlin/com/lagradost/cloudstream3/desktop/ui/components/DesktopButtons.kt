@@ -40,7 +40,7 @@ fun DesktopButton(
 ) {
     Button(
         onClick = onClick,
-        modifier = modifier,
+        modifier = modifier.desktopInteractiveFocus(interactionSource = interactionSource, shape = shape, enabled = enabled),
         enabled = enabled,
         shape = shape,
         colors = colors,
@@ -67,7 +67,7 @@ fun DesktopOutlinedButton(
 ) {
     OutlinedButton(
         onClick = onClick,
-        modifier = modifier,
+        modifier = modifier.desktopInteractiveFocus(interactionSource = interactionSource, shape = shape, enabled = enabled),
         enabled = enabled,
         shape = shape,
         colors = colors,
@@ -94,7 +94,7 @@ fun DesktopTextButton(
 ) {
     TextButton(
         onClick = onClick,
-        modifier = modifier,
+        modifier = modifier.desktopInteractiveFocus(interactionSource = interactionSource, shape = shape, enabled = enabled),
         enabled = enabled,
         shape = shape,
         colors = colors,
@@ -121,7 +121,7 @@ fun DesktopFilledTonalButton(
 ) {
     FilledTonalButton(
         onClick = onClick,
-        modifier = modifier,
+        modifier = modifier.desktopInteractiveFocus(interactionSource = interactionSource, shape = shape, enabled = enabled),
         enabled = enabled,
         shape = shape,
         colors = colors,
@@ -148,7 +148,7 @@ fun DesktopElevatedButton(
 ) {
     ElevatedButton(
         onClick = onClick,
-        modifier = modifier,
+        modifier = modifier.desktopInteractiveFocus(interactionSource = interactionSource, shape = shape, enabled = enabled),
         enabled = enabled,
         shape = shape,
         colors = colors,
@@ -179,7 +179,9 @@ fun DesktopIconButton(
     val contentColor = if (enabled) colors.contentColor else colors.disabledContentColor
     Surface(
         onClick = onClick,
-        modifier = modifier.defaultMinSize(minWidth = 40.dp, minHeight = 40.dp),
+        modifier = modifier
+            .defaultMinSize(minWidth = 40.dp, minHeight = 40.dp)
+            .desktopInteractiveFocus(interactionSource = interactionSource, shape = shape, enabled = enabled),
         enabled = enabled,
         shape = shape,
         color = containerColor,

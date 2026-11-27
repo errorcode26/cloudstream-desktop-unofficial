@@ -13,6 +13,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -44,6 +45,7 @@ import com.lagradost.cloudstream3.desktop.explore.models.ExploreSearchScope
 import com.lagradost.cloudstream3.desktop.explore.models.ManifestCatalogDescriptor
 import com.lagradost.cloudstream3.desktop.explore.viewmodel.EXPLORE_YEAR_OPTIONS
 import com.lagradost.cloudstream3.desktop.ui.components.LocalDesktopTheme
+import com.lagradost.cloudstream3.desktop.ui.components.desktopInteractiveFocus
 
 @Composable
 internal fun CompactCatalogChip(
@@ -54,6 +56,8 @@ internal fun CompactCatalogChip(
     val theme = LocalDesktopTheme.current
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
+    val isFocused by interactionSource.collectIsFocusedAsState()
+    val isActiveVisual = isHovered || isFocused
 
     val chipShape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact
 
@@ -62,10 +66,11 @@ internal fun CompactCatalogChip(
             .height(28.dp)
             .clip(chipShape)
             .hoverable(interactionSource)
+            .desktopInteractiveFocus(interactionSource = interactionSource, shape = chipShape)
             .clickable(interactionSource = interactionSource, indication = null, onClick = onClick),
         color = if (isSelected) {
             MaterialTheme.colorScheme.primary
-        } else if (isHovered) {
+        } else if (isActiveVisual) {
             Color.White.copy(alpha = 0.10f)
         } else {
             Color.White.copy(alpha = 0.05f)
@@ -75,7 +80,7 @@ internal fun CompactCatalogChip(
             width = if (isSelected) 1.dp else 0.5.dp,
             color = if (isSelected) {
                 MaterialTheme.colorScheme.primary
-            } else if (isHovered) {
+            } else if (isActiveVisual) {
                 Color.White.copy(alpha = 0.30f)
             } else {
                 Color.White.copy(alpha = 0.12f)

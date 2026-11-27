@@ -4,6 +4,7 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.*
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -31,6 +32,8 @@ import coil3.compose.AsyncImage
 import com.lagradost.cloudstream3.TvType
 import com.lagradost.cloudstream3.desktop.ui.components.DesktopDrilldownScaffold
 import com.lagradost.cloudstream3.desktop.ui.components.LocalDesktopTheme
+import com.lagradost.cloudstream3.desktop.ui.components.desktopFocusRing
+import com.lagradost.cloudstream3.desktop.ui.components.desktopInteractiveFocus
 import com.lagradost.cloudstream3.desktop.ui.navigation.Config
 import com.lagradost.cloudstream3.desktop.explore.models.ExploreItem
 import com.lagradost.cloudstream3.desktop.explore.ui.ExploreProviderDialog
@@ -493,12 +496,15 @@ private fun CategoryTabPill(
         label = "textColor",
     )
 
+    val pillInteraction = remember { MutableInteractionSource() }
     val pillShape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact
     Surface(
         onClick = onClick,
+        interactionSource = pillInteraction,
         shape = pillShape,
         color = pillBg,
         border = BorderStroke(1.dp, pillBorder),
+        modifier = Modifier.desktopInteractiveFocus(interactionSource = pillInteraction, shape = pillShape),
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
@@ -533,24 +539,29 @@ private fun StudioMediaCard(
     val theme = LocalDesktopTheme.current
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
+    val isFocused by interactionSource.collectIsFocusedAsState()
+    val isActiveVisual = isHovered || isFocused
+    val cardShape = RoundedCornerShape(12.dp)
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .hoverable(interactionSource)
+            .desktopInteractiveFocus(interactionSource = interactionSource, shape = cardShape, showRing = false)
             .clickable(interactionSource = interactionSource, indication = null) { onClick() },
     ) {
         // Poster Box
         Surface(
-            shape = RoundedCornerShape(12.dp),
+            shape = cardShape,
             color = theme.SurfaceCard,
             border = BorderStroke(
                 1.dp,
-                if (isHovered) theme.Accent.copy(alpha = 0.75f) else theme.Divider,
+                if (isActiveVisual) theme.Accent.copy(alpha = 0.75f) else theme.Divider,
             ),
             modifier = Modifier
                 .fillMaxWidth()
-                .aspectRatio(2f / 3f),
+                .aspectRatio(2f / 3f)
+                .desktopFocusRing(isFocused = isFocused, shape = cardShape),
         ) {
             Box(modifier = Modifier.fillMaxSize()) {
                 if (!item.posterUrl.isNullOrBlank()) {

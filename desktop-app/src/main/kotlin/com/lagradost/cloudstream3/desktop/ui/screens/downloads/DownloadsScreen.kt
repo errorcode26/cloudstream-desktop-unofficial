@@ -3,6 +3,9 @@ package com.lagradost.cloudstream3.desktop.ui.screens.downloads
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -36,6 +39,7 @@ import com.lagradost.cloudstream3.desktop.downloader.DesktopDownloadManager
 import com.lagradost.cloudstream3.desktop.downloader.DownloadStatus
 import com.lagradost.cloudstream3.desktop.downloader.DownloadTask
 import com.lagradost.cloudstream3.desktop.ui.components.CloudstreamAlertDialog
+import com.lagradost.cloudstream3.desktop.ui.components.desktopFocusableCard
 import com.lagradost.cloudstream3.desktop.ui.screens.downloads.contract.*
 import com.lagradost.cloudstream3.desktop.ui.screens.downloads.dialogs.DownloadSettingsDialog
 import kotlinx.coroutines.Dispatchers
@@ -523,14 +527,48 @@ private fun DownloadedItemCard(
     var bounds by remember { mutableStateOf(androidx.compose.ui.geometry.Rect.Zero) }
     val scope = rememberCoroutineScope()
     val isContextMenuEnabled = true
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
+    val isFocused by interactionSource.collectIsFocusedAsState()
+    val cardShape = RoundedCornerShape(12.dp)
     val showTasks = remember(task.showName, allCompletedTasks) {
         allCompletedTasks.filter { it.showName.equals(task.showName, ignoreCase = true) }
+    }
+    val openContextMenu = {
+        com.lagradost.cloudstream3.desktop.ui.components.GlobalContextMenuState.showForDownload(
+            bounds = bounds,
+            task = task,
+            allShowTasks = showTasks,
+            onPlay = onPlay,
+            onDelete = onDelete,
+            onDeleteShow = onDeleteShow,
+            onOpenInExplorer = {
+                scope.launch(Dispatchers.IO) {
+                    try {
+                        val file = task.file
+                        if (file.exists()) {
+                            if (System.getProperty("os.name").lowercase().contains("win")) {
+                                Runtime.getRuntime().exec(arrayOf("explorer.exe", "/select,", file.absolutePath))
+                            } else {
+                                Desktop.getDesktop().open(file.parentFile ?: file)
+                            }
+                        }
+                    } catch (e: Exception) {
+                        try {
+                            Desktop.getDesktop().open(task.file.parentFile ?: task.file)
+                        } catch (err: Exception) {
+                            com.lagradost.common.logging.AppLogger.e("DownloadsScreen: Failed to open file in explorer: ${task.file.name}", err)
+                        }
+                    }
+                }
+            },
+        )
     }
 
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
+            .clip(cardShape)
             .onGloballyPositioned { coordinates ->
                 val newBounds = Rect(
                     offset = coordinates.positionInWindow(),
@@ -540,40 +578,19 @@ private fun DownloadedItemCard(
                     bounds = newBounds
                 }
             }
+            .desktopFocusableCard(
+                interactionSource = interactionSource,
+                shape = cardShape,
+                onClick = onPlay,
+                onSecondaryClick = if (isContextMenuEnabled) openContextMenu else null,
+            )
             .pointerInput(isContextMenuEnabled) {
                 awaitPointerEventScope {
                     while (true) {
                         val event = awaitPointerEvent()
                         if (event.type == androidx.compose.ui.input.pointer.PointerEventType.Release) {
                             if (isContextMenuEnabled && event.button == androidx.compose.ui.input.pointer.PointerButton.Secondary) {
-                                com.lagradost.cloudstream3.desktop.ui.components.GlobalContextMenuState.showForDownload(
-                                    bounds = bounds,
-                                    task = task,
-                                    allShowTasks = showTasks,
-                                    onPlay = onPlay,
-                                    onDelete = onDelete,
-                                    onDeleteShow = onDeleteShow,
-                                    onOpenInExplorer = {
-                                        scope.launch(Dispatchers.IO) {
-                                            try {
-                                                val file = task.file
-                                                if (file.exists()) {
-                                                    if (System.getProperty("os.name").lowercase().contains("win")) {
-                                                        Runtime.getRuntime().exec(arrayOf("explorer.exe", "/select,", file.absolutePath))
-                                                    } else {
-                                                        Desktop.getDesktop().open(file.parentFile ?: file)
-                                                    }
-                                                }
-                                            } catch (e: Exception) {
-                                                try {
-                                                    Desktop.getDesktop().open(task.file.parentFile ?: task.file)
-                                                } catch (err: Exception) {
-                                                    com.lagradost.common.logging.AppLogger.e("DownloadsScreen: Failed to open file in explorer: ${task.file.name}", err)
-                                                }
-                                            }
-                                        }
-                                    },
-                                )
+                                openContextMenu()
                             } else if (event.button == androidx.compose.ui.input.pointer.PointerButton.Primary) {
                                 onPlay()
                             }
@@ -581,9 +598,12 @@ private fun DownloadedItemCard(
                     }
                 }
             },
-        shape = RoundedCornerShape(12.dp),
+        shape = cardShape,
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
-        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)),
+        border = androidx.compose.foundation.BorderStroke(
+            if (isHovered || isFocused) 1.5.dp else 1.dp,
+            if (isHovered || isFocused) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f),
+        ),
     ) {
         Column {
             Box(modifier = Modifier.fillMaxWidth().aspectRatio(2f / 3f)) {

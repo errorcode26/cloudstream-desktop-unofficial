@@ -70,7 +70,11 @@ import com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton
 import com.lagradost.cloudstream3.desktop.ui.components.DesktopOutlinedButton
 import com.lagradost.cloudstream3.desktop.ui.components.DesktopTextButton
 import com.lagradost.cloudstream3.desktop.ui.components.DesktopVerticalScrollbar
+import com.lagradost.cloudstream3.desktop.ui.components.FocusLayerBoundary
 import com.lagradost.cloudstream3.desktop.ui.components.LocalDesktopTheme
+import com.lagradost.cloudstream3.desktop.ui.components.desktopDirectionalFocusNavigation
+import com.lagradost.cloudstream3.desktop.ui.components.handleEscapeKey
+import com.lagradost.cloudstream3.desktop.ui.components.nonFocusableTap
 import com.lagradost.cloudstream3.desktop.ui.screens.details.contract.DetailsTrackerEntryState
 import com.lagradost.cloudstream3.desktop.ui.screens.details.contract.DetailsTrackersUiState
 import com.lagradost.cloudstream3.desktop.ui.screens.details.contract.DetailsUiEvent
@@ -98,11 +102,9 @@ fun DetailsTrackerDrawerHost(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(Color.Black.copy(alpha = 0.45f))
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                        onClick = { onEvent(DetailsUiEvent.OnDismissTrackerDrawer) },
-                    ),
+                    .nonFocusableTap {
+                        onEvent(DetailsUiEvent.OnDismissTrackerDrawer)
+                    },
             )
         }
 
@@ -114,13 +116,24 @@ fun DetailsTrackerDrawerHost(
                 .align(Alignment.CenterEnd)
                 .padding(top = 56.dp, end = 16.dp, bottom = 16.dp),
         ) {
-            DetailsTrackerDrawerPanel(
-                showName = showName,
-                trackersState = trackersState,
-                currentSeasonEpisodes = currentSeasonEpisodes,
-                isMovieLike = isMovieLike,
-                onEvent = onEvent,
-            )
+            FocusLayerBoundary(
+                active = isOpen,
+                trapFocus = true,
+                requestFocusWhenActive = true,
+                modifier = Modifier
+                    .handleEscapeKey(enabled = isOpen) {
+                        onEvent(DetailsUiEvent.OnDismissTrackerDrawer)
+                    }
+                    .desktopDirectionalFocusNavigation(enabled = isOpen),
+            ) {
+                DetailsTrackerDrawerPanel(
+                    showName = showName,
+                    trackersState = trackersState,
+                    currentSeasonEpisodes = currentSeasonEpisodes,
+                    isMovieLike = isMovieLike,
+                    onEvent = onEvent,
+                )
+            }
         }
     }
 }
@@ -146,11 +159,7 @@ private fun DetailsTrackerDrawerPanel(
             .widthIn(min = 396.dp, max = 456.dp)
             .fillMaxWidth(0.94f)
             .fillMaxHeight()
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                onClick = {},
-            ),
+            .nonFocusableTap {},
         shape = RoundedCornerShape(20.dp),
         color = theme.SurfaceCard.copy(alpha = if (theme.isAmoled) 0.96f else 0.94f),
         border = BorderStroke(1.dp, if (theme.isLightMode) theme.Divider.copy(alpha = 0.7f) else Color.White.copy(alpha = 0.14f)),

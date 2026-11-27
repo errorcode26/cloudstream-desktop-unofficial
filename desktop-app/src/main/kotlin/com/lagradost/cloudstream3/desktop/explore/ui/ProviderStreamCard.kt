@@ -6,6 +6,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -30,6 +31,7 @@ import androidx.compose.ui.unit.sp
 import com.lagradost.cloudstream3.desktop.explore.models.ProviderMatch
 import com.lagradost.cloudstream3.desktop.ui.badges.DesktopBadgeComponents
 import com.lagradost.cloudstream3.desktop.ui.components.LocalDesktopTheme
+import com.lagradost.cloudstream3.desktop.ui.components.desktopInteractiveFocus
 
 @Composable
 internal fun ProviderFilterPill(
@@ -38,11 +40,17 @@ internal fun ProviderFilterPill(
     onClick: () -> Unit,
 ) {
     val theme = LocalDesktopTheme.current
+    val interactionSource = remember { MutableInteractionSource() }
+    val pillShape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact
     Surface(
-        shape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact,
+        shape = pillShape,
         color = if (selected) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.06f),
         border = BorderStroke(0.5.dp, if (selected) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.12f)),
-        modifier = Modifier.clickable(onClick = onClick),
+        modifier = Modifier
+            .clip(pillShape)
+            .hoverable(interactionSource)
+            .desktopInteractiveFocus(interactionSource = interactionSource, shape = pillShape)
+            .clickable(interactionSource = interactionSource, indication = null, onClick = onClick),
     ) {
         Text(
             text = label,
@@ -62,26 +70,31 @@ internal fun ProviderStreamCard(
     val theme = LocalDesktopTheme.current
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
+    val isFocused by interactionSource.collectIsFocusedAsState()
+    val isActiveVisual = isHovered || isFocused
+    val cardShape = RoundedCornerShape(12.dp)
 
-    val cardBg = if (isHovered) {
+    val cardBg = if (isActiveVisual) {
         if (theme.isAmoled) Color(0xFF161820) else theme.SurfaceElevated
     } else {
         if (theme.isAmoled) Color(0xFF0F1116) else theme.SurfaceCard
     }
 
-    val cardBorder = if (isHovered) {
+    val cardBorder = if (isActiveVisual) {
         MaterialTheme.colorScheme.primary.copy(alpha = 0.55f)
     } else {
         Color.White.copy(alpha = 0.08f)
     }
 
     Surface(
-        shape = RoundedCornerShape(12.dp),
+        shape = cardShape,
         color = cardBg,
         border = BorderStroke(1.dp, cardBorder),
         modifier = Modifier
             .fillMaxWidth()
+            .clip(cardShape)
             .hoverable(interactionSource)
+            .desktopInteractiveFocus(interactionSource = interactionSource, shape = cardShape)
             .clickable(interactionSource = interactionSource, indication = null, onClick = onClick),
     ) {
         Row(

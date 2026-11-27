@@ -2,6 +2,8 @@ package com.lagradost.cloudstream3.desktop.ui.screens.home
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -24,6 +26,7 @@ import com.lagradost.cloudstream3.MainAPI
 import com.lagradost.cloudstream3.TvType
 import com.lagradost.cloudstream3.desktop.torrent.DesktopTorrentEngine
 import com.lagradost.cloudstream3.desktop.ui.components.AppToastManager
+import com.lagradost.cloudstream3.desktop.ui.components.desktopInteractiveFocus
 
 @Composable
 internal fun HomeSimpleProviderGrid(
@@ -64,12 +67,16 @@ internal fun HomeSimpleProviderGrid(
             val isSingleNameUnique = sortedProviders.count { it.name == provider.name } == 1
             val isActive = activeProviders.contains(pKey) || (isSingleNameUnique && activeProviders.contains(provider.name))
 
+            val itemInteraction = remember { MutableInteractionSource() }
+            val itemShape = RoundedCornerShape(8.dp)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(8.dp))
+                    .clip(itemShape)
                     .background(if (isActive) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface)
-                    .clickable {
+                    .hoverable(itemInteraction)
+                    .desktopInteractiveFocus(interactionSource = itemInteraction, shape = itemShape)
+                    .clickable(interactionSource = itemInteraction, indication = null) {
                         onSelectProvider(provider, pKey)
                     }
                     .padding(12.dp),

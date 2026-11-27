@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -167,6 +168,8 @@ fun PosterCard(
     val interactionSource = remember { MutableInteractionSource() }
     val isHoveredRaw by interactionSource.collectIsHoveredAsState()
     val isHovered = isHoveredRaw && isHoverEnabled
+    val isFocused by interactionSource.collectIsFocusedAsState()
+    val isActiveVisual = isHovered || isFocused
 
     val posterTitlePosition = style.titlePosition
     val posterMetadataPosition = style.metadataPosition
@@ -242,7 +245,7 @@ fun PosterCard(
 
     Column(modifier = modifier.width(width)) {
         Box {
-            if (isHovered && posterHoverGlowEnabled) {
+            if (isActiveVisual && posterHoverGlowEnabled) {
                 Box(
                     modifier = Modifier
                         .matchParentSize()
@@ -253,7 +256,7 @@ fun PosterCard(
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .then(if (isHoverEnabled) Modifier.posterHoverEffect(shape) else Modifier)
+                    .then(if (isHoverEnabled || isFocused) Modifier.posterHoverEffect(shape, isFocused = isFocused) else Modifier)
                     .clip(shape)
                     .hoverable(interactionSource)
                     .onGloballyPositioned { coordinates ->
@@ -265,6 +268,20 @@ fun PosterCard(
                             bounds = newBounds
                         }
                     }
+                    .desktopFocusableCard(
+                        interactionSource = interactionSource,
+                        shape = shape,
+                        onClick = { currentOnClick() },
+                        onSecondaryClick = {
+                            GlobalContextMenuState.showForPoster(
+                                bounds = bounds,
+                                item = currentItem,
+                                provider = currentProvider,
+                                onClick = currentOnClick,
+                                onPlayClick = currentOnPlayClick,
+                            )
+                        },
+                    )
                     .pointerInput(Unit) {
                         awaitPointerEventScope {
                             var downPos: androidx.compose.ui.geometry.Offset? = null
@@ -363,7 +380,7 @@ fun PosterCard(
                     }
 
                     androidx.compose.animation.AnimatedVisibility(
-                        visible = isHovered,
+                        visible = isActiveVisual,
                         enter = androidx.compose.animation.fadeIn(),
                         exit = androidx.compose.animation.fadeOut(),
                     ) {
@@ -371,7 +388,7 @@ fun PosterCard(
                     }
 
                     androidx.compose.animation.AnimatedVisibility(
-                        visible = isHovered,
+                        visible = isActiveVisual,
                         enter = androidx.compose.animation.fadeIn(animationSpec = androidx.compose.animation.core.tween(200)) +
                             androidx.compose.animation.scaleIn(initialScale = 0.8f, animationSpec = androidx.compose.animation.core.tween(200)),
                         exit = androidx.compose.animation.fadeOut(animationSpec = androidx.compose.animation.core.tween(200)) +
@@ -397,7 +414,7 @@ fun PosterCard(
 
                     // Gradient at the bottom with the title
                     androidx.compose.animation.AnimatedVisibility(
-                        visible = isHovered && posterTitlePosition == com.lagradost.cloudstream3.desktop.ui.theme.PosterTitlePosition.INSIDE,
+                        visible = isActiveVisual && posterTitlePosition == com.lagradost.cloudstream3.desktop.ui.theme.PosterTitlePosition.INSIDE,
                         modifier = Modifier.align(Alignment.BottomCenter),
                         enter = androidx.compose.animation.fadeIn(),
                         exit = androidx.compose.animation.fadeOut(),
@@ -449,7 +466,7 @@ fun PosterCard(
 
                         if (posterMetadataPosition == PosterMetadataPosition.STEALTH_HOVER) {
                             androidx.compose.animation.AnimatedVisibility(
-                                visible = isHovered,
+                                visible = isActiveVisual,
                                 enter = androidx.compose.animation.fadeIn(),
                                 exit = androidx.compose.animation.fadeOut(),
                             ) {

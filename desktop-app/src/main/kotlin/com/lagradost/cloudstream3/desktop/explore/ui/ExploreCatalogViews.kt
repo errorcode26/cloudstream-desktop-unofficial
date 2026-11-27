@@ -6,6 +6,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -36,6 +37,7 @@ import com.lagradost.cloudstream3.desktop.explore.viewmodel.ExploreUiState
 import com.lagradost.cloudstream3.desktop.explore.viewmodel.ExploreViewModel
 import com.lagradost.cloudstream3.desktop.ui.DockPosition
 import com.lagradost.cloudstream3.desktop.ui.components.LocalDesktopTheme
+import com.lagradost.cloudstream3.desktop.ui.components.desktopInteractiveFocus
 import com.lagradost.cloudstream3.desktop.ui.theme.AppearanceConfig
 import com.lagradost.common.storage.DesktopDataStore
 
@@ -215,27 +217,31 @@ internal fun ExploreFilterSidebar(
                         val genreLabel = if (genre == "All") "All Genres" else genre
                         val interactionSource = remember { MutableInteractionSource() }
                         val isHovered by interactionSource.collectIsHoveredAsState()
+                        val isFocused by interactionSource.collectIsFocusedAsState()
+                        val isActiveVisual = isHovered || isFocused
+                        val genreShape = RoundedCornerShape(8.dp)
 
                         Surface(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(32.dp)
-                                .clip(RoundedCornerShape(8.dp))
+                                .clip(genreShape)
                                 .hoverable(interactionSource)
+                                .desktopInteractiveFocus(interactionSource = interactionSource, shape = genreShape)
                                 .clickable(interactionSource = interactionSource, indication = null) {
                                     onSelectGenre(genre)
                                 },
                             color = if (isSelected) {
                                 Color.White.copy(alpha = 0.12f)
-                            } else if (isHovered) {
+                            } else if (isActiveVisual) {
                                 Color.White.copy(alpha = 0.05f)
                             } else {
                                 Color.Transparent
                             },
-                            shape = RoundedCornerShape(8.dp),
+                            shape = genreShape,
                             border = if (isSelected) {
                                 BorderStroke(0.5.dp, Color.White.copy(alpha = 0.25f))
-                            } else if (isHovered) {
+                            } else if (isActiveVisual) {
                                 BorderStroke(0.5.dp, Color.White.copy(alpha = 0.12f))
                             } else {
                                 null
@@ -251,7 +257,7 @@ internal fun ExploreFilterSidebar(
                                     text = genreLabel,
                                     fontSize = 12.sp,
                                     fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-                                    color = if (isSelected) Color.White else (if (isHovered) theme.TextPrimary else theme.TextMuted),
+                                    color = if (isSelected) Color.White else (if (isActiveVisual) theme.TextPrimary else theme.TextMuted),
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                 )
@@ -290,29 +296,33 @@ internal fun ExploreFilterSidebar(
                             val isSelected = selectedYear.equals(yr, ignoreCase = true)
                             val interactionSource = remember { MutableInteractionSource() }
                             val isHovered by interactionSource.collectIsHoveredAsState()
+                            val isFocused by interactionSource.collectIsFocusedAsState()
+                            val isActiveVisual = isHovered || isFocused
+                            val yearShape = RoundedCornerShape(6.dp)
 
                             Surface(
                                 modifier = Modifier
                                     .weight(1f)
                                     .height(28.dp)
-                                    .clip(RoundedCornerShape(6.dp))
+                                    .clip(yearShape)
                                     .hoverable(interactionSource)
+                                    .desktopInteractiveFocus(interactionSource = interactionSource, shape = yearShape)
                                     .clickable(interactionSource = interactionSource, indication = null) {
                                         onSelectYear(yr)
                                     },
                                 color = if (isSelected) {
                                     Color.White.copy(alpha = 0.14f)
-                                } else if (isHovered) {
+                                } else if (isActiveVisual) {
                                     Color.White.copy(alpha = 0.07f)
                                 } else {
                                     Color.White.copy(alpha = 0.03f)
                                 },
-                                shape = RoundedCornerShape(6.dp),
+                                shape = yearShape,
                                 border = BorderStroke(
                                     0.5.dp,
                                     if (isSelected) {
                                         Color.White.copy(alpha = 0.30f)
-                                    } else if (isHovered) {
+                                    } else if (isActiveVisual) {
                                         Color.White.copy(alpha = 0.18f)
                                     } else {
                                         Color.White.copy(alpha = 0.08f)
@@ -327,7 +337,7 @@ internal fun ExploreFilterSidebar(
                                         text = yr,
                                         fontSize = 10.5.sp,
                                         fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-                                        color = if (isSelected) Color.White else (if (isHovered) theme.TextPrimary else theme.TextMuted),
+                                        color = if (isSelected) Color.White else (if (isActiveVisual) theme.TextPrimary else theme.TextMuted),
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis,
                                     )

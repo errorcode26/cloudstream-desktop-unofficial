@@ -85,21 +85,8 @@ fun rememberFullscreenHelper(): FullscreenHelperState {
                 com.lagradost.cloudstream3.desktop.ui.screens.dev.DevStudioState.toggle()
                 true
             } else if (keyEvent.key == Key.Escape && keyEvent.type == KeyEventType.KeyDown) {
-                if (com.lagradost.cloudstream3.desktop.ui.components.GlobalContextMenuState.isActive) {
-                    com.lagradost.cloudstream3.desktop.ui.components.GlobalContextMenuState.dismiss()
-                    true
-                } else if (com.lagradost.cloudstream3.desktop.ui.screens.settings.SettingsSession.activeSubScreen != null) {
-                    com.lagradost.cloudstream3.desktop.ui.screens.settings.SettingsSession.activeSubScreen = null
-                    true
-                } else if (controller.isFullscreen) {
+                if (controller.isFullscreen) {
                     toggleFunc()
-                    true
-                } else {
-                    false
-                }
-            } else if (keyEvent.isAltPressed && keyEvent.key == Key.DirectionLeft && keyEvent.type == KeyEventType.KeyDown) {
-                if (com.lagradost.cloudstream3.desktop.ui.screens.settings.SettingsSession.activeSubScreen != null) {
-                    com.lagradost.cloudstream3.desktop.ui.screens.settings.SettingsSession.activeSubScreen = null
                     true
                 } else {
                     false

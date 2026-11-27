@@ -8,6 +8,7 @@ import androidx.compose.foundation.TooltipArea
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
@@ -143,6 +144,7 @@ fun FullscreenToggleButton(
                     scaleY = buttonScale
                 }
                 .clip(buttonShape)
+                .desktopInteractiveFocus(interactionSource = interactionSource, shape = buttonShape)
                 .clickable(
                     interactionSource = interactionSource,
                     indication = null,
@@ -282,6 +284,7 @@ fun TopBarProviderPill(
                 modifier = Modifier
                     .size(42.dp)
                     .clip(pillShape)
+                    .desktopInteractiveFocus(interactionSource = interactionSource, shape = pillShape)
                     .clickable(
                         interactionSource = interactionSource,
                         indication = null,
@@ -325,6 +328,7 @@ fun TopBarProviderPill(
                 modifier = Modifier
                     .height(42.dp)
                     .clip(pillShape)
+                    .desktopInteractiveFocus(interactionSource = interactionSource, shape = pillShape)
                     .clickable(
                         interactionSource = interactionSource,
                         indication = null,

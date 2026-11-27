@@ -11,6 +11,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -48,6 +49,7 @@ import com.lagradost.cloudstream3.desktop.tracking.TrackerDescriptor
 import com.lagradost.cloudstream3.desktop.tracking.UnifiedLibraryEntry
 import com.lagradost.cloudstream3.desktop.tracking.UnifiedWatchStatus
 import com.lagradost.cloudstream3.desktop.ui.components.DesktopUi
+import com.lagradost.cloudstream3.desktop.ui.components.desktopFocusableCard
 import com.lagradost.cloudstream3.desktop.ui.components.posterHoverEffect
 import com.lagradost.cloudstream3.desktop.ui.screens.library.contract.LocalBookmarkProgress
 import com.lagradost.cloudstream3.desktop.ui.screens.library.contract.LocalTrackerLinkInfo
@@ -81,17 +83,19 @@ private fun LibraryPosterCardShell(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
+    val isFocused by interactionSource.collectIsFocusedAsState()
+    val isActiveVisual = isHovered || isFocused
     val posterCornerRadius by AppearanceConfig.posterRoundingDp.collectAsState()
     val shape = remember(posterCornerRadius) { RoundedCornerShape(posterCornerRadius.dp) }
     val primary = MaterialTheme.colorScheme.primary
     var bounds by remember { mutableStateOf(Rect.Zero) }
 
     Box(modifier = Modifier.fillMaxWidth()) {
-        if (isHovered || isSelectedForEdit) {
+        if (isActiveVisual || isSelectedForEdit) {
             val glowColor = when {
                 isSelectedForEdit && accentOverride != null -> accentOverride.copy(alpha = 0.65f)
                 isWarningState -> Color(0xFFE65100).copy(alpha = 0.65f)
-                accentOverride != null && isHovered -> accentOverride.copy(alpha = 0.55f)
+                accentOverride != null && isActiveVisual -> accentOverride.copy(alpha = 0.55f)
                 else -> primary.copy(alpha = 0.65f)
             }
             Box(
@@ -105,10 +109,17 @@ private fun LibraryPosterCardShell(
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
-                .posterHoverEffect(shape)
+                .posterHoverEffect(shape, isFocused = isFocused)
                 .clip(shape)
                 .hoverable(interactionSource)
                 .onGloballyPositioned { coords -> bounds = coords.boundsInWindow() }
+                .desktopFocusableCard(
+                    interactionSource = interactionSource,
+                    shape = shape,
+                    showRing = false,
+                    onClick = onClick,
+                    onSecondaryClick = { onSecondaryClick(bounds) },
+                )
                 .pointerInput(itemKey) {
                     awaitPointerEventScope {
                         while (true) {
@@ -125,10 +136,10 @@ private fun LibraryPosterCardShell(
                 },
             shape = shape,
             color = DesktopUi.SurfaceCard,
-            tonalElevation = if (isHovered || isSelectedForEdit) 8.dp else 2.dp,
+            tonalElevation = if (isActiveVisual || isSelectedForEdit) 8.dp else 2.dp,
             border = when {
                 isSelectedForEdit -> BorderStroke(2.dp, accentOverride ?: primary)
-                isHovered -> BorderStroke(
+                isActiveVisual -> BorderStroke(
                     2.dp,
                     when {
                         isWarningState -> Color(0xFFFFA726)
@@ -170,7 +181,7 @@ private fun LibraryPosterCardShell(
                 }
 
                 AnimatedVisibility(
-                    visible = isHovered,
+                    visible = isActiveVisual,
                     enter = fadeIn(),
                     exit = fadeOut(),
                 ) {
@@ -178,7 +189,7 @@ private fun LibraryPosterCardShell(
                 }
 
                 AnimatedVisibility(
-                    visible = isHovered,
+                    visible = isActiveVisual,
                     enter = fadeIn(animationSpec = tween(200)) + scaleIn(initialScale = 0.8f, animationSpec = tween(200)),
                     exit = fadeOut(animationSpec = tween(200)) + scaleOut(targetScale = 0.8f, animationSpec = tween(200)),
                     modifier = Modifier.align(Alignment.Center),
@@ -186,7 +197,7 @@ private fun LibraryPosterCardShell(
                     centerHoverContent()
                 }
 
-                topOverlayContent(isHovered)
+                topOverlayContent(isActiveVisual)
 
                 Column(
                     modifier = Modifier
@@ -195,7 +206,7 @@ private fun LibraryPosterCardShell(
                         .background(CARD_TITLE_SCRIM_BRUSH)
                         .padding(horizontal = 10.dp, vertical = 10.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp),
-                    content = { bottomOverlayContent(isHovered) },
+                    content = { bottomOverlayContent(isActiveVisual) },
                 )
             }
         }

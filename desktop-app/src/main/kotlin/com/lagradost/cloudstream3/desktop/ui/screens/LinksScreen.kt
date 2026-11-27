@@ -70,6 +70,7 @@ import com.lagradost.cloudstream3.desktop.ui.components.AppToastManager
 import com.lagradost.cloudstream3.desktop.ui.components.DesktopBackButton
 import com.lagradost.cloudstream3.desktop.ui.components.LocalDesktopTheme
 import com.lagradost.cloudstream3.desktop.ui.components.WindowControlsPill
+import com.lagradost.cloudstream3.desktop.ui.components.handleEscapeKey
 import com.lagradost.cloudstream3.desktop.ui.screens.details.FloatingEpisodeCard
 import com.lagradost.cloudstream3.desktop.ui.screens.details.matchesHistory
 import com.lagradost.cloudstream3.desktop.ui.screens.links.LinksViewModel
@@ -465,8 +466,9 @@ fun LinksSidePanel(
     Surface(
         modifier = Modifier
             .fillMaxSize()
+            .handleEscapeKey { onClose() }
             .onPreviewKeyEvent { event ->
-                if ((event.key == Key.Escape || event.key == Key.Back || event.key == Key.Backspace) && event.type == KeyEventType.KeyUp) {
+                if (event.key == Key.Back && event.type == KeyEventType.KeyUp) {
                     onClose()
                     true
                 } else {
@@ -687,8 +689,9 @@ fun ComposeLinksScreen(
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
+            .handleEscapeKey { onBack() }
             .onPreviewKeyEvent { event ->
-                if ((event.key == Key.Escape || event.key == Key.Back || event.key == Key.Backspace) && event.type == KeyEventType.KeyUp) {
+                if (event.key == Key.Back && event.type == KeyEventType.KeyUp) {
                     onBack()
                     true
                 } else {

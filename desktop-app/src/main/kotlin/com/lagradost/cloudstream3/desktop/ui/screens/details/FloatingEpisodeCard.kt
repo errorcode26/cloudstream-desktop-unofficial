@@ -3,8 +3,6 @@
 package com.lagradost.cloudstream3.desktop.ui.screens.details
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -30,6 +28,7 @@ import com.lagradost.cloudstream3.Episode
 import com.lagradost.cloudstream3.LoadResponse
 import com.lagradost.cloudstream3.MainAPI
 import com.lagradost.cloudstream3.TvSeriesLoadResponse
+import com.lagradost.cloudstream3.desktop.ui.components.nonFocusableTap
 import com.lagradost.cloudstream3.desktop.ui.screens.details.contract.DetailsUiState
 import com.lagradost.cloudstream3.desktop.utils.TitleUtils
 import com.lagradost.common.storage.WatchHistory
@@ -80,10 +79,7 @@ fun FloatingEpisodeCard(
         modifier = modifier
             .widthIn(max = 560.dp)
             .fillMaxWidth()
-            .clickable(
-                indication = null,
-                interactionSource = remember { MutableInteractionSource() },
-            ) { /* absorb clicks so clicking inside does not dismiss */ },
+            .nonFocusableTap { /* absorb clicks so clicking inside does not dismiss */ },
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {

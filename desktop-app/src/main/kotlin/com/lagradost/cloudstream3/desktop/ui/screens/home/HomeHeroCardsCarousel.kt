@@ -11,6 +11,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -54,6 +55,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
@@ -84,6 +87,7 @@ import com.lagradost.cloudstream3.desktop.ui.DockPosition
 import com.lagradost.cloudstream3.desktop.ui.LocalSafeArea
 import com.lagradost.cloudstream3.desktop.ui.badges.DesktopBadgeComponents
 import com.lagradost.cloudstream3.desktop.ui.components.HeroPrimaryCtaButton
+import com.lagradost.cloudstream3.desktop.ui.components.desktopInteractiveFocus
 import com.lagradost.cloudstream3.desktop.ui.theme.AppearanceConfig
 import com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes
 import com.lagradost.cloudstream3.desktop.utils.ImageUtils
@@ -193,12 +197,13 @@ fun HomeHeroCardsCarousel(
 
     val carouselInteractionSource = remember { MutableInteractionSource() }
     val isCarouselHovered by carouselInteractionSource.collectIsHoveredAsState()
+    var isCarouselFocused by remember { mutableStateOf(false) }
 
-    LaunchedEffect(totalItems, autoSlideDelay, isDragging, isCarouselHovered) {
-        if (totalItems > 1 && autoSlideDelay > 0 && !isDragging && !isCarouselHovered) {
+    LaunchedEffect(totalItems, autoSlideDelay, isDragging, isCarouselHovered, isCarouselFocused) {
+        if (totalItems > 1 && autoSlideDelay > 0 && !isDragging && !isCarouselHovered && !isCarouselFocused) {
             while (isActive) {
                 delay(autoSlideDelay * 1000L)
-                if (!isDragging && !isCarouselHovered && !animatedPosition.isRunning) {
+                if (!isDragging && !isCarouselHovered && !isCarouselFocused && !animatedPosition.isRunning) {
                     stepRelative(1)
                 }
             }
@@ -246,6 +251,7 @@ fun HomeHeroCardsCarousel(
         modifier = Modifier
             .fillMaxWidth()
             .height(totalHeroHeight)
+            .onFocusChanged { isCarouselFocused = it.hasFocus }
             .hoverable(carouselInteractionSource),
     ) {
         val stageWidth = (maxWidth - effectiveStart - effectiveEnd).coerceAtLeast(260.dp)
@@ -406,9 +412,9 @@ fun HomeHeroCardsCarousel(
                 }
             }
 
-            // Desktop Hover Navigation Chevrons flanking active center card
+            // Desktop Hover / Focus Navigation Chevrons flanking active center card
             val chevronAlpha by animateFloatAsState(
-                targetValue = if (isCarouselHovered && totalItems > 1) 1f else 0f,
+                targetValue = if ((isCarouselHovered || isCarouselFocused) && totalItems > 1) 1f else 0f,
                 animationSpec = tween(200),
                 label = "chevron_fade",
             )
@@ -481,6 +487,7 @@ fun HomeHeroCardsCarousel(
                                 if (isSelected) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.35f),
                             )
                             .pointerHoverIcon(PointerIcon.Hand)
+                            .focusProperties { canFocus = false }
                             .clickable { navigateToActualIndex(index) },
                     )
                 }
@@ -550,6 +557,7 @@ private fun HeroStackedCard(
             .clip(cardShape)
             .background(Color(0xFF0F0F14))
             .pointerHoverIcon(PointerIcon.Hand)
+            .focusProperties { canFocus = false }
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
@@ -856,6 +864,8 @@ private fun HeroCarouselChevronButton(
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
+    val isFocused by interactionSource.collectIsFocusedAsState()
+    val isHighlighted = isHovered || isFocused
     Box(
         modifier = modifier
             .size(buttonSize)
@@ -872,16 +882,17 @@ private fun HeroCarouselChevronButton(
             )
             .clip(shape)
             .background(
-                if (isHovered) Color(0xFF22222E).copy(alpha = 0.92f * chevronAlpha)
+                if (isHighlighted) Color(0xFF22222E).copy(alpha = 0.92f * chevronAlpha)
                 else Color(0xFF14141A).copy(alpha = 0.78f * chevronAlpha),
             )
             .border(
                 1.dp,
-                if (isHovered) Color.White.copy(alpha = 0.45f * chevronAlpha)
+                if (isHighlighted) Color.White.copy(alpha = 0.45f * chevronAlpha)
                 else Color.White.copy(alpha = 0.20f * chevronAlpha),
                 shape,
             )
             .pointerHoverIcon(PointerIcon.Hand)
+            .desktopInteractiveFocus(interactionSource = interactionSource, shape = shape)
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,

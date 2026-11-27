@@ -5,6 +5,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -353,7 +354,8 @@ private fun TopBarProfilePill(
 
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
-    val isExpanded = showProfileName || isHovered || showProfileFlyout
+    val isFocused by interactionSource.collectIsFocusedAsState()
+    val isExpanded = showProfileName || isHovered || isFocused || showProfileFlyout
 
     val buttonShapes = LocalDesktopButtonShapes.current
     val profileButtonShape = if (isExpanded) buttonShapes.medium else buttonShapes.icon
@@ -363,6 +365,7 @@ private fun TopBarProfilePill(
             modifier = Modifier
                 .height(42.dp)
                 .clip(profileButtonShape)
+                .desktopInteractiveFocus(interactionSource = interactionSource, shape = profileButtonShape)
                 .clickable(
                     interactionSource = interactionSource,
                     indication = null,
@@ -370,7 +373,7 @@ private fun TopBarProfilePill(
                 )
                 .border(
                     1.dp,
-                    if (isHovered) hoverBorder else buttonBorder,
+                    if (isHovered || isFocused) hoverBorder else buttonBorder,
                     profileButtonShape,
                 ),
             color = buttonBg,
@@ -484,12 +487,17 @@ private fun TopBarProfilePill(
                 otherProfiles.forEach { profile ->
                     val rowInteractionSource = remember { MutableInteractionSource() }
                     val isRowHovered by rowInteractionSource.collectIsHoveredAsState()
+                    val isRowFocused by rowInteractionSource.collectIsFocusedAsState()
+                    val rowHighlight = isRowHovered || isRowFocused
+                    val rowShape = RoundedCornerShape(10.dp)
 
                     Surface(
-                        shape = RoundedCornerShape(10.dp),
-                        color = if (isRowHovered) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f) else Color.Transparent,
+                        shape = rowShape,
+                        color = if (rowHighlight) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f) else Color.Transparent,
                         modifier = Modifier
                             .fillMaxWidth()
+                            .clip(rowShape)
+                            .desktopInteractiveFocus(interactionSource = rowInteractionSource, shape = rowShape)
                             .clickable(interactionSource = rowInteractionSource, indication = null) {
                                 showProfileFlyout = false
                                 if (profile.hasPin) {
@@ -513,8 +521,8 @@ private fun TopBarProfilePill(
                             Text(
                                 text = profile.name,
                                 style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = if (isRowHovered) FontWeight.SemiBold else FontWeight.Medium,
-                                color = if (isRowHovered) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                                fontWeight = if (rowHighlight) FontWeight.SemiBold else FontWeight.Medium,
+                                color = if (rowHighlight) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
                                 modifier = Modifier.weight(1f),
                                 maxLines = 1,
                                 overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
@@ -539,11 +547,16 @@ private fun TopBarProfilePill(
             // Action: Add Profile
             val addInteraction = remember { MutableInteractionSource() }
             val isAddHovered by addInteraction.collectIsHoveredAsState()
+            val isAddFocused by addInteraction.collectIsFocusedAsState()
+            val addHighlight = isAddHovered || isAddFocused
+            val flyoutRowShape = RoundedCornerShape(10.dp)
             Surface(
-                shape = RoundedCornerShape(10.dp),
-                color = if (isAddHovered) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f) else Color.Transparent,
+                shape = flyoutRowShape,
+                color = if (addHighlight) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f) else Color.Transparent,
                 modifier = Modifier
                     .fillMaxWidth()
+                    .clip(flyoutRowShape)
+                    .desktopInteractiveFocus(interactionSource = addInteraction, shape = flyoutRowShape)
                     .clickable(interactionSource = addInteraction, indication = null) {
                         showProfileFlyout = false
                         onNavigate(Config.ProfileEdit(profileId = null, switchOnCreate = true))
@@ -558,13 +571,13 @@ private fun TopBarProfilePill(
                         Icons.Default.Add,
                         contentDescription = null,
                         modifier = Modifier.size(18.dp),
-                        tint = if (isAddHovered) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        tint = if (addHighlight) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Text(
                         text = "Add Profile",
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Medium,
-                        color = if (isAddHovered) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                        color = if (addHighlight) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
                     )
                 }
             }
@@ -572,11 +585,15 @@ private fun TopBarProfilePill(
             // Action: Manage Profiles Hub
             val manageInteraction = remember { MutableInteractionSource() }
             val isManageHovered by manageInteraction.collectIsHoveredAsState()
+            val isManageFocused by manageInteraction.collectIsFocusedAsState()
+            val manageHighlight = isManageHovered || isManageFocused
             Surface(
-                shape = RoundedCornerShape(10.dp),
-                color = if (isManageHovered) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f) else Color.Transparent,
+                shape = flyoutRowShape,
+                color = if (manageHighlight) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f) else Color.Transparent,
                 modifier = Modifier
                     .fillMaxWidth()
+                    .clip(flyoutRowShape)
+                    .desktopInteractiveFocus(interactionSource = manageInteraction, shape = flyoutRowShape)
                     .clickable(interactionSource = manageInteraction, indication = null) {
                         showProfileFlyout = false
                         onOpenProfileManager?.invoke()
@@ -591,13 +608,13 @@ private fun TopBarProfilePill(
                         Icons.Default.ManageAccounts,
                         contentDescription = null,
                         modifier = Modifier.size(18.dp),
-                        tint = if (isManageHovered) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        tint = if (manageHighlight) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Text(
                         text = "Manage Profiles",
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Medium,
-                        color = if (isManageHovered) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                        color = if (manageHighlight) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
                     )
                 }
             }

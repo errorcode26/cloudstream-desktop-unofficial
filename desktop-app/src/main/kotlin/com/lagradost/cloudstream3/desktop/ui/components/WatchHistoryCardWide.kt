@@ -7,6 +7,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -147,6 +148,20 @@ fun WatchHistoryCardWide(
         DesktopRepositoryManager.getPluginIcon(provider?.name)
     }
 
+    val isFocused by interactionSource.collectIsFocusedAsState()
+    val isActiveVisual = isHovered || isFocused
+    val openContextMenu = {
+        GlobalContextMenuState.showForWatchHistory(
+            bounds = boundsHolder.bounds,
+            history = history,
+            provider = provider,
+            onRemove = onRemove,
+            onClick = onClick,
+            onPlayClick = onPlayClick,
+            onReLink = onReLink,
+        )
+    }
+
     Box(
         modifier = modifier
             .graphicsLayer {
@@ -154,7 +169,7 @@ fun WatchHistoryCardWide(
                 scaleY = scale
             },
     ) {
-        if (isHovered && posterHoverGlowEnabled) {
+        if (isActiveVisual && posterHoverGlowEnabled) {
             Box(
                 modifier = Modifier
                     .matchParentSize()
@@ -167,7 +182,7 @@ fun WatchHistoryCardWide(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .then(if (isHovered) Modifier.border(1.5.dp, primary, cardShape) else Modifier.border(0.5.dp, Color.White.copy(alpha = 0.08f), cardShape))
+                .then(if (isActiveVisual) Modifier.border(2.dp, primary, cardShape) else Modifier.border(0.5.dp, Color.White.copy(alpha = 0.08f), cardShape))
                 .clip(cardShape)
                 .background(backgroundColor)
                 .hoverable(interactionSource)
@@ -177,21 +192,20 @@ fun WatchHistoryCardWide(
                         size = Size(coordinates.size.width.toFloat(), coordinates.size.height.toFloat()),
                     )
                 }
+                .desktopFocusableCard(
+                    interactionSource = interactionSource,
+                    shape = cardShape,
+                    showRing = false,
+                    onClick = onClick,
+                    onSecondaryClick = if (isContextMenuEnabled) openContextMenu else null,
+                )
                 .pointerInput(isContextMenuEnabled) {
                     awaitPointerEventScope {
                         while (true) {
                             val event = awaitPointerEvent()
                             if (event.type == PointerEventType.Release) {
                                 if (isContextMenuEnabled && event.button == PointerButton.Secondary) {
-                                    GlobalContextMenuState.showForWatchHistory(
-                                        bounds = boundsHolder.bounds,
-                                        history = history,
-                                        provider = provider,
-                                        onRemove = onRemove,
-                                        onClick = onClick,
-                                        onPlayClick = onPlayClick,
-                                        onReLink = onReLink,
-                                    )
+                                    openContextMenu()
                                 } else if (event.button == PointerButton.Primary) {
                                     onClick()
                                 }

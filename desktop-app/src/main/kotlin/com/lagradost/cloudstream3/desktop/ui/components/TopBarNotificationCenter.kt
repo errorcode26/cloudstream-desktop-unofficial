@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -64,6 +65,7 @@ fun TopBarNotificationCenter() {
 
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
+    val isFocused by interactionSource.collectIsFocusedAsState()
 
     PluginUpdatesModal(
         show = showPluginUpdatesModal,
@@ -90,6 +92,7 @@ fun TopBarNotificationCenter() {
             modifier = Modifier
                 .size(42.dp)
                 .clip(buttonShape)
+                .desktopInteractiveFocus(interactionSource = interactionSource, shape = buttonShape)
                 .clickable(
                     interactionSource = interactionSource,
                     indication = null,
@@ -97,7 +100,7 @@ fun TopBarNotificationCenter() {
                 )
                 .border(
                     1.dp,
-                    if (isHovered) hoverBorder else buttonBorder,
+                    if (isHovered || isFocused) hoverBorder else buttonBorder,
                     buttonShape,
                 ),
             color = buttonBg,

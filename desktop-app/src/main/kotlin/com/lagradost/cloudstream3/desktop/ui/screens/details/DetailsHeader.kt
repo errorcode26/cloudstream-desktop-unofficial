@@ -43,6 +43,8 @@ import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import coil3.compose.LocalPlatformContext
 import coil3.compose.SubcomposeAsyncImage
+import com.lagradost.cloudstream3.desktop.ui.components.desktopInteractiveFocus
+import com.lagradost.cloudstream3.desktop.ui.components.nonFocusableTap
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.lagradost.cloudstream3.ActorData
@@ -440,10 +442,7 @@ fun DetailsMetadata(
                                         if (canExpandPlot) {
                                             Modifier
                                                 .pointerHoverIcon(PointerIcon.Hand)
-                                                .clickable(
-                                                    interactionSource = remember { MutableInteractionSource() },
-                                                    indication = null,
-                                                ) { plotExpanded = !plotExpanded }
+                                                .nonFocusableTap { plotExpanded = !plotExpanded }
                                         } else {
                                             Modifier
                                         },
@@ -466,17 +465,22 @@ fun DetailsMetadata(
                                 )
                                 if (canExpandPlot) {
                                     Spacer(modifier = Modifier.height(4.dp))
+                                    val toggleInteraction = remember { MutableInteractionSource() }
+                                    val toggleShape = RoundedCornerShape(6.dp)
                                     Text(
                                         text = if (plotExpanded) "Show less" else "Show more",
                                         color = Color.White,
                                         fontSize = 14.sp,
                                         fontWeight = FontWeight.SemiBold,
                                         modifier = Modifier
+                                            .clip(toggleShape)
                                             .pointerHoverIcon(PointerIcon.Hand)
+                                            .desktopInteractiveFocus(interactionSource = toggleInteraction, shape = toggleShape)
                                             .clickable(
-                                                interactionSource = remember { MutableInteractionSource() },
+                                                interactionSource = toggleInteraction,
                                                 indication = null,
-                                            ) { plotExpanded = !plotExpanded },
+                                            ) { plotExpanded = !plotExpanded }
+                                            .padding(horizontal = 4.dp, vertical = 2.dp),
                                     )
                                 }
                             }

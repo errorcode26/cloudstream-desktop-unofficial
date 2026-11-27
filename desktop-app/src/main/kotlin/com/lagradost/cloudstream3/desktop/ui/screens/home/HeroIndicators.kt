@@ -11,7 +11,9 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -43,11 +45,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.Dp
+import com.lagradost.cloudstream3.desktop.ui.components.desktopInteractiveFocus
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import coil3.compose.LocalPlatformContext
@@ -132,6 +136,9 @@ internal fun BoxScope.HeroFilmstrip(
                         verticalArrangement = Arrangement.spacedBy(5.dp),
                         modifier = Modifier.alpha(thumbAlpha),
                     ) {
+                        val thumbInteraction = remember { MutableInteractionSource() }
+                        val isThumbFocused by thumbInteraction.collectIsFocusedAsState()
+                        val thumbShape = RoundedCornerShape(8.dp)
                         Box(
                             modifier = Modifier
                                 .height(posterHeight)
@@ -146,9 +153,9 @@ internal fun BoxScope.HeroFilmstrip(
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier
                                     .fillMaxSize()
-                                    .clip(RoundedCornerShape(8.dp))
+                                    .clip(thumbShape)
                                     .then(
-                                        if (isSelected) {
+                                        if (isSelected || isThumbFocused) {
                                             Modifier.border(
                                                 width = 1.5.dp,
                                                 brush = Brush.verticalGradient(
@@ -157,13 +164,19 @@ internal fun BoxScope.HeroFilmstrip(
                                                         Color.White.copy(alpha = 0.25f),
                                                     ),
                                                 ),
-                                                shape = RoundedCornerShape(8.dp),
+                                                shape = thumbShape,
                                             )
                                         } else {
                                             Modifier
                                         },
                                     )
-                                    .clickable { onSelectThumb(index) },
+                                    .hoverable(thumbInteraction)
+                                    .desktopInteractiveFocus(interactionSource = thumbInteraction, shape = thumbShape)
+                                    .clickable(
+                                        interactionSource = thumbInteraction,
+                                        indication = null,
+                                        onClick = { onSelectThumb(index) },
+                                    ),
                             )
                         }
 
@@ -245,6 +258,7 @@ internal fun BoxScope.HeroDashes(
                         modifier = Modifier
                             .height(24.dp)
                             .clip(RoundedCornerShape(12.dp))
+                            .focusProperties { canFocus = false }
                             .clickable(
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = null,

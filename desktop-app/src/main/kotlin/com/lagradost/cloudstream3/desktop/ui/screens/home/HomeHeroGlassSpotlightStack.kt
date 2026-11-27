@@ -15,6 +15,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -37,6 +38,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -47,6 +49,8 @@ import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -77,6 +81,7 @@ import com.lagradost.cloudstream3.desktop.ui.DockPosition
 import com.lagradost.cloudstream3.desktop.ui.LocalSafeArea
 import com.lagradost.cloudstream3.desktop.ui.badges.DesktopBadgeComponents
 import com.lagradost.cloudstream3.desktop.ui.components.LocalDesktopTheme
+import com.lagradost.cloudstream3.desktop.ui.components.desktopInteractiveFocus
 import com.lagradost.cloudstream3.desktop.ui.components.getTextShadow
 import com.lagradost.cloudstream3.desktop.ui.theme.AppearanceConfig
 import com.lagradost.cloudstream3.desktop.utils.ImageUtils
@@ -113,6 +118,7 @@ internal fun HomeHeroGlassSpotlightStack(
 
     var currentIndex by rememberSaveable { mutableIntStateOf(0) }
     var userInteractionTrigger by remember { mutableIntStateOf(0) }
+    var isSpotlightFocused by remember { mutableStateOf(false) }
 
     LaunchedEffect(displayItems.size) {
         if (currentIndex >= displayItems.size) {
@@ -120,11 +126,13 @@ internal fun HomeHeroGlassSpotlightStack(
         }
     }
 
-    LaunchedEffect(displayItems.size, autoSlideDelay, userInteractionTrigger) {
-        if (displayItems.size > 1 && autoSlideDelay > 0) {
+    LaunchedEffect(displayItems.size, autoSlideDelay, userInteractionTrigger, isSpotlightFocused) {
+        if (displayItems.size > 1 && autoSlideDelay > 0 && !isSpotlightFocused) {
             while (isActive) {
                 delay(autoSlideDelay * 1000L)
-                currentIndex = (currentIndex + 1) % displayItems.size
+                if (!isSpotlightFocused) {
+                    currentIndex = (currentIndex + 1) % displayItems.size
+                }
             }
         }
     }
@@ -164,7 +172,8 @@ internal fun HomeHeroGlassSpotlightStack(
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxWidth()
-            .height(heroHeight),
+            .height(heroHeight)
+            .onFocusChanged { isSpotlightFocused = it.hasFocus },
     ) {
         val rootWidth = maxWidth
         val isCompact = rootWidth < 760.dp
@@ -393,6 +402,8 @@ private fun FrostedSpotlightCard(
     val theme = LocalDesktopTheme.current
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
+    val isFocused by interactionSource.collectIsFocusedAsState()
+    val isActiveVisual = isHovered || isFocused
     val cardShape = RoundedCornerShape(20.dp)
 
     val frostBase = when {
@@ -418,13 +429,13 @@ private fun FrostedSpotlightCard(
     val borderBrush = Brush.linearGradient(
         colors = if (isLightMode) {
             listOf(
-                Color.Black.copy(alpha = if (isHovered) 0.28f else 0.14f),
+                Color.Black.copy(alpha = if (isActiveVisual) 0.28f else 0.14f),
                 Color.Black.copy(alpha = 0.05f),
             )
         } else {
             listOf(
-                Color.White.copy(alpha = if (isHovered) 0.42f else 0.28f),
-                Color.White.copy(alpha = if (isHovered) 0.18f else 0.09f),
+                Color.White.copy(alpha = if (isActiveVisual) 0.42f else 0.28f),
+                Color.White.copy(alpha = if (isActiveVisual) 0.18f else 0.09f),
             )
         },
     )
@@ -445,6 +456,7 @@ private fun FrostedSpotlightCard(
             .border(BorderStroke(1.dp, borderBrush), cardShape)
             .pointerHoverIcon(PointerIcon.Hand)
             .hoverable(interactionSource)
+            .desktopInteractiveFocus(interactionSource = interactionSource, shape = cardShape)
             .clickable(interactionSource = interactionSource, indication = null, onClick = onClick),
     ) {
         AnimatedContent(
@@ -592,6 +604,8 @@ private fun SpotlightPosterStack(
 
                 val interactionSource = remember { MutableInteractionSource() }
                 val isHovered by interactionSource.collectIsHoveredAsState()
+                val isFocused by interactionSource.collectIsFocusedAsState()
+                val isActiveVisual = isHovered || isFocused
                 val posterUrl = provider?.fixUrlNull(queuedItem.posterUrl)
 
                 Box(
@@ -647,9 +661,9 @@ private fun SpotlightPosterStack(
                             .clip(posterShape)
                             .background(Color(0xFF141722))
                             .border(
-                                width = if (isHovered) 1.5.dp else 1.dp,
+                                width = if (isActiveVisual) 1.5.dp else 1.dp,
                                 color = when {
-                                    isHovered -> Color.White.copy(alpha = 0.55f)
+                                    isActiveVisual -> Color.White.copy(alpha = 0.55f)
                                     queuePos == 0 -> Color.White.copy(alpha = 0.24f)
                                     else -> Color.White.copy(alpha = 0.12f)
                                 },
@@ -657,6 +671,7 @@ private fun SpotlightPosterStack(
                             )
                             .pointerHoverIcon(PointerIcon.Hand)
                             .hoverable(interactionSource)
+                            .desktopInteractiveFocus(interactionSource = interactionSource, shape = posterShape)
                             .clickable(interactionSource = interactionSource, indication = null) {
                                 onPosterSelect(slideIdx)
                             },
@@ -688,7 +703,7 @@ private fun SpotlightPosterStack(
                             }
                         }
 
-                        if (animDim > 0.01f && !isHovered) {
+                        if (animDim > 0.01f && !isActiveVisual) {
                             Box(
                                 modifier = Modifier
                                     .fillMaxSize()
@@ -731,6 +746,7 @@ private fun SpotlightControlsRow(
                 Box(
                     modifier = Modifier
                         .height(18.dp)
+                        .focusProperties { canFocus = false }
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null,

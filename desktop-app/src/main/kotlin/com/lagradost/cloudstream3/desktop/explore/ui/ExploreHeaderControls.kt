@@ -7,6 +7,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -32,6 +33,7 @@ import com.lagradost.cloudstream3.desktop.explore.viewmodel.ExploreUiState
 import com.lagradost.cloudstream3.desktop.explore.viewmodel.ExploreViewModel
 import com.lagradost.cloudstream3.desktop.ui.LocalHazeState
 import com.lagradost.cloudstream3.desktop.ui.components.LocalDesktopTheme
+import com.lagradost.cloudstream3.desktop.ui.components.desktopInteractiveFocus
 import com.lagradost.cloudstream3.desktop.ui.navigation.Config
 import com.lagradost.cloudstream3.desktop.ui.theme.AppearanceConfig
 import dev.chrisbanes.haze.HazeStyle
@@ -268,6 +270,8 @@ internal fun ExploreHeaderControls(
                                     val title = viewModel.formatTypeTitle(type)
                                     val tabInteractionSource = remember { MutableInteractionSource() }
                                     val isTabHovered by tabInteractionSource.collectIsHoveredAsState()
+                                    val isTabFocused by tabInteractionSource.collectIsFocusedAsState()
+                                    val isTabHighlighted = isTabHovered || isTabFocused
 
                                     Box(
                                         modifier = Modifier
@@ -276,9 +280,14 @@ internal fun ExploreHeaderControls(
                                             .background(
                                                 when {
                                                     isSelected -> MaterialTheme.colorScheme.primary
-                                                    isTabHovered -> if (isLightMode) Color.Black.copy(alpha = 0.08f) else Color.White.copy(alpha = 0.08f)
+                                                    isTabHighlighted -> if (isLightMode) Color.Black.copy(alpha = 0.08f) else Color.White.copy(alpha = 0.08f)
                                                     else -> Color.Transparent
                                                 },
+                                            )
+                                            .hoverable(tabInteractionSource)
+                                            .desktopInteractiveFocus(
+                                                interactionSource = tabInteractionSource,
+                                                shape = switcherShapes.compact,
                                             )
                                             .clickable(
                                                 interactionSource = tabInteractionSource,
@@ -291,7 +300,7 @@ internal fun ExploreHeaderControls(
                                             text = title,
                                             fontSize = 12.sp,
                                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
-                                            color = if (isSelected) Color.Black else (if (isTabHovered) theme.TextPrimary else theme.TextMuted),
+                                            color = if (isSelected) Color.Black else (if (isTabHighlighted) theme.TextPrimary else theme.TextMuted),
                                             letterSpacing = 0.2.sp,
                                         )
                                     }
@@ -308,13 +317,16 @@ internal fun ExploreHeaderControls(
 @Composable
 private fun ExploreHeaderBackButton(onClick: () -> Unit) {
     val backShape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact
+    val interactionSource = remember { MutableInteractionSource() }
     Surface(
         shape = backShape,
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)),
         modifier = Modifier
             .clip(backShape)
-            .clickable(onClick = onClick),
+            .hoverable(interactionSource)
+            .desktopInteractiveFocus(interactionSource = interactionSource, shape = backShape)
+            .clickable(interactionSource = interactionSource, indication = null, onClick = onClick),
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),

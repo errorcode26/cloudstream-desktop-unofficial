@@ -7,6 +7,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -29,6 +30,7 @@ import com.lagradost.cloudstream3.AnimeLoadResponse
 import com.lagradost.cloudstream3.LoadResponse
 import com.lagradost.cloudstream3.TvSeriesLoadResponse
 import com.lagradost.cloudstream3.desktop.metadata.MetadataConfig
+import com.lagradost.cloudstream3.desktop.ui.components.desktopInteractiveFocus
 import com.lagradost.cloudstream3.desktop.ui.screens.details.contract.DetailsUiState
 import com.lagradost.cloudstream3.desktop.ui.screens.details.contract.ProductionCompany
 
@@ -473,9 +475,12 @@ fun ProductionCompanyCard(
 
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
+    val isFocused by interactionSource.collectIsFocusedAsState()
+    val isActiveVisual = isHovered || isFocused
+    val badgeShape = RoundedCornerShape(12.dp)
 
     val scale by animateFloatAsState(
-        targetValue = if (isHovered && onClick != null) 1.06f else 1.0f,
+        targetValue = if (isActiveVisual && onClick != null) 1.06f else 1.0f,
         animationSpec = tween(durationMillis = 150),
     )
 
@@ -487,17 +492,19 @@ fun ProductionCompanyCard(
                 scaleY = scale
                 clip = false
             }
-            .clip(RoundedCornerShape(12.dp))
-            .background(Color.White.copy(alpha = if (isHovered) 1.0f else 0.94f))
+            .clip(badgeShape)
+            .background(Color.White.copy(alpha = if (isActiveVisual) 1.0f else 0.94f))
             .border(
                 width = 1.dp,
-                color = if (isHovered) MaterialTheme.colorScheme.primary.copy(alpha = 0.6f) else Color.White.copy(alpha = 0.2f),
-                shape = RoundedCornerShape(12.dp),
+                color = if (isActiveVisual) MaterialTheme.colorScheme.primary.copy(alpha = 0.6f) else Color.White.copy(alpha = 0.2f),
+                shape = badgeShape,
             )
             .hoverable(interactionSource)
             .run {
                 if (onClick != null) {
-                    this.clickable(interactionSource = interactionSource, indication = null) { onClick() }
+                    this
+                        .desktopInteractiveFocus(interactionSource = interactionSource, shape = badgeShape)
+                        .clickable(interactionSource = interactionSource, indication = null) { onClick() }
                 } else {
                     this
                 }

@@ -10,7 +10,9 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -81,11 +83,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onPreviewKeyEvent
-import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.layout.ContentScale
@@ -108,6 +105,8 @@ import com.lagradost.cloudstream3.desktop.ui.components.DesktopOutlinedButton
 import com.lagradost.cloudstream3.desktop.ui.components.DesktopTextButton
 import com.lagradost.cloudstream3.desktop.ui.components.DesktopVerticalScrollbar
 import com.lagradost.cloudstream3.desktop.ui.components.LocalDesktopTheme
+import com.lagradost.cloudstream3.desktop.ui.components.desktopInteractiveFocus
+import com.lagradost.cloudstream3.desktop.ui.components.handleEscapeKey
 import com.lagradost.cloudstream3.desktop.ui.screens.profile.contract.DiceBearBackground
 import com.lagradost.cloudstream3.desktop.ui.screens.profile.contract.DiceBearCatalog
 import com.lagradost.cloudstream3.desktop.ui.screens.profile.contract.DiceBearPreset
@@ -202,13 +201,8 @@ fun ProfileEditScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .onPreviewKeyEvent { keyEvent ->
-                if (keyEvent.type == KeyEventType.KeyUp && keyEvent.key == Key.Escape && !uiState.isSaving) {
-                    viewModel.onEvent(ProfileEditUiEvent.Cancel)
-                    true
-                } else {
-                    false
-                }
+            .handleEscapeKey(enabled = !uiState.isSaving) {
+                viewModel.onEvent(ProfileEditUiEvent.Cancel)
             },
         contentAlignment = Alignment.TopCenter,
     ) {
@@ -800,13 +794,15 @@ private fun SegmentedModePill(
     val theme = LocalDesktopTheme.current
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
+    val isFocused by interactionSource.collectIsFocusedAsState()
+    val isActiveVisual = isHovered || isFocused
     val pillShape = RoundedCornerShape(7.dp)
 
     Surface(
         shape = pillShape,
         color = when {
             selected -> MaterialTheme.colorScheme.primary.copy(alpha = 0.22f)
-            isHovered -> theme.SurfaceCard.copy(alpha = 0.65f)
+            isActiveVisual -> theme.SurfaceCard.copy(alpha = 0.65f)
             else -> Color.Transparent
         },
         border = if (selected) {
@@ -817,6 +813,8 @@ private fun SegmentedModePill(
         modifier = Modifier
             .clip(pillShape)
             .pointerHoverIcon(PointerIcon.Hand)
+            .hoverable(interactionSource)
+            .desktopInteractiveFocus(interactionSource = interactionSource, shape = pillShape)
             .clickable(interactionSource = interactionSource, indication = null, onClick = onClick),
     ) {
         Row(
@@ -866,6 +864,8 @@ private fun GradientsArtworkSection(
                 val isSelected = state.selectedColorIndex == index
                 val interactionSource = remember { MutableInteractionSource() }
                 val isHovered by interactionSource.collectIsHoveredAsState()
+                val isFocused by interactionSource.collectIsFocusedAsState()
+                val isActiveVisual = isHovered || isFocused
 
                 Box(
                     modifier = Modifier
@@ -873,13 +873,15 @@ private fun GradientsArtworkSection(
                         .clip(CircleShape)
                         .background(ProfilePalette.getBrush(index))
                         .pointerHoverIcon(PointerIcon.Hand)
+                        .hoverable(interactionSource)
+                        .desktopInteractiveFocus(interactionSource = interactionSource, shape = CircleShape)
                         .clickable(interactionSource = interactionSource, indication = null) {
                             onEvent(ProfileEditUiEvent.ColorSelected(index))
                         }
                         .then(
                             when {
                                 isSelected -> Modifier.border(3.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
-                                isHovered -> Modifier.border(1.5.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f), CircleShape)
+                                isActiveVisual -> Modifier.border(1.5.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f), CircleShape)
                                 else -> Modifier
                             },
                         ),
@@ -1282,10 +1284,12 @@ private fun BackgroundSwatchDot(
     val theme = LocalDesktopTheme.current
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
+    val isFocused by interactionSource.collectIsFocusedAsState()
+    val isActiveVisual = isHovered || isFocused
 
     val borderStrokeColor = when {
         isSelected -> MaterialTheme.colorScheme.onSurface
-        isHovered -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.65f)
+        isActiveVisual -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.65f)
         else -> theme.Divider.copy(alpha = 0.7f)
     }
 
@@ -1294,6 +1298,8 @@ private fun BackgroundSwatchDot(
             .size(22.dp)
             .clip(CircleShape)
             .pointerHoverIcon(PointerIcon.Hand)
+            .hoverable(interactionSource)
+            .desktopInteractiveFocus(interactionSource = interactionSource, shape = CircleShape)
             .clickable(interactionSource = interactionSource, indication = null, onClick = onClick)
             .border(
                 width = if (isSelected) 2.dp else 1.dp,
@@ -1349,19 +1355,23 @@ private fun StyleRailItem(
     val theme = LocalDesktopTheme.current
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
+    val isFocused by interactionSource.collectIsFocusedAsState()
+    val isActiveVisual = isHovered || isFocused
     val itemShape = RoundedCornerShape(8.dp)
 
     Surface(
         shape = itemShape,
         color = when {
             isSelected -> MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
-            isHovered -> theme.SurfaceCard.copy(alpha = 0.65f)
+            isActiveVisual -> theme.SurfaceCard.copy(alpha = 0.65f)
             else -> Color.Transparent
         },
         modifier = Modifier
             .fillMaxWidth()
             .clip(itemShape)
             .pointerHoverIcon(PointerIcon.Hand)
+            .hoverable(interactionSource)
+            .desktopInteractiveFocus(interactionSource = interactionSource, shape = itemShape)
             .clickable(interactionSource = interactionSource, indication = null, onClick = onClick),
     ) {
         Row(
@@ -1405,20 +1415,22 @@ private fun AvatarGalleryTile(
     var loadState by remember(thumbUrl) { mutableStateOf(TileLoadState.LOADING) }
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
+    val isFocused by interactionSource.collectIsFocusedAsState()
+    val isActiveVisual = isHovered || isFocused
 
     val tileShape = RoundedCornerShape(14.dp)
     Surface(
         shape = tileShape,
         color = when {
             isSelected -> MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
-            isHovered -> theme.SurfaceElevated.copy(alpha = 0.85f)
+            isActiveVisual -> theme.SurfaceElevated.copy(alpha = 0.85f)
             else -> theme.SurfaceElevated.copy(alpha = 0.45f)
         },
         border = BorderStroke(
             width = if (isSelected) 2.dp else 1.dp,
             color = when {
                 isSelected -> MaterialTheme.colorScheme.primary
-                isHovered -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.40f)
+                isActiveVisual -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.40f)
                 else -> theme.Divider.copy(alpha = 0.45f)
             },
         ),
@@ -1427,6 +1439,8 @@ private fun AvatarGalleryTile(
             .aspectRatio(1f)
             .clip(tileShape)
             .pointerHoverIcon(PointerIcon.Hand)
+            .hoverable(interactionSource)
+            .desktopInteractiveFocus(interactionSource = interactionSource, shape = tileShape)
             .clickable(interactionSource = interactionSource, indication = null, onClick = onClick),
     ) {
         Box(

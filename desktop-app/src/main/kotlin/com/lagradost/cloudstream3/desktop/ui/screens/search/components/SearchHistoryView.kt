@@ -1,6 +1,7 @@
 package com.lagradost.cloudstream3.desktop.ui.screens.search.components
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -10,12 +11,14 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.lagradost.cloudstream3.desktop.ui.components.desktopInteractiveFocus
 
 @Composable
 fun SearchHistoryView(
@@ -48,13 +51,17 @@ fun SearchHistoryView(
         }
 
         itemsIndexed(searchHistory, key = { index, item -> "${item}_$index" }) { _, item ->
+            val itemInteraction = remember { MutableInteractionSource() }
+            val itemShape = RoundedCornerShape(12.dp)
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 4.dp),
-                shape = RoundedCornerShape(12.dp),
+                    .padding(vertical = 4.dp)
+                    .desktopInteractiveFocus(interactionSource = itemInteraction, shape = itemShape),
+                shape = itemShape,
                 color = Color(0xFF14141A).copy(alpha = 0.65f),
                 border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.10f)),
+                interactionSource = itemInteraction,
                 onClick = { onSelectHistoryItem(item) },
             ) {
                 Row(

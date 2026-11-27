@@ -256,7 +256,16 @@ fun ContextMenuOverlay() {
                 .then(hazeModifier),
             contentAlignment = Alignment.Center,
         ) {
-            val screenMaxHeight = maxHeight
+            FocusLayerBoundary(
+                active = state.isActive,
+                trapFocus = true,
+                requestFocusWhenActive = true,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .handleEscapeKey(enabled = state.isActive) { state.dismiss() }
+                    .desktopDirectionalFocusNavigation(enabled = state.isActive),
+            ) {
+            val screenMaxHeight = this@BoxWithConstraints.maxHeight
 
             // Sizable dimensions adapt dynamically to available window height
             val posterHeight = if (isEpisode) {
@@ -265,7 +274,7 @@ fun ContextMenuOverlay() {
                 (screenMaxHeight * 0.44f).coerceIn(300.dp, 440.dp)
             }
             val posterWidth = if (isEpisode) {
-                (posterHeight * 16f / 9f).coerceAtMost(maxWidth * 0.75f)
+                (posterHeight * 16f / 9f).coerceAtMost(this@BoxWithConstraints.maxWidth * 0.75f)
             } else {
                 posterHeight * 2f / 3f
             }
@@ -279,11 +288,7 @@ fun ContextMenuOverlay() {
                 modifier = Modifier
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState())
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                        onClick = { state.dismiss() },
-                    ),
+                    .nonFocusableTap { state.dismiss() },
                 contentAlignment = Alignment.Center,
             ) {
                 AnimatedVisibility(
@@ -301,7 +306,7 @@ fun ContextMenuOverlay() {
                         modifier = Modifier
                             .wrapContentSize()
                             .padding(vertical = 24.dp)
-                            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {},
+                            .nonFocusableTap {},
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
                         // 1 & 2. Poster / Thumbnail Surface & Header Presentation
@@ -368,6 +373,7 @@ fun ContextMenuOverlay() {
                         }
                     }
                 }
+            }
             }
         }
     }

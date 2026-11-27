@@ -4,6 +4,7 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -19,6 +20,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -29,6 +31,8 @@ import com.lagradost.cloudstream3.desktop.ui.components.DesktopFilledTonalButton
 import com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton
 import com.lagradost.cloudstream3.desktop.ui.components.DesktopOutlinedButton
 import com.lagradost.cloudstream3.desktop.ui.components.DesktopTextButton
+import com.lagradost.cloudstream3.desktop.ui.components.FocusLayerBoundary
+import com.lagradost.cloudstream3.desktop.ui.components.desktopInteractiveFocus
 import com.lagradost.cloudstream3.desktop.ui.navigation.Config
 import com.lagradost.cloudstream3.desktop.ui.screens.extensions.contract.ExtensionsUiEffect
 import com.lagradost.cloudstream3.desktop.ui.screens.extensions.contract.ExtensionsUiEvent
@@ -126,10 +130,13 @@ fun ComposeExtensionScreen(
                     tabs.forEachIndexed { index, tab ->
                         val isSelected = selectedTab == index
                         val isStremioTab = tab.isExternal
+                        val tabInteraction = remember { MutableInteractionSource() }
+                        val tabShape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.medium
 
                         Surface(
                             onClick = { selectedTab = index },
-                            shape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.medium,
+                            interactionSource = tabInteraction,
+                            shape = tabShape,
                             color = when {
                                 isSelected && isStremioTab -> Color(0xFF00B4D8).copy(alpha = 0.20f)
                                 isSelected -> MaterialTheme.colorScheme.primaryContainer
@@ -140,6 +147,10 @@ fun ComposeExtensionScreen(
                                 isSelected -> BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f))
                                 else -> null
                             },
+                            modifier = Modifier.desktopInteractiveFocus(
+                                interactionSource = tabInteraction,
+                                shape = tabShape,
+                            ),
                         ) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
@@ -255,24 +266,30 @@ fun ComposeExtensionScreen(
                     label = "ExtensionTabTransition",
                     modifier = Modifier.fillMaxSize(),
                 ) { targetTab ->
-                    when (targetTab) {
-                        0 -> BrowseTab(
-                            viewModel = viewModel,
-                            syncGeneration = syncGen,
-                            onNavigateToRepos = { selectedTab = 2 },
-                        )
-                        1 -> InstalledTab(
-                            viewModel = viewModel,
-                            syncGeneration = syncGen,
-                            onNavigateToBrowse = { selectedTab = 0 },
-                        )
-                        2 -> RepositoriesTab(viewModel = viewModel)
-                        3 -> SettingsAddons(
-                            viewModel = viewModel,
-                            onNavigate = onNavigate,
-                            isInsideSettings = isInsideSettings,
-                        )
-                        4 -> UpdateHistoryTab(viewModel = viewModel)
+                    FocusLayerBoundary(
+                        active = (targetTab == selectedTab),
+                        restoreFocus = false,
+                        modifier = Modifier.fillMaxSize(),
+                    ) {
+                        when (targetTab) {
+                            0 -> BrowseTab(
+                                viewModel = viewModel,
+                                syncGeneration = syncGen,
+                                onNavigateToRepos = { selectedTab = 2 },
+                            )
+                            1 -> InstalledTab(
+                                viewModel = viewModel,
+                                syncGeneration = syncGen,
+                                onNavigateToBrowse = { selectedTab = 0 },
+                            )
+                            2 -> RepositoriesTab(viewModel = viewModel)
+                            3 -> SettingsAddons(
+                                viewModel = viewModel,
+                                onNavigate = onNavigate,
+                                isInsideSettings = isInsideSettings,
+                            )
+                            4 -> UpdateHistoryTab(viewModel = viewModel)
+                        }
                     }
                 }
             }

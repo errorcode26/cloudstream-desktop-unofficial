@@ -7,6 +7,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -421,18 +422,22 @@ internal fun ActionMenuItem(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
+    val isFocused by interactionSource.collectIsFocusedAsState()
+    val highlighted = isHovered || isFocused
 
     val bgColor by animateColorAsState(
-        targetValue = if (isHovered) Color.White.copy(alpha = 0.09f) else Color.Transparent,
+        targetValue = if (highlighted) Color.White.copy(alpha = 0.12f) else Color.Transparent,
         animationSpec = tween(120),
         label = "actionItemBg",
     )
 
+    val rowShape = RoundedCornerShape(8.dp)
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
+            .clip(rowShape)
             .background(bgColor)
+            .desktopInteractiveFocus(interactionSource = interactionSource, shape = rowShape)
             .clickable(interactionSource = interactionSource, indication = ripple()) { onClick() }
             .padding(horizontal = 18.dp, vertical = 14.5.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -465,12 +470,14 @@ internal fun LibraryStatusChip(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
+    val isFocused by interactionSource.collectIsFocusedAsState()
+    val highlighted = isHovered || isFocused
     val primary = MaterialTheme.colorScheme.primary
 
     val bgColor by animateColorAsState(
         targetValue = if (isSelected) {
             primary.copy(alpha = 0.85f)
-        } else if (isHovered) {
+        } else if (highlighted) {
             Color.White.copy(alpha = 0.16f)
         } else {
             Color.White.copy(alpha = 0.06f)
@@ -479,13 +486,14 @@ internal fun LibraryStatusChip(
         label = "chipBg",
     )
 
+    val chipShape = RoundedCornerShape(8.dp)
     Surface(
         onClick = onClick,
-        shape = RoundedCornerShape(8.dp),
+        shape = chipShape,
         color = bgColor,
         border = BorderStroke(
             1.dp,
-            if (isSelected) {
+            if (isSelected || isFocused) {
                 primary
             } else if (isHovered) {
                 Color.White.copy(alpha = 0.25f)
@@ -493,7 +501,9 @@ internal fun LibraryStatusChip(
                 Color.White.copy(alpha = 0.08f)
             },
         ),
-        modifier = modifier.height(38.dp),
+        modifier = modifier
+            .height(38.dp)
+            .desktopInteractiveFocus(interactionSource = interactionSource, shape = chipShape, showRing = false),
         interactionSource = interactionSource,
     ) {
         Row(

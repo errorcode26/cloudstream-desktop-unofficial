@@ -37,6 +37,9 @@ import com.arkivanov.decompose.extensions.compose.stack.animation.fade
 import com.arkivanov.decompose.extensions.compose.stack.animation.plus
 import com.arkivanov.decompose.extensions.compose.stack.animation.stackAnimation
 import com.arkivanov.decompose.extensions.compose.subscribeAsState
+import com.lagradost.cloudstream3.desktop.ui.components.FocusLayerBoundary
+import com.lagradost.cloudstream3.desktop.ui.components.desktopDirectionalFocusNavigation
+import com.lagradost.cloudstream3.desktop.ui.components.handleBubbledEscapeKey
 import com.lagradost.cloudstream3.desktop.ui.navigation.RootComponent
 import com.lagradost.cloudstream3.desktop.ui.screens.ComposeDetailsScreen
 import com.lagradost.cloudstream3.desktop.ui.screens.ComposeHomeScreen
@@ -246,8 +249,32 @@ fun CloudstreamApp(rootComponent: RootComponent) {
                             androidx.compose.ui.Modifier.fillMaxSize()
                         }
 
+                        val rootLayerActive = !com.lagradost.cloudstream3.desktop.ui.components.GlobalDialogState.isAnyDialogOpen &&
+                            !com.lagradost.cloudstream3.desktop.ui.components.GlobalContextMenuState.isActive
+                        val activeInstanceSnapshot = childStack.active.instance
+                        val isVideoPlayerOpen = currentVideo != null
+                        val rootBackEnabled = !isVideoPlayerOpen && rootLayerActive &&
+                            (showProfileManagerModal || childStack.backStack.isNotEmpty())
+
+                        FocusLayerBoundary(
+                            active = rootLayerActive,
+                            restoreFocus = true,
+                            modifier = rootContentModifier
+                                .desktopDirectionalFocusNavigation(
+                                    enabled = !isVideoPlayerOpen && rootLayerActive,
+                                )
+                                .handleBubbledEscapeKey(
+                                    enabled = rootBackEnabled,
+                                ) {
+                                    if (showProfileManagerModal) {
+                                        showProfileManagerModal = false
+                                    } else if (childStack.backStack.isNotEmpty()) {
+                                        rootComponent.pop()
+                                    }
+                                },
+                        ) {
                         androidx.compose.foundation.layout.BoxWithConstraints(
-                            modifier = rootContentModifier,
+                            modifier = androidx.compose.ui.Modifier.fillMaxSize(),
                         ) {
                             val activeInstance = childStack.active.instance
 
@@ -426,6 +453,11 @@ fun CloudstreamApp(rootComponent: RootComponent) {
                                                     fade(tween(160, easing = FastOutSlowInEasing)),
                                                 ),
                                             ) {
+                                                FocusLayerBoundary(
+                                                    active = (it.instance == activeInstance),
+                                                    restoreFocus = false,
+                                                    modifier = androidx.compose.ui.Modifier.fillMaxSize(),
+                                                ) {
                                                 when (val child = it.instance) {
                                                     is RootComponent.Child.Details -> {
                                                         val api by child.component.apiState.collectAsState()
@@ -680,11 +712,13 @@ fun CloudstreamApp(rootComponent: RootComponent) {
                                                         )
                                                     }
                                                 }
+                                                }
                                             }
                                         }
                                     }
                                 }
                             }
+                        }
                         }
 
                         // Context Menu Overlay (unblurred)

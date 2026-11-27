@@ -10,6 +10,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
@@ -304,12 +305,15 @@ fun CategoryRowViewAllButton(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
+    val isFocused by interactionSource.collectIsFocusedAsState()
     val isPressed by interactionSource.collectIsPressedAsState()
+    val isActive = isHovered || isFocused
+    val viewAllShape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact
 
     val scale by animateFloatAsState(
         targetValue = when {
             isPressed -> 0.94f
-            isHovered -> 1.04f
+            isActive -> 1.04f
             else -> 1.0f
         },
         animationSpec = spring(
@@ -322,12 +326,13 @@ fun CategoryRowViewAllButton(
     Surface(
         onClick = onClick,
         interactionSource = interactionSource,
-        shape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact,
-        color = Color.White.copy(alpha = if (isHovered) 0.10f else 0.05f),
-        border = BorderStroke(1.dp, Color.White.copy(alpha = if (isHovered) 0.22f else 0.10f)),
+        shape = viewAllShape,
+        color = Color.White.copy(alpha = if (isActive) 0.10f else 0.05f),
+        border = BorderStroke(1.dp, Color.White.copy(alpha = if (isActive) 0.22f else 0.10f)),
         shadowElevation = 0.dp,
         modifier = modifier
             .height(34.dp)
+            .desktopInteractiveFocus(interactionSource = interactionSource, shape = viewAllShape)
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale
@@ -339,7 +344,7 @@ fun CategoryRowViewAllButton(
         ) {
             Text(
                 text = "View All",
-                color = if (isHovered) Color.White else Color.White.copy(alpha = 0.85f),
+                color = if (isActive) Color.White else Color.White.copy(alpha = 0.85f),
                 style = if (isCompact) MaterialTheme.typography.labelMedium else MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.SemiBold,
             )
@@ -462,13 +467,16 @@ fun ScrollChevron(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
+    val isFocused by interactionSource.collectIsFocusedAsState()
     val isPressed by interactionSource.collectIsPressedAsState()
+    val isActive = enabled && (isHovered || isFocused)
+    val chevronShape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.icon
 
     val scale by animateFloatAsState(
         targetValue = when {
             !enabled -> 1.0f
             isPressed -> 0.92f
-            isHovered -> 1.08f
+            isActive -> 1.08f
             else -> 1.0f
         },
         animationSpec = spring(
@@ -480,13 +488,13 @@ fun ScrollChevron(
 
     val bgColor = when {
         !enabled -> Color.White.copy(alpha = 0.02f)
-        isHovered -> Color.White.copy(alpha = 0.12f)
+        isActive -> Color.White.copy(alpha = 0.12f)
         else -> Color.White.copy(alpha = 0.05f)
     }
 
     val borderColor = when {
         !enabled -> Color.White.copy(alpha = 0.04f)
-        isHovered -> Color.White.copy(alpha = 0.24f)
+        isActive -> Color.White.copy(alpha = 0.24f)
         else -> Color.White.copy(alpha = 0.10f)
     }
 
@@ -496,11 +504,12 @@ fun ScrollChevron(
         interactionSource = interactionSource,
         modifier = modifier
             .size(34.dp)
+            .desktopInteractiveFocus(interactionSource = interactionSource, shape = chevronShape, enabled = enabled)
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale
             },
-        shape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.icon,
+        shape = chevronShape,
         color = bgColor,
         border = BorderStroke(1.dp, borderColor),
         shadowElevation = 0.dp,
@@ -511,7 +520,7 @@ fun ScrollChevron(
                 contentDescription = null,
                 tint = when {
                     !enabled -> Color.White.copy(alpha = 0.20f)
-                    isHovered -> Color.White
+                    isActive -> Color.White
                     else -> Color.White.copy(alpha = 0.75f)
                 },
                 modifier = Modifier.size(20.dp),
@@ -548,21 +557,25 @@ fun PosterTitleLabel(
 }
 
 @Composable
-fun Modifier.posterHoverEffect(shape: androidx.compose.ui.graphics.Shape = RoundedCornerShape(12.dp)): Modifier {
+fun Modifier.posterHoverEffect(
+    shape: androidx.compose.ui.graphics.Shape = RoundedCornerShape(12.dp),
+    isFocused: Boolean = false,
+): Modifier {
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
+    val isActive = hovered || isFocused
     val scale by animateFloatAsState(
-        targetValue = if (hovered) 1.05f else 1f,
+        targetValue = if (isActive) 1.05f else 1f,
         animationSpec = tween(180),
         label = "posterScale",
     )
     val elevation by animateFloatAsState(
-        targetValue = if (hovered) 12f else 4f,
+        targetValue = if (isActive) 12f else 4f,
         animationSpec = tween(180),
         label = "posterElevation",
     )
     val borderColor by androidx.compose.animation.animateColorAsState(
-        targetValue = if (hovered) MaterialTheme.colorScheme.primary else Color.Transparent,
+        targetValue = if (isActive) MaterialTheme.colorScheme.primary else Color.Transparent,
         animationSpec = tween(180),
         label = "posterBorderColor",
     )

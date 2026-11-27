@@ -7,6 +7,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -72,8 +73,10 @@ fun WatchHistoryCard(
 
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
+    val isFocused by interactionSource.collectIsFocusedAsState()
+    val isActiveVisual = isHovered || isFocused
     val scale by animateFloatAsState(
-        targetValue = if (isHovered) 1.03f else 1f,
+        targetValue = if (isActiveVisual) 1.03f else 1f,
         animationSpec = androidx.compose.animation.core.tween(200),
         label = "scale",
     )
@@ -135,7 +138,7 @@ fun WatchHistoryCard(
                 scaleY = scale
             },
     ) {
-        if (isHovered && posterHoverGlowEnabled) {
+        if (isActiveVisual && posterHoverGlowEnabled) {
             Box(
                 modifier = Modifier
                     .matchParentSize()
@@ -146,7 +149,7 @@ fun WatchHistoryCard(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .then(if (isHovered) Modifier.border(2.dp, MaterialTheme.colorScheme.primary, shape) else Modifier)
+                .then(if (isActiveVisual) Modifier.border(2.dp, MaterialTheme.colorScheme.primary, shape) else Modifier)
                 .clip(shape)
                 .hoverable(interactionSource)
                 .onGloballyPositioned { coordinates ->
@@ -155,6 +158,26 @@ fun WatchHistoryCard(
                         size = Size(coordinates.size.width.toFloat(), coordinates.size.height.toFloat()),
                     )
                 }
+                .desktopFocusableCard(
+                    interactionSource = interactionSource,
+                    shape = shape,
+                    onClick = { currentOnClick() },
+                    onSecondaryClick = if (isContextMenuEnabled) {
+                        {
+                            GlobalContextMenuState.showForWatchHistory(
+                                bounds = boundsHolder.bounds,
+                                history = currentHistory,
+                                provider = currentProvider,
+                                onRemove = currentOnRemove,
+                                onClick = currentOnClick,
+                                onPlayClick = currentOnPlayClick,
+                                onReLink = currentOnReLink,
+                            )
+                        }
+                    } else {
+                        null
+                    },
+                )
                 .pointerInput(isContextMenuEnabled) {
                     awaitPointerEventScope {
                         var downPos: androidx.compose.ui.geometry.Offset? = null
@@ -225,7 +248,7 @@ fun WatchHistoryCard(
             )
 
             AnimatedVisibility(
-                visible = isHovered,
+                visible = isActiveVisual,
                 enter = androidx.compose.animation.fadeIn(),
                 exit = androidx.compose.animation.fadeOut(),
             ) {
@@ -234,7 +257,7 @@ fun WatchHistoryCard(
 
             // Play button overlay on hover
             AnimatedVisibility(
-                visible = isHovered,
+                visible = isActiveVisual,
                 modifier = Modifier.align(Alignment.Center),
                 enter = androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(150)),
                 exit = androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(150)),
@@ -486,8 +509,10 @@ fun WatchHistoryCardDetailed(
 
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
+    val isFocused by interactionSource.collectIsFocusedAsState()
+    val isActiveVisual = isHovered || isFocused
     val scale by animateFloatAsState(
-        targetValue = if (isHovered) 1.025f else 1f,
+        targetValue = if (isActiveVisual) 1.025f else 1f,
         animationSpec = androidx.compose.animation.core.tween(200),
         label = "scale",
     )
@@ -547,7 +572,7 @@ fun WatchHistoryCardDetailed(
                 scaleY = scale
             },
     ) {
-        if (isHovered && posterHoverGlowEnabled) {
+        if (isActiveVisual && posterHoverGlowEnabled) {
             Box(
                 modifier = Modifier
                     .matchParentSize()
@@ -559,7 +584,7 @@ fun WatchHistoryCardDetailed(
         Row(
             modifier = Modifier
                 .fillMaxSize()
-                .then(if (isHovered) Modifier.border(2.dp, primary, cardShape) else Modifier)
+                .then(if (isActiveVisual) Modifier.border(2.dp, primary, cardShape) else Modifier)
                 .clip(cardShape)
                 .background(backgroundColor)
                 .hoverable(interactionSource)
@@ -569,6 +594,26 @@ fun WatchHistoryCardDetailed(
                         size = Size(coordinates.size.width.toFloat(), coordinates.size.height.toFloat()),
                     )
                 }
+                .desktopFocusableCard(
+                    interactionSource = interactionSource,
+                    shape = cardShape,
+                    onClick = { currentOnClick() },
+                    onSecondaryClick = if (isContextMenuEnabled) {
+                        {
+                            GlobalContextMenuState.showForWatchHistory(
+                                bounds = boundsHolder.bounds,
+                                history = currentHistory,
+                                provider = currentProvider,
+                                onRemove = currentOnRemove,
+                                onClick = currentOnClick,
+                                onPlayClick = currentOnPlayClick,
+                                onReLink = currentOnReLink,
+                            )
+                        }
+                    } else {
+                        null
+                    },
+                )
                 .pointerInput(isContextMenuEnabled) {
                     awaitPointerEventScope {
                         var downPos: androidx.compose.ui.geometry.Offset? = null
@@ -645,7 +690,7 @@ fun WatchHistoryCardDetailed(
                 )
 
                 // Play overlay
-                if (isHovered) {
+                if (isActiveVisual) {
                     Box(
                         modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.3f)),
                         contentAlignment = Alignment.Center,

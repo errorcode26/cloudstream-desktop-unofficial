@@ -13,7 +13,9 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -42,7 +44,11 @@ import com.lagradost.cloudstream3.desktop.profile.Profile
 import com.lagradost.cloudstream3.desktop.profile.ProfileAvatar
 import com.lagradost.cloudstream3.desktop.ui.components.DesktopButton
 import com.lagradost.cloudstream3.desktop.ui.components.DesktopOutlinedButton
+import com.lagradost.cloudstream3.desktop.ui.components.FocusLayerBoundary
 import com.lagradost.cloudstream3.desktop.ui.components.PinCodeDialog
+import com.lagradost.cloudstream3.desktop.ui.components.desktopFocusRing
+import com.lagradost.cloudstream3.desktop.ui.components.desktopInteractiveFocus
+import com.lagradost.cloudstream3.desktop.ui.components.handleEscapeKey
 import com.lagradost.cloudstream3.desktop.ui.screens.profile.contract.ProfileUiEffect
 import com.lagradost.cloudstream3.desktop.ui.screens.profile.contract.ProfileUiEvent
 
@@ -81,7 +87,14 @@ fun ProfileSelectScreen(
         },
         label = "profile_select_editor_transition",
     ) { (isCreating, editingProfileId) ->
-        if (isCreating || editingProfileId != null) {
+        val targetIsEditing = isCreating || editingProfileId != null
+        val currentIsEditing = uiState.isCreatingNew || uiState.editingProfile != null
+        FocusLayerBoundary(
+            active = (targetIsEditing == currentIsEditing),
+            restoreFocus = false,
+            modifier = Modifier.fillMaxSize(),
+        ) {
+        if (targetIsEditing) {
             val editViewModel = remember(isCreating, editingProfileId) {
                 ProfileEditViewModel(
                     profileId = if (isCreating) null else editingProfileId,
@@ -97,7 +110,11 @@ fun ProfileSelectScreen(
             )
         } else {
             Box(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .handleEscapeKey(enabled = uiState.isManageMode) {
+                        viewModel.onEvent(ProfileUiEvent.OnToggleManageMode(false))
+                    },
                 contentAlignment = Alignment.Center,
             ) {
             Column(
@@ -220,6 +237,7 @@ fun ProfileSelectScreen(
             }
         }
         }
+        }
     }
 }
 
@@ -232,15 +250,17 @@ private fun ProfileCardItem(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
+    val isFocused by interactionSource.collectIsFocusedAsState()
+    val isActiveVisual = isHovered || isFocused
 
     val scale by animateFloatAsState(
-        targetValue = if (isHovered) 1.06f else 1.0f,
+        targetValue = if (isActiveVisual) 1.06f else 1.0f,
         animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
     )
 
     val borderColor by animateColorAsState(
         targetValue = when {
-            isHovered -> MaterialTheme.colorScheme.primary
+            isActiveVisual -> MaterialTheme.colorScheme.primary
             isActive -> MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
             else -> MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
         },
@@ -250,6 +270,8 @@ private fun ProfileCardItem(
     Column(
         modifier = Modifier
             .width(130.dp)
+            .hoverable(interactionSource)
+            .desktopInteractiveFocus(interactionSource = interactionSource, shape = CircleShape, showRing = false)
             .clickable(interactionSource = interactionSource, indication = null, onClick = onClick)
             .padding(vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -261,7 +283,8 @@ private fun ProfileCardItem(
                     scaleX = scale
                     scaleY = scale
                 }
-                .border(if (isHovered || isActive) 2.5.dp else 1.dp, borderColor, CircleShape),
+                .desktopFocusRing(isFocused = isFocused, shape = CircleShape)
+                .border(if (isActiveVisual || isActive) 2.5.dp else 1.dp, borderColor, CircleShape),
             contentAlignment = Alignment.Center,
         ) {
             ProfileAvatar(
@@ -344,15 +367,19 @@ private fun AddProfileCardItem(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
+    val isFocused by interactionSource.collectIsFocusedAsState()
+    val isActiveVisual = isHovered || isFocused
 
     val scale by animateFloatAsState(
-        targetValue = if (isHovered) 1.06f else 1.0f,
+        targetValue = if (isActiveVisual) 1.06f else 1.0f,
         animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
     )
 
     Column(
         modifier = Modifier
             .width(130.dp)
+            .hoverable(interactionSource)
+            .desktopInteractiveFocus(interactionSource = interactionSource, shape = CircleShape, showRing = false)
             .clickable(interactionSource = interactionSource, indication = null, onClick = onClick)
             .padding(vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -364,9 +391,10 @@ private fun AddProfileCardItem(
                     scaleX = scale
                     scaleY = scale
                 }
+                .desktopFocusRing(isFocused = isFocused, shape = CircleShape)
                 .clip(CircleShape)
                 .background(
-                    if (isHovered) {
+                    if (isActiveVisual) {
                         MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
                     } else {
                         MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f)
@@ -374,7 +402,7 @@ private fun AddProfileCardItem(
                 )
                 .border(
                     1.dp,
-                    if (isHovered) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f),
+                    if (isActiveVisual) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f),
                     CircleShape,
                 ),
             contentAlignment = Alignment.Center,
@@ -383,7 +411,7 @@ private fun AddProfileCardItem(
                 Icons.Default.Add,
                 contentDescription = "Add Profile",
                 modifier = Modifier.size(36.dp),
-                tint = if (isHovered) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                tint = if (isActiveVisual) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
 
@@ -392,8 +420,8 @@ private fun AddProfileCardItem(
         Text(
             text = "Add Profile",
             style = MaterialTheme.typography.titleMedium,
-            fontWeight = if (isHovered) FontWeight.Bold else FontWeight.Medium,
-            color = if (isHovered) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+            fontWeight = if (isActiveVisual) FontWeight.Bold else FontWeight.Medium,
+            color = if (isActiveVisual) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 1,
             textAlign = TextAlign.Center,
             modifier = Modifier.fillMaxWidth(),

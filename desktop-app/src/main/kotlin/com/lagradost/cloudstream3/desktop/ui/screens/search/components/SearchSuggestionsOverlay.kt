@@ -3,6 +3,8 @@ package com.lagradost.cloudstream3.desktop.ui.screens.search.components
 import androidx.compose.animation.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -11,6 +13,7 @@ import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -20,6 +23,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import com.lagradost.cloudstream3.desktop.ui.components.desktopInteractiveFocus
 import com.lagradost.cloudstream3.desktop.ui.screens.search.SearchSuggestionItem
 
 @Composable
@@ -49,11 +53,15 @@ fun SearchSuggestionsOverlay(
         ) {
             Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp, horizontal = 4.dp)) {
                 suggestions.forEachIndexed { index, item ->
+                    val rowInteraction = remember { MutableInteractionSource() }
+                    val rowShape = RoundedCornerShape(8.dp)
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
-                            .clickable {
+                            .clip(rowShape)
+                            .hoverable(rowInteraction)
+                            .desktopInteractiveFocus(interactionSource = rowInteraction, shape = rowShape)
+                            .clickable(interactionSource = rowInteraction, indication = null) {
                                 onSelectSuggestion(item.title, true)
                             }
                             .padding(horizontal = 14.dp, vertical = 9.dp),

@@ -8,6 +8,7 @@ import androidx.compose.foundation.TooltipArea
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -35,6 +36,7 @@ import com.lagradost.cloudstream3.desktop.repo.DesktopRepositoryManager
 import com.lagradost.cloudstream3.desktop.stremio.StremioAddonManager
 import com.lagradost.cloudstream3.desktop.ui.badges.BadgeManager
 import com.lagradost.cloudstream3.desktop.ui.components.DesktopUi
+import com.lagradost.cloudstream3.desktop.ui.components.desktopInteractiveFocus
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.ExtractorLinkType
 
@@ -308,25 +310,28 @@ private fun StreamActionIconButton(
 ) {
     val interaction = remember { MutableInteractionSource() }
     val isHovered by interaction.collectIsHoveredAsState()
+    val isFocused by interaction.collectIsFocusedAsState()
+    val isHighlighted = isHovered || isFocused
 
     val containerBg = when {
-        isPrimary && isHovered -> MaterialTheme.colorScheme.primary.copy(alpha = 0.85f)
+        isPrimary && isHighlighted -> MaterialTheme.colorScheme.primary.copy(alpha = 0.85f)
         isPrimary -> MaterialTheme.colorScheme.primary.copy(alpha = 0.22f)
-        isHovered -> Color.White.copy(alpha = 0.15f)
+        isHighlighted -> Color.White.copy(alpha = 0.15f)
         else -> Color.White.copy(alpha = 0.05f)
     }
 
     val borderColor = when {
-        isPrimary && isHovered -> MaterialTheme.colorScheme.primary
+        isPrimary && isHighlighted -> MaterialTheme.colorScheme.primary
         isPrimary -> MaterialTheme.colorScheme.primary.copy(alpha = 0.50f)
+        isFocused -> MaterialTheme.colorScheme.primary
         isHovered -> Color.White.copy(alpha = 0.25f)
         else -> Color.White.copy(alpha = 0.08f)
     }
 
     val iconTint = when {
-        isPrimary && isHovered -> MaterialTheme.colorScheme.onPrimary
+        isPrimary && isHighlighted -> MaterialTheme.colorScheme.onPrimary
         isPrimary -> MaterialTheme.colorScheme.primary
-        isHovered -> Color.White
+        isHighlighted -> Color.White
         else -> DesktopUi.TextPrimary.copy(alpha = 0.70f)
     }
 
@@ -355,7 +360,12 @@ private fun StreamActionIconButton(
                 .size(36.dp)
                 .hoverable(interaction)
                 .clip(buttonShape)
-                .clickable(enabled = enabled, onClick = onClick),
+                .desktopInteractiveFocus(
+                    interactionSource = interaction,
+                    shape = buttonShape,
+                    enabled = enabled,
+                )
+                .clickable(enabled = enabled, interactionSource = interaction, indication = null, onClick = onClick),
             shape = buttonShape,
             color = containerBg,
             border = BorderStroke(1.dp, borderColor),
@@ -385,8 +395,10 @@ fun StreamLinkCard(
 ) {
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
+    val focused by interaction.collectIsFocusedAsState()
+    val isHighlighted = hovered || focused
     val scale by animateFloatAsState(
-        targetValue = if (hovered) 1.005f else 1f,
+        targetValue = if (isHighlighted) 1.005f else 1f,
         animationSpec = tween(150),
         label = "cardScale",
     )
@@ -505,11 +517,12 @@ fun StreamLinkCard(
     val cardShape = RoundedCornerShape(12.dp)
     val cardBackground = when {
         isPlaying -> MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
-        hovered -> DesktopUi.SurfaceElevated.copy(alpha = 0.85f)
+        isHighlighted -> DesktopUi.SurfaceElevated.copy(alpha = 0.85f)
         else -> DesktopUi.SurfaceCard.copy(alpha = 0.55f)
     }
     val cardBorder = when {
         isPlaying -> BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.85f))
+        focused -> BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary)
         hovered -> BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.45f))
         else -> BorderStroke(1.dp, Color.White.copy(alpha = 0.08f))
     }
@@ -520,10 +533,15 @@ fun StreamLinkCard(
             .scale(scale)
             .hoverable(interaction)
             .clip(cardShape)
-            .clickable(enabled = !isBusy, onClick = onPlay),
+            .desktopInteractiveFocus(
+                interactionSource = interaction,
+                shape = cardShape,
+                enabled = !isBusy,
+            )
+            .clickable(enabled = !isBusy, interactionSource = interaction, indication = null, onClick = onPlay),
         shape = cardShape,
         color = cardBackground,
-        tonalElevation = if (hovered) 4.dp else 1.dp,
+        tonalElevation = if (isHighlighted) 4.dp else 1.dp,
         border = cardBorder,
     ) {
         Row(

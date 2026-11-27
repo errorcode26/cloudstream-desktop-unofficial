@@ -6,6 +6,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -35,6 +36,8 @@ import com.lagradost.cloudstream3.ActorData
 import com.lagradost.cloudstream3.MainAPI
 import com.lagradost.cloudstream3.desktop.ui.components.CloudstreamCustomDialog
 import com.lagradost.cloudstream3.desktop.ui.components.LocalDesktopTheme
+import com.lagradost.cloudstream3.desktop.ui.components.desktopFocusRing
+import com.lagradost.cloudstream3.desktop.ui.components.desktopInteractiveFocus
 import com.lagradost.cloudstream3.fixUrlNull
 
 enum class CastFilterCategory(val label: String) {
@@ -268,6 +271,8 @@ private fun FullCastGridCard(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
+    val isFocused by interactionSource.collectIsFocusedAsState()
+    val isActiveVisual = isHovered || isFocused
 
     val (mainImgRaw, cornerImgRaw) = if (!isInverted || actor.voiceActor?.image.isNullOrBlank()) {
         Pair(actor.actor.image, actor.voiceActor?.image)
@@ -309,6 +314,7 @@ private fun FullCastGridCard(
         modifier = Modifier
             .fillMaxWidth()
             .hoverable(interactionSource)
+            .desktopInteractiveFocus(interactionSource = interactionSource, shape = profileShapes.card, showRing = false)
             .clickable(interactionSource = interactionSource, indication = null) { onClick() },
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -320,11 +326,12 @@ private fun FullCastGridCard(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
+                    .desktopFocusRing(isFocused = isFocused, shape = profileShapes.card)
                     .clip(profileShapes.card)
                     .background(MaterialTheme.colorScheme.surfaceVariant)
                     .border(
-                        width = if (isHovered) 2.dp else 1.dp,
-                        color = if (isHovered) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                        width = if (isActiveVisual) 2.dp else 1.dp,
+                        color = if (isActiveVisual) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
                         shape = profileShapes.card,
                     ),
                 contentAlignment = Alignment.Center,

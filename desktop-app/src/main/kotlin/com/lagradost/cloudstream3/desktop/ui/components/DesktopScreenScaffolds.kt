@@ -11,11 +11,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onPreviewKeyEvent
-import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.dp
 import com.lagradost.cloudstream3.desktop.ui.DesktopDimens
 
@@ -64,20 +59,9 @@ fun DesktopDrilldownScaffold(
     dialogs: @Composable BoxScope.() -> Unit = {},
     content: @Composable BoxScope.() -> Unit,
 ) {
-    val rootModifier = if (enableEscapeBack) {
-        modifier
-            .fillMaxSize()
-            .onPreviewKeyEvent { event ->
-                if (event.type == KeyEventType.KeyUp && event.key == Key.Escape) {
-                    onBack()
-                    true
-                } else {
-                    false
-                }
-            }
-    } else {
-        modifier.fillMaxSize()
-    }
+    val rootModifier = modifier
+        .fillMaxSize()
+        .handleEscapeKey(enabled = enableEscapeBack, onEscape = onBack)
 
     Box(modifier = rootModifier) {
         backgroundOverlay()

@@ -14,6 +14,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
@@ -57,6 +58,9 @@ fun DesktopFilterChip(
     height: Dp = 40.dp,
     shape: Shape = LocalDesktopButtonShapes.current.compact,
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isFocused by interactionSource.collectIsFocusedAsState()
+
     Box(
         modifier = modifier
             .height(height)
@@ -70,11 +74,18 @@ fun DesktopFilterChip(
                 },
             )
             .border(
-                width = if (isSelected) 1.5.dp else 1.dp,
-                color = if (isSelected) Color.White.copy(alpha = 0.65f) else Color.White.copy(alpha = 0.1f),
+                width = if (isSelected || isFocused) 1.5.dp else 1.dp,
+                color = if (isFocused) {
+                    MaterialTheme.colorScheme.primary
+                } else if (isSelected) {
+                    Color.White.copy(alpha = 0.65f)
+                } else {
+                    Color.White.copy(alpha = 0.1f)
+                },
                 shape = shape,
             )
-            .clickable(onClick = onClick)
+            .desktopInteractiveFocus(interactionSource = interactionSource, shape = shape)
+            .clickable(interactionSource = interactionSource, indication = null, onClick = onClick)
             .padding(horizontal = 16.dp),
         contentAlignment = Alignment.Center,
     ) {
@@ -100,9 +111,13 @@ fun DesktopIconButton(
     isActive: Boolean = false,
     shape: Shape = LocalDesktopButtonShapes.current.icon,
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isFocused by interactionSource.collectIsFocusedAsState()
     val alpha = if (enabled) (if (isActive) 0.8f else 0.6f) else 0.25f
     val borderColor = if (enabled) {
-        if (isActive) Color.White.copy(alpha = 0.65f) else Color.White.copy(alpha = 0.1f)
+        if (isFocused) MaterialTheme.colorScheme.primary
+        else if (isActive) Color.White.copy(alpha = 0.65f)
+        else Color.White.copy(alpha = 0.1f)
     } else {
         Color.White.copy(alpha = 0.04f)
     }
@@ -119,11 +134,12 @@ fun DesktopIconButton(
                 },
             )
             .border(
-                width = if (isActive) 1.5.dp else 1.dp,
+                width = if (isActive || isFocused) 1.5.dp else 1.dp,
                 color = borderColor,
                 shape = shape,
             )
-            .clickable(enabled = enabled, onClick = onClick),
+            .desktopInteractiveFocus(interactionSource = interactionSource, shape = shape, enabled = enabled)
+            .clickable(enabled = enabled, interactionSource = interactionSource, indication = null, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
         Icon(
@@ -150,12 +166,20 @@ fun DesktopActionBadge(
     height: Dp = 40.dp,
     shape: Shape = LocalDesktopButtonShapes.current.compact,
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isFocused by interactionSource.collectIsFocusedAsState()
     Surface(
         onClick = onClick,
         shape = shape,
         color = if (isActive) activeColor.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
-        border = BorderStroke(1.dp, if (isActive) activeColor.copy(alpha = 0.5f) else Color.White.copy(alpha = 0.1f)),
-        modifier = modifier.height(height),
+        border = BorderStroke(
+            if (isFocused) 1.5.dp else 1.dp,
+            if (isFocused) MaterialTheme.colorScheme.primary else if (isActive) activeColor.copy(alpha = 0.5f) else Color.White.copy(alpha = 0.1f),
+        ),
+        interactionSource = interactionSource,
+        modifier = modifier
+            .height(height)
+            .desktopInteractiveFocus(interactionSource = interactionSource, shape = shape),
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -201,6 +225,8 @@ fun HeroPrimaryCtaButton(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
+    val isFocused by interactionSource.collectIsFocusedAsState()
+    val isActiveVisual = isHovered || isFocused
     val isPressed by interactionSource.collectIsPressedAsState()
     val accentColor = MaterialTheme.colorScheme.primary
     val density = LocalDensity.current.density
@@ -208,7 +234,7 @@ fun HeroPrimaryCtaButton(
     val containerScale by animateFloatAsState(
         targetValue = when {
             isPressed -> 0.97f
-            isHovered -> 1.028f
+            isActiveVisual -> 1.028f
             else -> 1.0f
         },
         animationSpec = spring(dampingRatio = 0.65f, stiffness = Spring.StiffnessMediumLow),
@@ -216,17 +242,17 @@ fun HeroPrimaryCtaButton(
     )
 
     val glowElevation by animateDpAsState(
-        targetValue = if (isHovered) 16.dp else 0.dp,
+        targetValue = if (isActiveVisual) 16.dp else 0.dp,
         animationSpec = tween(durationMillis = 180),
         label = "heroCtaGlow",
     )
 
     val borderWidth by animateDpAsState(
         targetValue = when {
-            isUnavailable && isHovered -> 1.8.dp
+            isUnavailable && isActiveVisual -> 1.8.dp
             isUnavailable -> 1.2.dp
             isPressed -> 2.4.dp
-            isHovered -> 2.dp
+            isActiveVisual -> 2.dp
             else -> 0.dp
         },
         animationSpec = tween(durationMillis = 160),
@@ -235,9 +261,9 @@ fun HeroPrimaryCtaButton(
 
     val borderColor by animateColorAsState(
         targetValue = when {
-            isUnavailable && isHovered -> Color(0xFFFF6B6B).copy(alpha = 0.85f)
+            isUnavailable && isActiveVisual -> Color(0xFFFF6B6B).copy(alpha = 0.85f)
             isUnavailable -> Color(0xFFE50914).copy(alpha = 0.5f)
-            isHovered || isPressed -> accentColor.copy(alpha = 0.95f)
+            isActiveVisual || isPressed -> accentColor.copy(alpha = 0.95f)
             else -> Color.Transparent
         },
         animationSpec = tween(durationMillis = 160),
@@ -246,10 +272,10 @@ fun HeroPrimaryCtaButton(
 
     val bgColor by animateColorAsState(
         targetValue = when {
-            isUnavailable && isHovered -> Color(0xFFE50914).copy(alpha = 0.24f)
+            isUnavailable && isActiveVisual -> Color(0xFFE50914).copy(alpha = 0.24f)
             isUnavailable -> Color(0xFFE50914).copy(alpha = 0.15f)
             isPressed -> Color(0xFFE5E5E5)
-            isHovered -> Color.White
+            isActiveVisual -> Color.White
             else -> Color(0xFFF5F5F5)
         },
         animationSpec = tween(durationMillis = 150),
@@ -260,19 +286,19 @@ fun HeroPrimaryCtaButton(
     val glowColor = if (isUnavailable) Color(0xFFE50914) else accentColor
 
     val iconScale by animateFloatAsState(
-        targetValue = if (isHovered && iconNudgeOnHover) 1.18f else 1.0f,
+        targetValue = if (isActiveVisual && iconNudgeOnHover) 1.18f else 1.0f,
         animationSpec = spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessMediumLow),
         label = "heroCtaIconScale",
     )
     val iconShiftDp by animateFloatAsState(
-        targetValue = if (isHovered && iconNudgeOnHover) 2.5f else 0f,
+        targetValue = if (isActiveVisual && iconNudgeOnHover) 2.5f else 0f,
         animationSpec = spring(dampingRatio = 0.65f, stiffness = Spring.StiffnessMediumLow),
         label = "heroCtaIconShift",
     )
 
     val sheenProgress = remember { Animatable(-0.35f) }
-    LaunchedEffect(isHovered, isUnavailable) {
-        if (isHovered && !isUnavailable) {
+    LaunchedEffect(isActiveVisual, isUnavailable) {
+        if (isActiveVisual && !isUnavailable) {
             sheenProgress.snapTo(-0.35f)
             sheenProgress.animateTo(
                 targetValue = 1.35f,
@@ -292,8 +318,8 @@ fun HeroPrimaryCtaButton(
             .shadow(
                 elevation = glowElevation,
                 shape = shape,
-                ambientColor = glowColor.copy(alpha = if (isHovered) 0.55f else 0f),
-                spotColor = glowColor.copy(alpha = if (isHovered) 0.75f else 0f),
+                ambientColor = glowColor.copy(alpha = if (isActiveVisual) 0.55f else 0f),
+                spotColor = glowColor.copy(alpha = if (isActiveVisual) 0.75f else 0f),
             )
             .clip(shape)
             .background(bgColor)
@@ -326,6 +352,7 @@ fun HeroPrimaryCtaButton(
                     Modifier
                 },
             )
+            .desktopInteractiveFocus(interactionSource = interactionSource, shape = shape)
             .pointerHoverIcon(PointerIcon.Hand)
             .hoverable(interactionSource)
             .clickable(
@@ -377,12 +404,14 @@ fun HeroSecondaryButton(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
+    val isFocused by interactionSource.collectIsFocusedAsState()
+    val isActiveVisual = isHovered || isFocused
     val isPressed by interactionSource.collectIsPressedAsState()
 
     val scale by animateFloatAsState(
         targetValue = when {
             isPressed -> 0.93f
-            isHovered -> 1.05f
+            isActiveVisual -> 1.05f
             else -> 1.0f
         },
         animationSpec = spring(dampingRatio = 0.68f, stiffness = Spring.StiffnessMediumLow),
@@ -392,7 +421,7 @@ fun HeroSecondaryButton(
     val containerColor by animateColorAsState(
         targetValue = when {
             isPressed -> Color.White.copy(alpha = 0.26f)
-            isHovered -> Color.White.copy(alpha = 0.22f)
+            isActiveVisual -> Color.White.copy(alpha = 0.22f)
             isActive -> Color.White.copy(alpha = 0.18f)
             else -> Color.White.copy(alpha = 0.12f)
         },
@@ -402,6 +431,7 @@ fun HeroSecondaryButton(
 
     val borderColor by animateColorAsState(
         targetValue = when {
+            isFocused -> MaterialTheme.colorScheme.primary
             isHovered || isActive -> Color.White.copy(alpha = 0.60f)
             else -> Color.White.copy(alpha = 0.28f)
         },
@@ -410,7 +440,7 @@ fun HeroSecondaryButton(
     )
 
     val borderWidth by animateDpAsState(
-        targetValue = if (isHovered || isActive) 1.5.dp else 1.2.dp,
+        targetValue = if (isActiveVisual || isActive) 1.5.dp else 1.2.dp,
         animationSpec = tween(durationMillis = 150),
         label = "heroSecondaryBorderWidth",
     )
@@ -422,12 +452,13 @@ fun HeroSecondaryButton(
                 scaleX = scale
                 scaleY = scale
             }
+            .desktopInteractiveFocus(interactionSource = interactionSource, shape = shape)
             .pointerHoverIcon(PointerIcon.Hand),
         shape = shape,
         color = containerColor,
         border = BorderStroke(borderWidth, borderColor),
         interactionSource = interactionSource,
     ) {
-        content(isHovered)
+        content(isActiveVisual)
     }
 }

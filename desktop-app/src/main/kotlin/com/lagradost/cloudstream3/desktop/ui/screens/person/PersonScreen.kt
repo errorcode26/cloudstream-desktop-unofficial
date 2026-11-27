@@ -7,6 +7,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.*
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -34,6 +35,8 @@ import com.lagradost.cloudstream3.desktop.ui.components.DesktopDrilldownScaffold
 import com.lagradost.cloudstream3.desktop.ui.components.DesktopVerticalScrollbar
 import com.lagradost.cloudstream3.desktop.ui.components.LocalDesktopTheme
 import com.lagradost.cloudstream3.desktop.ui.components.defaultScrollbarStyle
+import com.lagradost.cloudstream3.desktop.ui.components.desktopFocusRing
+import com.lagradost.cloudstream3.desktop.ui.components.desktopInteractiveFocus
 import com.lagradost.cloudstream3.desktop.ui.navigation.Config
 import com.lagradost.cloudstream3.desktop.explore.models.ExploreItem
 import com.lagradost.cloudstream3.desktop.explore.ui.ExploreProviderDialog
@@ -580,12 +583,15 @@ private fun CategoryTabPill(
         label = "textColor",
     )
 
+    val chipInteraction = remember { MutableInteractionSource() }
     val pillShape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact
     Surface(
         onClick = onClick,
+        interactionSource = chipInteraction,
         shape = pillShape,
         color = pillBg,
         border = BorderStroke(1.dp, pillBorder),
+        modifier = Modifier.desktopInteractiveFocus(interactionSource = chipInteraction, shape = pillShape),
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp),
@@ -620,9 +626,12 @@ private fun FilmographyCreditCard(
     val theme = LocalDesktopTheme.current
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
+    val isFocused by interactionSource.collectIsFocusedAsState()
+    val isActiveVisual = isHovered || isFocused
+    val cardShape = RoundedCornerShape(12.dp)
 
     val scale by animateFloatAsState(
-        targetValue = if (isHovered) 1.03f else 1.0f,
+        targetValue = if (isActiveVisual) 1.03f else 1.0f,
         animationSpec = spring(
             stiffness = Spring.StiffnessMediumLow,
         ),
@@ -633,15 +642,16 @@ private fun FilmographyCreditCard(
         modifier = Modifier
             .fillMaxWidth()
             .hoverable(interactionSource)
+            .desktopInteractiveFocus(interactionSource = interactionSource, shape = cardShape, showRing = false)
             .clickable(interactionSource = interactionSource, indication = null) { onClick() },
     ) {
         // Poster Box
         Surface(
-            shape = RoundedCornerShape(12.dp),
+            shape = cardShape,
             color = Color(0xFF141416),
             border = BorderStroke(
                 1.dp,
-                if (isHovered) theme.Accent.copy(alpha = 0.75f) else Color.White.copy(alpha = 0.08f),
+                if (isActiveVisual) theme.Accent.copy(alpha = 0.75f) else Color.White.copy(alpha = 0.08f),
             ),
             modifier = Modifier
                 .fillMaxWidth()
@@ -649,7 +659,8 @@ private fun FilmographyCreditCard(
                 .graphicsLayer {
                     scaleX = scale
                     scaleY = scale
-                },
+                }
+                .desktopFocusRing(isFocused = isFocused, shape = cardShape),
         ) {
             Box(modifier = Modifier.fillMaxSize()) {
                 if (!credit.posterUrl.isNullOrBlank()) {

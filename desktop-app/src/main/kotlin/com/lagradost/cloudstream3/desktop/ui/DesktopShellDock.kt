@@ -10,6 +10,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -54,6 +55,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.lagradost.cloudstream3.desktop.ui.components.desktopInteractiveFocus
 import androidx.compose.ui.zIndex
 import com.lagradost.cloudstream3.desktop.ui.components.DockItemsList
 import com.lagradost.cloudstream3.desktop.ui.components.DockProfileAvatar
@@ -531,11 +533,18 @@ internal fun MobileTabItem(
 ) {
     val primaryColor = MaterialTheme.colorScheme.primary
     val unselectedColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
+    val interactionSource = remember { MutableInteractionSource() }
+    val isFocused by interactionSource.collectIsFocusedAsState()
+    val isHovered by interactionSource.collectIsHoveredAsState()
+    val isHighlighted = selected || isHovered || isFocused
+    val shape = RoundedCornerShape(10.dp)
 
     Column(
         modifier = Modifier
-            .clip(RoundedCornerShape(10.dp))
-            .clickable(onClick = onClick)
+            .clip(shape)
+            .hoverable(interactionSource)
+            .desktopInteractiveFocus(interactionSource = interactionSource, shape = shape)
+            .clickable(interactionSource = interactionSource, indication = null, onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
@@ -543,15 +552,15 @@ internal fun MobileTabItem(
         Icon(
             imageVector = icon,
             contentDescription = label,
-            tint = if (selected) primaryColor else unselectedColor,
+            tint = if (isHighlighted) primaryColor else unselectedColor,
             modifier = Modifier.size(22.dp),
         )
         Spacer(Modifier.height(2.dp))
         Text(
             text = label,
             fontSize = 10.5.sp,
-            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-            color = if (selected) primaryColor else unselectedColor,
+            fontWeight = if (isHighlighted) FontWeight.Bold else FontWeight.Medium,
+            color = if (isHighlighted) primaryColor else unselectedColor,
         )
     }
 }

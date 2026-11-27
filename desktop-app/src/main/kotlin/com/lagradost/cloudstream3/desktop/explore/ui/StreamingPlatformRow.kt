@@ -7,7 +7,9 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
@@ -43,6 +45,7 @@ import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.lagradost.cloudstream3.desktop.explore.models.StreamingPlatform
 import com.lagradost.cloudstream3.desktop.ui.components.CloudstreamCustomDialog
+import com.lagradost.cloudstream3.desktop.ui.components.desktopInteractiveFocus
 import com.lagradost.cloudstream3.desktop.ui.components.LocalDesktopTheme
 import com.lagradost.cloudstream3.desktop.ui.components.ScrollChevron
 import com.lagradost.cloudstream3.desktop.ui.components.desktopDragScroll
@@ -257,22 +260,24 @@ fun StreamingPlatformCard(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
+    val isFocused by interactionSource.collectIsFocusedAsState()
+    val isActiveVisual = isHovered || isFocused
     val posterDepthEffectEnabled by AppearanceConfig.posterDepthEffectEnabled.collectAsState()
 
     val scale by animateFloatAsState(
-        targetValue = if (isHovered) 1.04f else 1.0f,
+        targetValue = if (isActiveVisual) 1.04f else 1.0f,
         animationSpec = tween(durationMillis = 180),
         label = "platform_card_scale",
     )
 
     val borderAlpha by animateFloatAsState(
-        targetValue = if (isHovered) 0.75f else 0.12f,
+        targetValue = if (isActiveVisual) 0.75f else 0.12f,
         animationSpec = tween(durationMillis = 180),
         label = "platform_card_border",
     )
 
     val glowAlpha by animateFloatAsState(
-        targetValue = if (isHovered) 0.35f else 0.0f,
+        targetValue = if (isActiveVisual) 0.35f else 0.0f,
         animationSpec = tween(durationMillis = 200),
         label = "platform_card_glow",
     )
@@ -306,6 +311,8 @@ fun StreamingPlatformCard(
             modifier = Modifier
                 .fillMaxSize()
                 .clip(cardShape)
+                .hoverable(interactionSource)
+                .desktopInteractiveFocus(interactionSource = interactionSource, shape = cardShape)
                 .clickable(
                     interactionSource = interactionSource,
                     indication = null,
@@ -314,7 +321,7 @@ fun StreamingPlatformCard(
                 .border(
                     BorderStroke(
                         1.dp,
-                        if (isHovered) platform.brandColor.copy(alpha = borderAlpha) else unhoveredBorderColor,
+                        if (isActiveVisual) platform.brandColor.copy(alpha = borderAlpha) else unhoveredBorderColor,
                     ),
                     cardShape,
                 ),

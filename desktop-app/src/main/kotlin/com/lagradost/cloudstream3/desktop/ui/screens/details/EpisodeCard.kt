@@ -6,6 +6,10 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -34,6 +38,7 @@ import coil3.request.crossfade
 import com.lagradost.cloudstream3.Episode
 import com.lagradost.cloudstream3.LoadResponse
 import com.lagradost.cloudstream3.MainAPI
+import com.lagradost.cloudstream3.desktop.ui.components.desktopFocusableCard
 import com.lagradost.cloudstream3.desktop.ui.components.shimmerBackground
 import com.lagradost.common.storage.WatchHistory
 import kotlinx.coroutines.Dispatchers
@@ -65,7 +70,10 @@ fun EpisodeCard(
     onMarkPreviousWatched: ((Episode) -> Unit)? = null,
     onSyncEpisodeToTracker: ((String, Episode) -> Unit)? = null,
 ) {
-    var isHovered by remember { mutableStateOf(false) }
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
+    val isFocused by interactionSource.collectIsFocusedAsState()
+    val isActiveVisual = isHovered || isFocused
 
     val currentHistory by rememberUpdatedState(history)
     val currentData by rememberUpdatedState(data)
@@ -105,10 +113,43 @@ fun EpisodeCard(
     val activeHistory = uiState?.activeLinkData?.third
     val isActiveForPanel = isPanelOpen && activeHistory != null && ep.matchesHistory(activeHistory)
 
+    val cardShape = RoundedCornerShape(16.dp)
+    val onActivateEpisode: () -> Unit = {
+        val hasCachedLinks = com.lagradost.cloudstream3.desktop.ui.screens.player.LinkCache.get(ep.data) != null
+        if (isEpisodeLocked && !hasCachedLinks) {
+            if (releaseStatus.isMissingFromProvider) {
+                val msg = releaseStatus.statusBadgeText ?: "Episode is not available on ${currentProvider.name}."
+                com.lagradost.cloudstream3.desktop.ui.components.AppToastManager.showWarning(msg)
+            } else {
+                val dateText = releaseStatus.formattedDate ?: releaseStatus.statusBadgeText ?: "a future date"
+                com.lagradost.cloudstream3.desktop.ui.components.AppToastManager.showInfo("Episode is unreleased (Scheduled for $dateText)")
+            }
+        } else {
+            currentOnPlay(ep)
+        }
+    }
+    val onShowEpisodeMenu: () -> Unit = {
+        val latestHistory = currentHistory
+        com.lagradost.cloudstream3.desktop.ui.components.GlobalContextMenuState.showForEpisode(
+            episode = ep,
+            loadResponse = currentData,
+            history = latestHistory,
+            provider = currentProvider,
+            isAntiSpoiler = isAntiSpoiler,
+            enableDownloadButtons = enableDownloadButtons,
+            onPlay = currentOnPlay,
+            onDownload = currentOnDownload,
+            onToggleWatched = currentOnToggleWatched,
+            onRemoveEpisodeWatched = currentOnRemoveEpisodeWatched,
+            onMarkPreviousWatched = currentOnMarkPreviousWatched,
+        )
+    }
+    val currentOnActivateEpisode by rememberUpdatedState(onActivateEpisode)
+
     val scale by animateFloatAsState(
         targetValue = when {
             isActiveForPanel -> 1.04f
-            isHovered && isContextMenuEnabled && !isEpisodeLocked -> 1.02f
+            isActiveVisual && isContextMenuEnabled && !isEpisodeLocked -> 1.02f
             else -> 1f
         },
         animationSpec = tween(220),
@@ -133,7 +174,7 @@ fun EpisodeCard(
                 scaleY = scale
             },
     ) {
-        val showGlow = isHovered && posterHoverGlowEnabled && isContextMenuEnabled && !isEpisodeLocked
+        val showGlow = isActiveVisual && posterHoverGlowEnabled && isContextMenuEnabled && !isEpisodeLocked
         val glowAlpha by animateFloatAsState(if (showGlow) 1f else 0f, animationSpec = tween(180))
         if (posterHoverGlowEnabled) {
             Box(
@@ -141,78 +182,23 @@ fun EpisodeCard(
                     .matchParentSize()
                     .graphicsLayer { alpha = glowAlpha }
                     .blur(26.dp, edgeTreatment = BlurredEdgeTreatment.Unbounded)
-                    .background(heroColor.copy(alpha = 0.55f), RoundedCornerShape(16.dp)),
+                    .background(heroColor.copy(alpha = 0.55f), cardShape),
             )
         }
 
         BoxWithConstraints(
             modifier = Modifier
                 .fillMaxSize()
-                .pointerInput(ep, isContextMenuEnabled) {
-                    awaitPointerEventScope {
-                        while (true) {
-                            val event = awaitPointerEvent()
-                            when (event.type) {
-                                androidx.compose.ui.input.pointer.PointerEventType.Enter -> isHovered = true
-                                androidx.compose.ui.input.pointer.PointerEventType.Exit -> isHovered = false
-                                androidx.compose.ui.input.pointer.PointerEventType.Release -> {
-                                    if (event.button == androidx.compose.ui.input.pointer.PointerButton.Secondary) {
-                                        if (!event.changes.any { it.isConsumed }) {
-                                            if (isContextMenuEnabled) {
-                                                val latestHistory = currentHistory
-                                                com.lagradost.cloudstream3.desktop.ui.components.GlobalContextMenuState.showForEpisode(
-                                                    episode = ep,
-                                                    loadResponse = currentData,
-                                                    history = latestHistory,
-                                                    provider = currentProvider,
-                                                    isAntiSpoiler = isAntiSpoiler,
-                                                    enableDownloadButtons = enableDownloadButtons,
-                                                    onPlay = currentOnPlay,
-                                                    onDownload = currentOnDownload,
-                                                    onToggleWatched = currentOnToggleWatched,
-                                                    onRemoveEpisodeWatched = currentOnRemoveEpisodeWatched,
-                                                    onMarkPreviousWatched = currentOnMarkPreviousWatched,
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                .pointerInput(ep, isEpisodeLocked, releaseStatus.isMissingFromProvider) {
-                    detectTapGestures(
-                        onTap = {
-                            val hasCachedLinks = com.lagradost.cloudstream3.desktop.ui.screens.player.LinkCache.get(ep.data) != null
-                            if (isEpisodeLocked && !hasCachedLinks) {
-                                if (releaseStatus.isMissingFromProvider) {
-                                    val msg = releaseStatus.statusBadgeText ?: "Episode is not available on ${provider.name}."
-                                    com.lagradost.cloudstream3.desktop.ui.components.AppToastManager.showWarning(msg)
-                                } else {
-                                    val dateText = releaseStatus.formattedDate ?: releaseStatus.statusBadgeText ?: "a future date"
-                                    com.lagradost.cloudstream3.desktop.ui.components.AppToastManager.showInfo("Episode is unreleased (Scheduled for $dateText)")
-    
-                                }
-
-
-
-                            } else {
-                                onPlay(ep)
-                            }
-                        },
-                    )
-                }
                 .shadow(
-                    elevation = if (isHovered && isContextMenuEnabled && !isEpisodeLocked) 12.dp else 4.dp,
-                    shape = RoundedCornerShape(16.dp),
-                    spotColor = if (isHovered && isContextMenuEnabled && !isEpisodeLocked) heroColor else Color.Black,
+                    elevation = if (isActiveVisual && isContextMenuEnabled && !isEpisodeLocked) 12.dp else 4.dp,
+                    shape = cardShape,
+                    spotColor = if (isActiveVisual && isContextMenuEnabled && !isEpisodeLocked) heroColor else Color.Black,
                     ambientColor = Color.Transparent,
                 )
                 .border(
                     width = if (isActiveForPanel) {
                         1.5.dp
-                    } else if (isHovered && isContextMenuEnabled && !isEpisodeLocked) {
+                    } else if (isActiveVisual && isContextMenuEnabled && !isEpisodeLocked) {
                         1.5.dp
                     } else if (isEpisodeLocked) {
                         1.dp
@@ -223,14 +209,40 @@ fun EpisodeCard(
                         Color.White.copy(alpha = 0.50f)
                     } else if (isEpisodeLocked) {
                         Color(0xFFFFB74D).copy(alpha = 0.45f)
-                    } else if (isHovered && isContextMenuEnabled) {
+                    } else if (isActiveVisual && isContextMenuEnabled) {
                         heroColor
                     } else {
                         Color.White.copy(alpha = 0.18f)
                     },
-                    shape = RoundedCornerShape(16.dp),
+                    shape = cardShape,
                 )
-                .clip(RoundedCornerShape(16.dp)),
+                .clip(cardShape)
+                .hoverable(interactionSource)
+                .desktopFocusableCard(
+                    interactionSource = interactionSource,
+                    shape = cardShape,
+                    onClick = { currentOnActivateEpisode() },
+                    onSecondaryClick = if (isContextMenuEnabled) onShowEpisodeMenu else null,
+                )
+                .pointerInput(ep, isContextMenuEnabled) {
+                    awaitPointerEventScope {
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            if (event.type == androidx.compose.ui.input.pointer.PointerEventType.Release &&
+                                event.button == androidx.compose.ui.input.pointer.PointerButton.Secondary &&
+                                !event.changes.any { it.isConsumed } &&
+                                isContextMenuEnabled
+                            ) {
+                                onShowEpisodeMenu()
+                            }
+                        }
+                    }
+                }
+                .pointerInput(ep, isEpisodeLocked, releaseStatus.isMissingFromProvider) {
+                    detectTapGestures(
+                        onTap = { currentOnActivateEpisode() },
+                    )
+                },
         ) {
             val isNarrow = maxWidth < 320.dp
 
@@ -526,7 +538,7 @@ fun EpisodeCard(
                     fontWeight = FontWeight.ExtraBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    color = if (isHovered) Color(0xFFB0C4FF) else Color.White,
+                    color = if (isActiveVisual) Color(0xFFB0C4FF) else Color.White,
                     modifier = Modifier
                         .fillMaxWidth()
                         .run { if (shouldHideSpoilers) this.blur(2.dp) else this },

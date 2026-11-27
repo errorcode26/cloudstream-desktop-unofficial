@@ -2,9 +2,12 @@ package com.lagradost.cloudstream3.desktop.ui.screens.details
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -17,6 +20,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventType
@@ -31,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lagradost.cloudstream3.LoadResponse
 import com.lagradost.cloudstream3.MainAPI
+import com.lagradost.cloudstream3.desktop.ui.components.desktopInteractiveFocus
 import com.lagradost.cloudstream3.desktop.ui.components.getTextShadow
 import com.lagradost.cloudstream3.desktop.ui.screens.details.contract.DetailsUiState
 import com.lagradost.cloudstream3.desktop.ui.theme.AppearanceConfig
@@ -57,11 +62,17 @@ fun InfoRowItem(
     interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },
     isHovered: Boolean = interactionSource.collectIsHoveredAsState().value,
 ) {
+    val isFocused by interactionSource.collectIsFocusedAsState()
+    val isActiveVisual = isHovered || isFocused
+    val itemShape = RoundedCornerShape(6.dp)
     Column(
         horizontalAlignment = Alignment.End,
         modifier = if (onClick != null) {
             Modifier
+                .clip(itemShape)
                 .pointerHoverIcon(PointerIcon.Hand)
+                .hoverable(interactionSource)
+                .desktopInteractiveFocus(interactionSource = interactionSource, shape = itemShape)
                 .clickable(
                     interactionSource = interactionSource,
                     indication = null,
@@ -83,8 +94,8 @@ fun InfoRowItem(
         Text(
             text = value,
             style = MaterialTheme.typography.bodyMedium.merge(textShadow),
-            color = if (onClick != null && isHovered) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.95f),
-            textDecoration = if (onClick != null && isHovered) TextDecoration.Underline else null,
+            color = if (onClick != null && isActiveVisual) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.95f),
+            textDecoration = if (onClick != null && isActiveVisual) TextDecoration.Underline else null,
             fontWeight = FontWeight.SemiBold,
             fontSize = 14.sp,
             maxLines = 1,

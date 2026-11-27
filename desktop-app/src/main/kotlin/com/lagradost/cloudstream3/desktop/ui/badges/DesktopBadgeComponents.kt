@@ -9,7 +9,9 @@ import androidx.compose.foundation.TooltipArea
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
@@ -43,6 +45,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lagradost.cloudstream3.LoadResponse
+import com.lagradost.cloudstream3.desktop.ui.components.desktopInteractiveFocus
 import com.lagradost.cloudstream3.TvType
 import com.lagradost.cloudstream3.desktop.metadata.RatingSource
 import java.net.URLEncoder
@@ -480,12 +483,14 @@ object DesktopBadgeComponents {
     ) {
         val interactionSource = remember { MutableInteractionSource() }
         val isHovered by interactionSource.collectIsHoveredAsState()
+        val isFocused by interactionSource.collectIsFocusedAsState()
         val isPressed by interactionSource.collectIsPressedAsState()
+        val isActiveVisual = isHovered || isFocused
 
         val scale by animateFloatAsState(
             targetValue = when {
                 isPressed -> 0.94f
-                isHovered && onClick != null -> 1.05f
+                isActiveVisual && onClick != null -> 1.05f
                 else -> 1.0f
             },
             animationSpec = spring(
@@ -505,15 +510,18 @@ object DesktopBadgeComponents {
                     }
                     .then(
                         if (onClick != null) {
+                            val badgeShape = RoundedCornerShape(6.dp)
                             Modifier
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(if (isHovered) Color.White.copy(alpha = 0.08f) else Color.Transparent)
+                                .clip(badgeShape)
+                                .background(if (isActiveVisual) Color.White.copy(alpha = 0.08f) else Color.Transparent)
                                 .border(
                                     1.dp,
-                                    if (isHovered) Color.White.copy(alpha = 0.20f) else Color.Transparent,
-                                    RoundedCornerShape(6.dp),
+                                    if (isActiveVisual) Color.White.copy(alpha = 0.20f) else Color.Transparent,
+                                    badgeShape,
                                 )
                                 .pointerHoverIcon(PointerIcon.Hand)
+                                .hoverable(interactionSource)
+                                .desktopInteractiveFocus(interactionSource = interactionSource, shape = badgeShape)
                                 .clickable(
                                     interactionSource = interactionSource,
                                     indication = null,
@@ -582,12 +590,14 @@ object DesktopBadgeComponents {
     ) {
         val interactionSource = remember { MutableInteractionSource() }
         val isHovered by interactionSource.collectIsHoveredAsState()
+        val isFocused by interactionSource.collectIsFocusedAsState()
         val isPressed by interactionSource.collectIsPressedAsState()
+        val isActiveVisual = isHovered || isFocused
 
         val scale by animateFloatAsState(
             targetValue = when {
                 isPressed -> 0.93f
-                isHovered && onClick != null -> 1.05f
+                isActiveVisual && onClick != null -> 1.05f
                 else -> 1.0f
             },
             animationSpec = spring(
@@ -598,12 +608,13 @@ object DesktopBadgeComponents {
         )
 
         val badgeContent = @Composable {
+            val badgeShape = RoundedCornerShape(4.dp)
             Surface(
-                shape = RoundedCornerShape(4.dp),
-                color = if (isHovered && onClick != null) brandColor.copy(alpha = 0.25f) else brandColor.copy(alpha = 0.15f),
+                shape = badgeShape,
+                color = if (isActiveVisual && onClick != null) brandColor.copy(alpha = 0.25f) else brandColor.copy(alpha = 0.15f),
                 border = BorderStroke(
                     1.dp,
-                    if (isHovered && onClick != null) brandColor.copy(alpha = 0.70f) else brandColor.copy(alpha = 0.40f),
+                    if (isActiveVisual && onClick != null) brandColor.copy(alpha = 0.70f) else brandColor.copy(alpha = 0.40f),
                 ),
                 modifier = modifier
                     .graphicsLayer {
@@ -613,7 +624,10 @@ object DesktopBadgeComponents {
                     .then(
                         if (onClick != null) {
                             Modifier
+                                .clip(badgeShape)
                                 .pointerHoverIcon(PointerIcon.Hand)
+                                .hoverable(interactionSource)
+                                .desktopInteractiveFocus(interactionSource = interactionSource, shape = badgeShape)
                                 .clickable(
                                     interactionSource = interactionSource,
                                     indication = null,

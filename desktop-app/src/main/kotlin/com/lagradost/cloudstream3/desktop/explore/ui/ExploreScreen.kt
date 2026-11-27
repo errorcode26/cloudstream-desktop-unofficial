@@ -58,6 +58,7 @@ import coil3.request.crossfade
 import com.lagradost.cloudstream3.MovieSearchResponse
 import com.lagradost.cloudstream3.TvType
 import com.lagradost.cloudstream3.desktop.explore.client.ExploreCollectionDetail
+import com.lagradost.cloudstream3.desktop.ui.components.handleEscapeKey
 import com.lagradost.cloudstream3.desktop.explore.client.ExploreHubClient
 import com.lagradost.cloudstream3.desktop.explore.models.ExploreItem
 import com.lagradost.cloudstream3.desktop.explore.models.ExploreSearchScope
@@ -205,7 +206,24 @@ fun ExploreScreen(
     val hazeSourceModifier = if (hazeState != null) Modifier.hazeSource(state = hazeState) else Modifier
     val focusManager = LocalFocusManager.current
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    val canHandleExploreBack = uiState.drilledSearchCategory != null ||
+        uiState.selectedCollection != null ||
+        uiState.drilledCatalog != null ||
+        uiState.drilledPlatform != null ||
+        uiState.searchQuery.isNotBlank()
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .handleEscapeKey(enabled = canHandleExploreBack) {
+                when {
+                    uiState.drilledSearchCategory != null -> viewModel.onEvent(ExploreUiEvent.ReturnFromSearchCategory)
+                    uiState.selectedCollection != null -> viewModel.onEvent(ExploreUiEvent.CloseCollection)
+                    uiState.drilledCatalog != null || uiState.drilledPlatform != null -> viewModel.onEvent(ExploreUiEvent.ReturnToShelves)
+                    uiState.searchQuery.isNotBlank() -> viewModel.onEvent(ExploreUiEvent.ClearSearchQuery)
+                }
+            },
+    ) {
         val handleItemClick: (ExploreItem) -> Unit = { item ->
             if (item.type.equals("collection", ignoreCase = true)) {
                 val collId = item.id.removePrefix("collection:").toIntOrNull()
@@ -253,7 +271,24 @@ fun ExploreScreen(
                     label = "explore_global_backdrop_crossfade",
                     modifier = Modifier.fillMaxSize(),
                 ) { targetBgUrl ->
-                    Box(modifier = Modifier.fillMaxSize()) {
+                    val canHandleExploreBack = uiState.drilledSearchCategory != null ||
+        uiState.selectedCollection != null ||
+        uiState.drilledCatalog != null ||
+        uiState.drilledPlatform != null ||
+        uiState.searchQuery.isNotBlank()
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .handleEscapeKey(enabled = canHandleExploreBack) {
+                when {
+                    uiState.drilledSearchCategory != null -> viewModel.onEvent(ExploreUiEvent.ReturnFromSearchCategory)
+                    uiState.selectedCollection != null -> viewModel.onEvent(ExploreUiEvent.CloseCollection)
+                    uiState.drilledCatalog != null || uiState.drilledPlatform != null -> viewModel.onEvent(ExploreUiEvent.ReturnToShelves)
+                    uiState.searchQuery.isNotBlank() -> viewModel.onEvent(ExploreUiEvent.ClearSearchQuery)
+                }
+            },
+    ) {
                         val context = coil3.compose.LocalPlatformContext.current
                         val imageRequest = remember(targetBgUrl) {
                             coil3.request.ImageRequest.Builder(context)

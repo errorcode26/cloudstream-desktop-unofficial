@@ -5,6 +5,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
@@ -47,6 +48,9 @@ import coil3.compose.AsyncImage
 import com.lagradost.cloudstream3.TvType
 import com.lagradost.cloudstream3.desktop.explore.ui.ExploreProviderDialog
 import com.lagradost.cloudstream3.desktop.explore.ui.ExploreSearchResultsView
+import com.lagradost.cloudstream3.desktop.ui.components.desktopInteractiveFocus
+import com.lagradost.cloudstream3.desktop.ui.components.handleEscapeKey
+import com.lagradost.cloudstream3.desktop.ui.components.nonFocusableTap
 import com.lagradost.cloudstream3.desktop.ui.navigation.Config
 import com.lagradost.cloudstream3.desktop.ui.screens.CategoryGridCache
 import com.lagradost.cloudstream3.desktop.ui.screens.search.components.AnimatedCategoryTab
@@ -101,10 +105,18 @@ fun ComposeSearchScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
+            .handleEscapeKey(
+                enabled = uiState.showSuggestions ||
+                    uiState.drilledSearchCategory != null ||
+                    uiState.searchQuery.isNotBlank(),
             ) {
+                when {
+                    uiState.showSuggestions -> viewModel.onEvent(SearchUiEvent.OnDismissSuggestions)
+                    uiState.drilledSearchCategory != null -> viewModel.onEvent(SearchUiEvent.OnDrillSearchCategory(null))
+                    uiState.searchQuery.isNotBlank() -> viewModel.onEvent(SearchUiEvent.OnClearSearch)
+                }
+            }
+            .nonFocusableTap {
                 if (uiState.showSuggestions) {
                     viewModel.onEvent(SearchUiEvent.OnDismissSuggestions)
                 }
@@ -180,22 +192,7 @@ fun ComposeSearchScreen(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .focusRequester(focusRequester)
-                                        .onFocusChanged { isSearchFocused = it.isFocused }
-                                        .onKeyEvent { keyEvent ->
-                                            if (keyEvent.type == KeyEventType.KeyDown && keyEvent.key == Key.Escape) {
-                                                if (uiState.showSuggestions) {
-                                                    viewModel.onEvent(SearchUiEvent.OnDismissSuggestions)
-                                                    true
-                                                } else if (uiState.searchQuery.isNotEmpty()) {
-                                                    viewModel.onEvent(SearchUiEvent.OnClearSearch)
-                                                    true
-                                                } else {
-                                                    false
-                                                }
-                                            } else {
-                                                false
-                                            }
-                                        },
+                                        .onFocusChanged { isSearchFocused = it.isFocused },
                                 )
                             }
 
@@ -227,10 +224,17 @@ fun ComposeSearchScreen(
                                 )
 
                                 // Embedded Multi-Source Selector Chip (Matches Upstream SearchFilter)
+                                val filterInteraction = remember { MutableInteractionSource() }
+                                val filterShape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact
                                 Surface(
-                                    shape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact,
+                                    shape = filterShape,
                                     color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                                    interactionSource = filterInteraction,
                                     onClick = { showProviderDropdown = true },
+                                    modifier = Modifier.desktopInteractiveFocus(
+                                        interactionSource = filterInteraction,
+                                        shape = filterShape,
+                                    ),
                                 ) {
                                     Row(
                                         verticalAlignment = Alignment.CenterVertically,
@@ -309,6 +313,7 @@ fun ComposeSearchScreen(
                                         Triple(false, Icons.Default.Extension, "Extensions"),
                                     ).forEach { (targetAddonMode, icon, label) ->
                                         val isTabSelected = uiState.isAddonMode == targetAddonMode
+                                        val tabInteraction = remember { MutableInteractionSource() }
                                         Box(
                                             modifier = Modifier
                                                 .fillMaxHeight()
@@ -324,7 +329,15 @@ fun ComposeSearchScreen(
                                                         Modifier
                                                     },
                                                 )
-                                                .clickable {
+                                                .hoverable(tabInteraction)
+                                                .desktopInteractiveFocus(
+                                                    interactionSource = tabInteraction,
+                                                    shape = switcherShapes.compact,
+                                                )
+                                                .clickable(
+                                                    interactionSource = tabInteraction,
+                                                    indication = null,
+                                                ) {
                                                     if (!isTabSelected) {
                                                         viewModel.onEvent(SearchUiEvent.OnToggleSearchMode(targetAddonMode))
                                                     }
@@ -437,10 +450,7 @@ fun ComposeSearchScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .weight(1f)
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                ) {
+                .nonFocusableTap {
                     if (uiState.showSuggestions) {
                         viewModel.onEvent(SearchUiEvent.OnDismissSuggestions)
                     }
