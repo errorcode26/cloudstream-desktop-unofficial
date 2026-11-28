@@ -3,6 +3,10 @@ package com.lagradost.cloudstream3.desktop.ui.screens.player.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -32,6 +36,7 @@ import com.lagradost.cloudstream3.TvSeriesLoadResponse
 import com.lagradost.cloudstream3.desktop.ui.VideoLaunchData
 import com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton
 import com.lagradost.cloudstream3.desktop.ui.components.applyShadowMultiplier
+import com.lagradost.cloudstream3.desktop.ui.components.desktopInteractiveFocus
 
 @Composable
 fun EpisodesOverlay(
@@ -200,24 +205,41 @@ fun EpisodesOverlay(
                             false
                         }
 
+                        val prevInteraction = remember { MutableInteractionSource() }
+                        val prevShape = RoundedCornerShape(6.dp)
                         Text(
                             text = "< Prev",
                             color = Color.White.copy(alpha = if (hasPrev) 1f else 0.5f),
                             fontSize = 14.sp,
-                            modifier = Modifier.clickable(enabled = hasPrev) {
-                                if (loadResponse is TvSeriesLoadResponse) {
-                                    val idx = seasons.indexOf(selectedSeason)
-                                    if (idx > 0) selectedSeason = seasons[idx - 1]
-                                } else if (loadResponse is AnimeLoadResponse) {
-                                    val idx = dubs.indexOf(selectedDub)
-                                    if (idx > 0) selectedDub = dubs[idx - 1]
+                            modifier = Modifier
+                                .clip(prevShape)
+                                .desktopInteractiveFocus(interactionSource = prevInteraction, shape = prevShape, enabled = hasPrev)
+                                .hoverable(prevInteraction, enabled = hasPrev)
+                                .clickable(interactionSource = prevInteraction, indication = null, enabled = hasPrev) {
+                                    if (loadResponse is TvSeriesLoadResponse) {
+                                        val idx = seasons.indexOf(selectedSeason)
+                                        if (idx > 0) selectedSeason = seasons[idx - 1]
+                                    } else if (loadResponse is AnimeLoadResponse) {
+                                        val idx = dubs.indexOf(selectedDub)
+                                        if (idx > 0) selectedDub = dubs[idx - 1]
+                                    }
                                 }
-                            },
+                                .padding(horizontal = 6.dp, vertical = 4.dp),
                         )
 
                         var expanded by remember { mutableStateOf(false) }
                         Box(modifier = Modifier.zIndex(10f)) {
-                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { expanded = !expanded }.padding(horizontal = 8.dp, vertical = 4.dp)) {
+                            val selectorInteraction = remember { MutableInteractionSource() }
+                            val selectorShape = RoundedCornerShape(6.dp)
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .clip(selectorShape)
+                                    .desktopInteractiveFocus(interactionSource = selectorInteraction, shape = selectorShape)
+                                    .hoverable(selectorInteraction)
+                                    .clickable(interactionSource = selectorInteraction, indication = null) { expanded = !expanded }
+                                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                            ) {
                                 val selectorText = if (loadResponse is TvSeriesLoadResponse) "Season $selectedSeason" else selectedDub?.name ?: ""
                                 Text(
                                     text = selectorText,
@@ -243,13 +265,16 @@ fun EpisodesOverlay(
                                         if (loadResponse is TvSeriesLoadResponse) {
                                             items(seasons) { season ->
                                                 val isSelected = season == selectedSeason
+                                                val optionInteraction = remember { MutableInteractionSource() }
                                                 Text(
                                                     text = "Season $season",
                                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                                     color = if (isSelected) Color(0xFF9151FF) else Color.White,
                                                     modifier = Modifier
                                                         .fillMaxWidth()
-                                                        .clickable {
+                                                        .desktopInteractiveFocus(interactionSource = optionInteraction, shape = RoundedCornerShape(6.dp))
+                                                        .hoverable(optionInteraction)
+                                                        .clickable(interactionSource = optionInteraction, indication = null) {
                                                             selectedSeason = season
                                                             expanded = false
                                                         }
@@ -259,13 +284,16 @@ fun EpisodesOverlay(
                                         } else if (loadResponse is AnimeLoadResponse) {
                                             items(dubs) { dub ->
                                                 val isSelected = dub == selectedDub
+                                                val optionInteraction = remember { MutableInteractionSource() }
                                                 Text(
                                                     text = dub.name,
                                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                                     color = if (isSelected) Color(0xFF9151FF) else Color.White,
                                                     modifier = Modifier
                                                         .fillMaxWidth()
-                                                        .clickable {
+                                                        .desktopInteractiveFocus(interactionSource = optionInteraction, shape = RoundedCornerShape(6.dp))
+                                                        .hoverable(optionInteraction)
+                                                        .clickable(interactionSource = optionInteraction, indication = null) {
                                                             selectedDub = dub
                                                             expanded = false
                                                         }
@@ -278,19 +306,26 @@ fun EpisodesOverlay(
                             }
                         }
 
+                        val nextInteraction = remember { MutableInteractionSource() }
+                        val nextShape = RoundedCornerShape(6.dp)
                         Text(
                             text = "Next >",
                             color = Color.White.copy(alpha = if (hasNext) 1f else 0.5f),
                             fontSize = 14.sp,
-                            modifier = Modifier.clickable(enabled = hasNext) {
-                                if (loadResponse is TvSeriesLoadResponse) {
-                                    val idx = seasons.indexOf(selectedSeason)
-                                    if (idx < seasons.size - 1) selectedSeason = seasons[idx + 1]
-                                } else if (loadResponse is AnimeLoadResponse) {
-                                    val idx = dubs.indexOf(selectedDub)
-                                    if (idx < dubs.size - 1) selectedDub = dubs[idx + 1]
+                            modifier = Modifier
+                                .clip(nextShape)
+                                .desktopInteractiveFocus(interactionSource = nextInteraction, shape = nextShape, enabled = hasNext)
+                                .hoverable(nextInteraction, enabled = hasNext)
+                                .clickable(interactionSource = nextInteraction, indication = null, enabled = hasNext) {
+                                    if (loadResponse is TvSeriesLoadResponse) {
+                                        val idx = seasons.indexOf(selectedSeason)
+                                        if (idx < seasons.size - 1) selectedSeason = seasons[idx + 1]
+                                    } else if (loadResponse is AnimeLoadResponse) {
+                                        val idx = dubs.indexOf(selectedDub)
+                                        if (idx < dubs.size - 1) selectedDub = dubs[idx + 1]
+                                    }
                                 }
-                            },
+                                .padding(horizontal = 6.dp, vertical = 4.dp),
                         )
                     }
                 }
@@ -336,12 +371,19 @@ fun EpisodeCard(
     val hasCachedLinks = com.lagradost.cloudstream3.desktop.ui.screens.player.LinkCache.get(episode.data) != null
     val isEpisodeLocked = !hasPlayableData && !hasCachedLinks && releaseStatus.isUnreleased && lockUnreleasedEpisodes
 
+    val cardInteraction = remember { MutableInteractionSource() }
+    val isHovered by cardInteraction.collectIsHoveredAsState()
+    val isFocused by cardInteraction.collectIsFocusedAsState()
+    val cardShape = RoundedCornerShape(8.dp)
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
-            .background(if (isCurrent) Color.White.copy(alpha = 0.1f) else Color.Transparent)
-            .clickable(enabled = !isEpisodeLocked, onClick = onClick)
+            .clip(cardShape)
+            .background(if (isCurrent || isHovered || isFocused) Color.White.copy(alpha = 0.1f) else Color.Transparent)
+            .desktopInteractiveFocus(interactionSource = cardInteraction, shape = cardShape, enabled = !isEpisodeLocked)
+            .hoverable(cardInteraction, enabled = !isEpisodeLocked)
+            .clickable(interactionSource = cardInteraction, indication = null, enabled = !isEpisodeLocked, onClick = onClick)
             .padding(if (isCurrent) 8.dp else 0.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

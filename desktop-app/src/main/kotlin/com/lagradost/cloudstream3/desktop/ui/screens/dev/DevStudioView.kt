@@ -114,6 +114,9 @@ fun DevStudioView(
                         DevStudioTab.NETWORK -> NetworkInspectorTabContent(state = state, onEvent = viewModel::onEvent)
                         DevStudioTab.PLAYER -> PlayerDiagnosticsTabContent(state = state, onEvent = viewModel::onEvent)
                         DevStudioTab.PROVIDERS -> ProviderHealthTabContent(state = state, onEvent = viewModel::onEvent)
+                        DevStudioTab.FOCUS_HUD -> FocusHudTabContent(
+                            onToast = { msg -> viewModel.onEvent(DevStudioUiEvent.ShowHudToast(msg)) },
+                        )
                     }
                 }
             }
@@ -231,8 +234,24 @@ private fun DevStudioTopBar(
             }
 
             // Right: Global Actions
+            val isFocusHudEnabled by DevStudioState.isVisualFocusHudEnabled.collectAsState()
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 val compactShape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact
+                DesktopFilledTonalButton(
+                    onClick = { DevStudioState.toggleVisualFocusHud() },
+                    colors = ButtonDefaults.filledTonalButtonColors(
+                        containerColor = if (isFocusHudEnabled) Color(0xFF16A34A).copy(alpha = 0.25f) else DevBgDark,
+                        contentColor = if (isFocusHudEnabled) Color(0xFF4ADE80) else Color.LightGray,
+                    ),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                    shape = compactShape,
+                    modifier = Modifier.height(30.dp),
+                ) {
+                    Icon(Icons.Default.CenterFocusStrong, contentDescription = null, tint = if (isFocusHudEnabled) Color(0xFF4ADE80) else Color.LightGray, modifier = Modifier.size(14.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text(if (isFocusHudEnabled) "Focus HUD ON (F9)" else "Focus HUD (F9)", fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                }
+
                 // Switch to Simple Mode
                 DesktopFilledTonalButton(
                     onClick = { onEvent(DevStudioUiEvent.ToggleAdvancedMode) },
@@ -387,11 +406,27 @@ private fun DevStudioSimpleTopBar(
             }
 
             // Right: Simple Actions + Switch to Dev Mode + Window controls
+            val isFocusHudEnabled by DevStudioState.isVisualFocusHudEnabled.collectAsState()
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 val compactShape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact
+                DesktopFilledTonalButton(
+                    onClick = { DevStudioState.toggleVisualFocusHud() },
+                    colors = ButtonDefaults.filledTonalButtonColors(
+                        containerColor = if (isFocusHudEnabled) Color(0xFF16A34A).copy(alpha = 0.25f) else DevCardDark,
+                        contentColor = if (isFocusHudEnabled) Color(0xFF4ADE80) else Color.LightGray,
+                    ),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                    shape = compactShape,
+                    modifier = Modifier.height(30.dp),
+                ) {
+                    Icon(Icons.Default.CenterFocusStrong, contentDescription = null, tint = if (isFocusHudEnabled) Color(0xFF4ADE80) else Color.LightGray, modifier = Modifier.size(14.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text(if (isFocusHudEnabled) "Focus HUD ON (F9)" else "Focus HUD (F9)", fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                }
+
                 // Primary: Copy All Logs
                 DesktopButton(
                     onClick = { onEvent(DevStudioUiEvent.CopyAllLogs) },

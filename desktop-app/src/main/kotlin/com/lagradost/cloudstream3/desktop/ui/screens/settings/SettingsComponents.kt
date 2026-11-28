@@ -3,7 +3,12 @@ package com.lagradost.cloudstream3.desktop.ui.screens.settings
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
@@ -23,8 +28,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lagradost.cloudstream3.desktop.ui.components.AppDropdownMenu
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopDropdownMenuItem
 import com.lagradost.cloudstream3.desktop.ui.components.DesktopFilledTonalButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopSwitch
 import com.lagradost.cloudstream3.desktop.ui.components.LocalDesktopTheme
+import com.lagradost.cloudstream3.desktop.ui.components.desktopInteractiveFocus
 import com.lagradost.cloudstream3.desktop.ui.screens.settings.contract.SettingsUiEvent
 import com.lagradost.cloudstream3.desktop.ui.screens.settings.contract.SettingsUiState
 import com.lagradost.cloudstream3.desktop.ui.theme.AppearanceConfig
@@ -156,7 +164,7 @@ fun SettingsToggleItem(
                 )
             }
         }
-        Switch(
+        DesktopSwitch(
             checked = checked,
             enabled = enabled,
             onCheckedChange = onCheckedChange,
@@ -214,7 +222,7 @@ fun <T> SettingsDropdownItem(
             }
             AppDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
                 options.forEach { (value, title) ->
-                    DropdownMenuItem(
+                    DesktopDropdownMenuItem(
                         text = {
                             Text(
                                 text = title,
@@ -263,12 +271,18 @@ fun SettingsSliderItem(
                 }
             }
         }
+        val sliderInteraction = remember { MutableInteractionSource() }
         Slider(
             value = value,
             onValueChange = onValueChange,
             valueRange = valueRange,
             steps = steps,
-            modifier = Modifier.widthIn(max = 400.dp).fillMaxWidth().padding(horizontal = 8.dp),
+            interactionSource = sliderInteraction,
+            modifier = Modifier
+                .widthIn(max = 400.dp)
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp)
+                .desktopInteractiveFocus(interactionSource = sliderInteraction, shape = CircleShape),
             colors = SliderDefaults.colors(
                 thumbColor = MaterialTheme.colorScheme.primary,
                 activeTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
@@ -310,11 +324,15 @@ fun SettingsChipGroupItem(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             options.forEach { (id, title) ->
+                val chipInteraction = remember { MutableInteractionSource() }
+                val chipShape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact
                 FilterChip(
                     selected = selectedValue == id,
                     onClick = { onSelectionChanged(id) },
                     label = { Text(title) },
-                    shape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact,
+                    shape = chipShape,
+                    interactionSource = chipInteraction,
+                    modifier = Modifier.desktopInteractiveFocus(interactionSource = chipInteraction, shape = chipShape),
                     colors = FilterChipDefaults.filterChipColors(
                         selectedContainerColor = MaterialTheme.colorScheme.primary,
                         selectedLabelColor = Color.White,
@@ -331,12 +349,22 @@ fun SettingsNavigationItem(
     subtitle: String? = null,
     onClick: () -> Unit,
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
+    val isFocused by interactionSource.collectIsFocusedAsState()
+    val rowShape = RoundedCornerShape(10.dp)
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .highlightAndScrollIfRequested(label)
-            .clickable(onClick = onClick)
-            .padding(vertical = 8.dp, horizontal = 4.dp),
+            .clip(rowShape)
+            .background(
+                if (isHovered || isFocused) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f) else Color.Transparent,
+            )
+            .desktopInteractiveFocus(interactionSource = interactionSource, shape = rowShape)
+            .hoverable(interactionSource)
+            .clickable(interactionSource = interactionSource, indication = null, onClick = onClick)
+            .padding(vertical = 8.dp, horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
@@ -483,12 +511,22 @@ fun SettingsNavigationRow(
     icon: androidx.compose.ui.graphics.vector.ImageVector? = null,
     onClick: () -> Unit,
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
+    val isFocused by interactionSource.collectIsFocusedAsState()
+    val rowShape = RoundedCornerShape(10.dp)
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .highlightAndScrollIfRequested(title)
-            .clickable { onClick() }
-            .padding(horizontal = 4.dp, vertical = 12.dp),
+            .clip(rowShape)
+            .background(
+                if (isHovered || isFocused) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f) else Color.Transparent,
+            )
+            .desktopInteractiveFocus(interactionSource = interactionSource, shape = rowShape)
+            .hoverable(interactionSource)
+            .clickable(interactionSource = interactionSource, indication = null) { onClick() }
+            .padding(horizontal = 8.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (icon != null) {
@@ -540,9 +578,11 @@ fun SettingsHubCard(
     val isLightMode by AppearanceConfig.isLightMode.collectAsState()
     val amoledMode by AppearanceConfig.amoledMode.collectAsState()
     val uiCardOpacity by AppearanceConfig.uiCardOpacity.collectAsState()
+    val cardInteraction = remember { MutableInteractionSource() }
+    val cardShape = RoundedCornerShape(16.dp)
 
     Surface(
-        shape = RoundedCornerShape(16.dp),
+        shape = cardShape,
         color = when {
             isLightMode -> theme.SurfaceCard
             amoledMode -> Color.Black
@@ -559,8 +599,10 @@ fun SettingsHubCard(
         shadowElevation = if (isLightMode) 1.dp else 0.dp,
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .clickable { onClick() },
+            .clip(cardShape)
+            .desktopInteractiveFocus(interactionSource = cardInteraction, shape = cardShape)
+            .hoverable(cardInteraction)
+            .clickable(interactionSource = cardInteraction, indication = null) { onClick() },
     ) {
         Row(
             modifier = Modifier

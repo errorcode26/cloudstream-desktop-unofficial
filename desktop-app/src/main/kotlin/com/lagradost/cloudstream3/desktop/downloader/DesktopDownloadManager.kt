@@ -609,20 +609,42 @@ object DesktopDownloadManager {
             if (tempDir.exists() && tempDir.isDirectory) {
                 tempDir.listFiles()?.forEach { file ->
                     if (!liveTaskIds.contains(file.name)) {
-                        reclaimedBytes += file.walkTopDown().sumOf { it.length() }
-                        file.deleteRecursively()
+                        if (file.isDirectory) {
+                            reclaimedBytes += runCatching {
+                                file.walkTopDown().sumOf { it.length() }
+                            }.getOrDefault(0L)
+                            runCatching {
+                                if (file.exists() && file.isDirectory) {
+                                    file.deleteRecursively()
+                                }
+                            }
+                        } else if (file.isFile) {
+                            reclaimedBytes += file.length()
+                            runCatching { file.delete() }
+                        }
                     }
                 }
             }
 
             // 2. Scan legacy dangling .part files and .segments in main downloads directory
-            downloadsDir.walkTopDown().forEach { file ->
-                if (file.isFile && file.name.endsWith(".part", ignoreCase = true)) {
-                    reclaimedBytes += file.length()
-                    file.delete()
-                } else if (file.isDirectory && file.name.endsWith(".segments", ignoreCase = true)) {
-                    reclaimedBytes += file.walkTopDown().sumOf { it.length() }
-                    file.deleteRecursively()
+            val dlDir = downloadsDir
+            if (dlDir.exists() && dlDir.isDirectory) {
+                runCatching {
+                    dlDir.walkTopDown().forEach { file ->
+                        if (file.isFile && file.name.endsWith(".part", ignoreCase = true)) {
+                            reclaimedBytes += file.length()
+                            file.delete()
+                        } else if (file.isDirectory && file.name.endsWith(".segments", ignoreCase = true)) {
+                            reclaimedBytes += runCatching {
+                                file.walkTopDown().sumOf { it.length() }
+                            }.getOrDefault(0L)
+                            runCatching {
+                                if (file.exists() && file.isDirectory) {
+                                    file.deleteRecursively()
+                                }
+                            }
+                        }
+                    }
                 }
             }
 
@@ -645,8 +667,8 @@ object DesktopDownloadManager {
             }
 
             AppLogger.i("DesktopDownloadManager: Cleaned orphaned temp files ($reclaimedBytes bytes reclaimed)")
-        } catch (e: Exception) {
-            AppLogger.w("Failed to clean orphaned temp files: ${e.message}")
+        } catch (t: Throwable) {
+            AppLogger.w("Failed to clean orphaned temp files: ${t.message}")
         }
         return reclaimedBytes
     }

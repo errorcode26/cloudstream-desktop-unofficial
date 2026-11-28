@@ -5,9 +5,13 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.focusGroup
+import androidx.compose.foundation.gestures.BringIntoViewSpec
+import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
@@ -30,9 +34,22 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isAltPressed
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.isShiftPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
@@ -236,11 +253,45 @@ fun AppDropdownMenu(
             modifier = modifier
                 .heightIn(max = 400.dp)
                 .widthIn(max = 350.dp)
+                .desktopDirectionalFocusNavigation()
                 .then(if (isAmoled) Modifier.border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(4.dp)) else Modifier),
             offset = offset,
             content = content,
         )
     }
+}
+
+/**
+ * Dropdown menu item with visible focus highlight and Focus HUD registration.
+ */
+@Composable
+fun DesktopDropdownMenuItem(
+    text: @Composable () -> Unit,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    leadingIcon: @Composable (() -> Unit)? = null,
+    trailingIcon: @Composable (() -> Unit)? = null,
+    enabled: Boolean = true,
+    interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },
+) {
+    val isFocused by interactionSource.collectIsFocusedAsState()
+    val isHovered by interactionSource.collectIsHoveredAsState()
+    val itemShape = RoundedCornerShape(6.dp)
+    DropdownMenuItem(
+        text = text,
+        onClick = onClick,
+        modifier = modifier
+            .padding(horizontal = 4.dp, vertical = 1.dp)
+            .clip(itemShape)
+            .background(
+                if (isFocused || isHovered) MaterialTheme.colorScheme.primary.copy(alpha = 0.14f) else Color.Transparent,
+            )
+            .desktopInteractiveFocus(interactionSource = interactionSource, shape = itemShape, enabled = enabled),
+        leadingIcon = leadingIcon,
+        trailingIcon = trailingIcon,
+        enabled = enabled,
+        interactionSource = interactionSource,
+    )
 }
 
 object DesktopUi {
@@ -352,6 +403,7 @@ fun CategoryRowViewAllButton(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun CategoryRowWithHeader(
     title: String,
@@ -372,6 +424,27 @@ fun CategoryRowWithHeader(
     val scope = rememberCoroutineScope()
     val canScrollBack by remember { derivedStateOf { listState.canScrollBackward } }
     val canScrollForward by remember { derivedStateOf { listState.canScrollForward } }
+    val headerGroupRequester = remember { FocusRequester() }
+    val cardsRowRequester = remember { FocusRequester() }
+
+    val horizontalBringIntoViewSpec = remember {
+        object : BringIntoViewSpec {
+            override fun calculateScrollDistance(
+                offset: Float,
+                size: Float,
+                containerSize: Float,
+            ): Float {
+                val trailingEdge = offset + size
+                if (offset >= 0f && trailingEdge <= containerSize) return 0f
+                val margin = (containerSize * 0.06f).coerceAtMost(72f)
+                return if (offset < 0f) {
+                    offset - margin
+                } else {
+                    (trailingEdge - containerSize) + margin
+                }
+            }
+        }
+    }
 
     BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
         val isCompact = maxWidth < 600.dp
@@ -396,7 +469,34 @@ fun CategoryRowWithHeader(
 
                 Spacer(modifier = Modifier.width(if (isCompact) 8.dp else 16.dp))
 
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                CompositionLocalProvider(LocalIsCategoryRowHeader provides true) {
+                Row(
+                    modifier = Modifier
+                        .focusRequester(headerGroupRequester)
+                        .focusProperties {
+                            down = cardsRowRequester
+                            onEnter = {
+                                if (requestedFocusDirection == FocusDirection.Down) {
+                                    val redirected = runCatching { cardsRowRequester.requestFocus() }.getOrDefault(false)
+                                    if (!redirected) {
+                                        cancelFocusChange()
+                                    }
+                                }
+                            }
+                        }
+                        .onPreviewKeyEvent { event ->
+                            if (event.type == KeyEventType.KeyDown &&
+                                event.key == Key.DirectionDown &&
+                                !event.isCtrlPressed && !event.isAltPressed && !event.isShiftPressed
+                            ) {
+                                runCatching { cardsRowRequester.requestFocus() }.getOrDefault(false)
+                            } else {
+                                false
+                            }
+                        }
+                        .focusGroup(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     if (trailingHeaderExtra != null) {
                         trailingHeaderExtra()
                         Spacer(modifier = Modifier.width(8.dp))
@@ -437,18 +537,26 @@ fun CategoryRowWithHeader(
                         )
                     }
                 }
+                }
             }
 
-            LazyRow(
-                state = listState,
-                // fillMaxWidth() so the list extends edge-to-edge; contentPadding indents items
-                // to align with the header. clipToBounds=false lets the last card peek fully
-                // without being hard-cut by the container boundary.
-                modifier = Modifier.fillMaxWidth().desktopDragScroll(listState),
-                contentPadding = rowContentPadding,
-                horizontalArrangement = Arrangement.spacedBy(itemSpacing),
-                content = content,
-            )
+            CompositionLocalProvider(LocalBringIntoViewSpec provides horizontalBringIntoViewSpec) {
+                LazyRow(
+                    state = listState,
+                    // fillMaxWidth() so the list extends edge-to-edge; contentPadding indents items
+                    // to align with the header. clipToBounds=false lets the last card peek fully
+                    // without being hard-cut by the container boundary.
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .focusRequester(cardsRowRequester)
+                        .focusRestorer()
+                        .focusGroup()
+                        .desktopDragScroll(listState),
+                    contentPadding = rowContentPadding,
+                    horizontalArrangement = Arrangement.spacedBy(itemSpacing),
+                    content = content,
+                )
+            }
         }
     }
 }
@@ -504,7 +612,11 @@ fun ScrollChevron(
         interactionSource = interactionSource,
         modifier = modifier
             .size(34.dp)
-            .desktopInteractiveFocus(interactionSource = interactionSource, shape = chevronShape, enabled = enabled)
+            .desktopInteractiveFocus(
+                interactionSource = interactionSource,
+                shape = chevronShape,
+                enabled = enabled,
+            )
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale
@@ -560,10 +672,11 @@ fun PosterTitleLabel(
 fun Modifier.posterHoverEffect(
     shape: androidx.compose.ui.graphics.Shape = RoundedCornerShape(12.dp),
     isFocused: Boolean = false,
+    hoverEnabled: Boolean = true,
 ): Modifier {
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
-    val isActive = hovered || isFocused
+    val isActive = (hoverEnabled && hovered) || isFocused
     val scale by animateFloatAsState(
         targetValue = if (isActive) 1.05f else 1f,
         animationSpec = tween(180),

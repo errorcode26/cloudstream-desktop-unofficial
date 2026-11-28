@@ -376,7 +376,7 @@ fun main(args: Array<String> = emptyArray()) {
                                 com.lagradost.cloudstream3.desktop.ui.dialogs.EmbeddedVerificationHost()
                                 com.lagradost.cloudstream3.desktop.ui.screens.ShadowUiHost()
                                 com.lagradost.cloudstream3.desktop.ui.components.WebView2SetupDialog()
-
+                                com.lagradost.cloudstream3.desktop.ui.screens.dev.VisualFocusOverlayHud(modifier = Modifier.fillMaxSize())
 
                                 // In-app Docked Dev Studio Overlay
                                 if (isDevOpen && !isDevDetached) {

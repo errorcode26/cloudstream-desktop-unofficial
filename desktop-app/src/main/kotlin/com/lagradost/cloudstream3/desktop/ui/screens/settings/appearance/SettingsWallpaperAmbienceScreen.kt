@@ -18,6 +18,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.request.crossfade
 import com.lagradost.cloudstream3.desktop.ui.components.DesktopButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopMaterialFilterChip
 import com.lagradost.cloudstream3.desktop.ui.components.DesktopOutlinedButton
 import com.lagradost.cloudstream3.desktop.ui.screens.settings.SettingsGroupCard
 import com.lagradost.cloudstream3.desktop.ui.screens.settings.SettingsSliderItem
@@ -116,7 +117,7 @@ fun SettingsWallpaperAmbienceScreen() {
                     ) {
                         positions.forEach { posKey ->
                             val isSelected = ambientGlowPositions.contains(posKey)
-                            FilterChip(
+                            DesktopMaterialFilterChip(
                                 selected = isSelected,
                                 onClick = { AppearanceConfig.toggleAmbientGlowPosition(posKey) },
                                 label = { Text(posKey, style = MaterialTheme.typography.labelSmall) },

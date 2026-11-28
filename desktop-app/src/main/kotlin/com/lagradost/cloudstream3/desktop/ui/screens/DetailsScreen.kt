@@ -53,6 +53,7 @@ import com.lagradost.cloudstream3.desktop.ui.components.DesktopThemeColors.*
 import com.lagradost.cloudstream3.desktop.ui.components.FocusLayerBoundary
 import com.lagradost.cloudstream3.desktop.ui.components.LocalDesktopTheme
 import com.lagradost.cloudstream3.desktop.ui.components.WindowControlsPill
+import com.lagradost.cloudstream3.desktop.ui.components.desktopLazyColumnBoundaryScroll
 import com.lagradost.cloudstream3.desktop.ui.components.handleEscapeKey
 import com.lagradost.cloudstream3.desktop.ui.navigation.Config
 import com.lagradost.cloudstream3.desktop.ui.screens.details.*
@@ -199,6 +200,8 @@ fun ComposeDetailsScreen(
 
         val hazeState = remember { HazeState() }
         val isAmoled = LocalDesktopTheme.current.isAmoled
+        val topActionsRequester = remember { FocusRequester() }
+        val detailsContentRequester = remember { FocusRequester() }
 
         BoxWithConstraints(
             modifier = Modifier
@@ -296,6 +299,8 @@ fun ComposeDetailsScreen(
                                 showHistory = showHistory,
                                 activeBgUrl = activeBgUrl,
                                 onEvent = viewModel::onEvent,
+                                topActionsRequester = topActionsRequester,
+                                detailsContentRequester = detailsContentRequester,
                             )
                         }
                     },
@@ -379,6 +384,8 @@ fun ComposeDetailsScreen(
                         uiState.activeTrailer == null &&
                         uiState.pendingExternalUrl == null,
                     restoreFocus = false,
+                    focusRequester = topActionsRequester,
+                    down = detailsContentRequester,
                     modifier = Modifier
                         .align(Alignment.TopCenter)
                         .fillMaxWidth()
@@ -427,6 +434,8 @@ fun DetailsContent(
     showHistory: Map<String, com.lagradost.common.storage.WatchHistory> = emptyMap(),
     activeBgUrl: String? = null,
     onEvent: (DetailsUiEvent) -> Unit = {},
+    topActionsRequester: FocusRequester = remember { FocusRequester() },
+    detailsContentRequester: FocusRequester = remember { FocusRequester() },
 ) {
     val scrollState = androidx.compose.foundation.lazy.rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
@@ -497,9 +506,15 @@ fun DetailsContent(
             Modifier
         }
 
+        val playFocusRequester = remember { FocusRequester() }
+
         FocusLayerBoundary(
             active = mainLayerActive,
             restoreFocus = true,
+            focusRequester = detailsContentRequester,
+            initialFocusRequester = playFocusRequester,
+            requestFocusWhenActive = mainLayerActive,
+            up = topActionsRequester,
             modifier = Modifier.fillMaxSize(),
         ) {
         DetailsBackdrop(
@@ -518,6 +533,7 @@ fun DetailsContent(
         val heroAction: @Composable (Modifier) -> Unit = { modifier ->
             com.lagradost.cloudstream3.desktop.ui.screens.details.DetailsPlayButton(
                 modifier = modifier,
+                buttonModifier = Modifier.focusRequester(playFocusRequester),
                 data = data,
                 provider = provider,
                 latestHistory = latestHistory,
@@ -543,6 +559,10 @@ fun DetailsContent(
             state = scrollState,
             modifier = Modifier
                 .fillMaxSize()
+                .desktopLazyColumnBoundaryScroll(
+                    listState = scrollState,
+                    topItemFocusRequester = playFocusRequester,
+                )
                 .then(if (isLinksPanelOpen) Modifier.blur(45.dp).graphicsLayer { alpha = 0.20f } else Modifier),
             contentPadding = PaddingValues(
                 bottom = 32.dp,

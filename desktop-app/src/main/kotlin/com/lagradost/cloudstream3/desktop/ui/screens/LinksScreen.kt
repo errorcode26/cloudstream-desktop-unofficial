@@ -41,6 +41,7 @@ import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
@@ -70,6 +71,7 @@ import com.lagradost.cloudstream3.desktop.ui.components.AppToastManager
 import com.lagradost.cloudstream3.desktop.ui.components.DesktopBackButton
 import com.lagradost.cloudstream3.desktop.ui.components.LocalDesktopTheme
 import com.lagradost.cloudstream3.desktop.ui.components.WindowControlsPill
+import com.lagradost.cloudstream3.desktop.ui.components.desktopFocusZone
 import com.lagradost.cloudstream3.desktop.ui.components.handleEscapeKey
 import com.lagradost.cloudstream3.desktop.ui.screens.details.FloatingEpisodeCard
 import com.lagradost.cloudstream3.desktop.ui.screens.details.matchesHistory
@@ -722,10 +724,22 @@ fun ComposeLinksScreen(
             )
         }
 
+        val topActionsRequester = remember { FocusRequester() }
+        val bodyRequester = remember { FocusRequester() }
+
         Box(modifier = Modifier.fillMaxSize()) {
             val panelWidth = if (rootMaxWidth >= 1000.dp) rootMaxWidth * 0.50f else (rootMaxWidth * 0.60f).coerceIn(480.dp, rootMaxWidth * 0.85f)
             val leftZoneWidth = rootMaxWidth - panelWidth
 
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .desktopFocusZone(
+                        zoneRequester = bodyRequester,
+                        restoreFocus = true,
+                        up = topActionsRequester,
+                    ),
+            ) {
             if (leftZoneWidth >= 360.dp && loadResponse != null) {
                 Box(
                     modifier = Modifier
@@ -792,13 +806,19 @@ fun ComposeLinksScreen(
                     onClose = onBack,
                 )
             }
+            }
 
             Row(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .fillMaxWidth()
                     .padding(start = 16.dp, end = 16.dp, top = 7.dp)
-                    .zIndex(100f),
+                    .zIndex(100f)
+                    .desktopFocusZone(
+                        zoneRequester = topActionsRequester,
+                        restoreFocus = false,
+                        down = bodyRequester,
+                    ),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {

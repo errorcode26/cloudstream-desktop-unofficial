@@ -29,6 +29,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.lagradost.cloudstream3.desktop.ui.screens.details.contract.DetailsSectionKey
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopSwitch
 import com.lagradost.cloudstream3.desktop.ui.components.DesktopTextButton
 import com.lagradost.cloudstream3.desktop.ui.screens.settings.SettingsGroupCard
 import com.lagradost.cloudstream3.desktop.ui.theme.AppearanceConfig
@@ -220,7 +221,7 @@ fun SettingsDetailsSectionsScreen() {
 
                             Spacer(modifier = Modifier.width(8.dp))
 
-                            Switch(
+                            DesktopSwitch(
                                 checked = isEnabled,
                                 onCheckedChange = { AppearanceConfig.toggleDetailsSection(sectionKey, it) },
                                 colors = SwitchDefaults.colors(

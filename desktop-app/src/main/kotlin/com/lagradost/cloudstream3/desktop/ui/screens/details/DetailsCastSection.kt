@@ -34,6 +34,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
+import com.lagradost.cloudstream3.desktop.ui.components.AppDropdownMenu
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopDropdownMenuItem
 import com.lagradost.cloudstream3.desktop.ui.components.desktopFocusRing
 import com.lagradost.cloudstream3.desktop.ui.components.desktopInteractiveFocus
 import coil3.request.crossfade
@@ -170,12 +172,15 @@ fun DetailsCastSection(
                         if (availableSeasons.size > 1 && onSeasonChange != null) {
                             var seasonMenuExpanded by remember { mutableStateOf(false) }
                             val seasonChipShape = LocalDesktopButtonShapes.current.compact
+                            val seasonInteraction = remember { MutableInteractionSource() }
                             Box {
                                 Surface(
                                     onClick = { seasonMenuExpanded = true },
                                     shape = seasonChipShape,
                                     color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
                                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                                    interactionSource = seasonInteraction,
+                                    modifier = Modifier.desktopInteractiveFocus(interactionSource = seasonInteraction, shape = seasonChipShape),
                                 ) {
                                     Row(
                                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
@@ -195,11 +200,11 @@ fun DetailsCastSection(
                                         )
                                     }
                                 }
-                                DropdownMenu(
+                                AppDropdownMenu(
                                     expanded = seasonMenuExpanded,
                                     onDismissRequest = { seasonMenuExpanded = false },
                                 ) {
-                                    DropdownMenuItem(
+                                    DesktopDropdownMenuItem(
                                         text = { Text("All Seasons (Series Cast)") },
                                         onClick = {
                                             seasonMenuExpanded = false
@@ -207,7 +212,7 @@ fun DetailsCastSection(
                                         },
                                     )
                                     availableSeasons.forEach { s ->
-                                        DropdownMenuItem(
+                                        DesktopDropdownMenuItem(
                                             text = { Text(if (s == 0) "Specials" else "Season $s") },
                                             onClick = {
                                                 seasonMenuExpanded = false
@@ -535,6 +540,7 @@ private fun ActorCard(
             // Bottom-right Dual Cast (Voice Actor) mini avatar badge
             val voiceActorImg = cornerImgRaw?.let { provider.fixUrlNull(it) }
             if (voiceActorImg != null) {
+                val avatarInteraction = remember { MutableInteractionSource() }
                 Box(
                     modifier = Modifier
                         .size(if (profileShapes.isCircular) 40.dp else 44.dp)
@@ -548,7 +554,9 @@ private fun ActorCard(
                         .padding(2.5.dp)
                         .clip(profileShapes.badge)
                         .background(MaterialTheme.colorScheme.surfaceVariant)
-                        .clickable { onInvertToggle() },
+                        .hoverable(avatarInteraction)
+                        .desktopInteractiveFocus(interactionSource = avatarInteraction, shape = profileShapes.badge)
+                        .clickable(interactionSource = avatarInteraction, indication = null) { onInvertToggle() },
                 ) {
                     AsyncImage(
                         model = coil3.request.ImageRequest.Builder(coil3.compose.LocalPlatformContext.current)

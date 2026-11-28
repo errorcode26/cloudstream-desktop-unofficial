@@ -9,8 +9,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.unit.dp
 import com.lagradost.cloudstream3.desktop.ui.DesktopDimens
 
@@ -59,6 +61,9 @@ fun DesktopDrilldownScaffold(
     dialogs: @Composable BoxScope.() -> Unit = {},
     content: @Composable BoxScope.() -> Unit,
 ) {
+    val topActionsRequester = remember { FocusRequester() }
+    val bodyRequester = remember { FocusRequester() }
+
     val rootModifier = modifier
         .fillMaxSize()
         .handleEscapeKey(enabled = enableEscapeBack, onEscape = onBack)
@@ -69,14 +74,25 @@ fun DesktopDrilldownScaffold(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(contentPadding),
+                .padding(contentPadding)
+                .desktopFocusZone(
+                    zoneRequester = bodyRequester,
+                    restoreFocus = true,
+                    up = topActionsRequester,
+                ),
             content = content,
         )
 
         DesktopFloatingTopActions(
             onBack = onBack,
             showWindowControls = showWindowControls,
-            modifier = Modifier.align(Alignment.TopCenter),
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .desktopFocusZone(
+                    zoneRequester = topActionsRequester,
+                    restoreFocus = false,
+                    down = bodyRequester,
+                ),
         )
 
         dialogs()

@@ -40,6 +40,7 @@ import com.lagradost.cloudstream3.desktop.downloader.DownloadStatus
 import com.lagradost.cloudstream3.desktop.downloader.DownloadTask
 import com.lagradost.cloudstream3.desktop.ui.components.CloudstreamAlertDialog
 import com.lagradost.cloudstream3.desktop.ui.components.desktopFocusableCard
+import com.lagradost.cloudstream3.desktop.ui.components.desktopTextInputFocus
 import com.lagradost.cloudstream3.desktop.ui.screens.downloads.contract.*
 import com.lagradost.cloudstream3.desktop.ui.screens.downloads.dialogs.DownloadSettingsDialog
 import kotlinx.coroutines.Dispatchers
@@ -159,7 +160,20 @@ fun DownloadsScreen(
                         focusedBorderColor = MaterialTheme.colorScheme.primary,
                         unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
                     ),
-                    modifier = Modifier.width(240.dp).height(48.dp),
+                    modifier = Modifier
+                        .width(240.dp)
+                        .height(48.dp)
+                        .desktopTextInputFocus(
+                            shape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.medium,
+                            singleLine = true,
+                        ) {
+                            if (uiState.searchQuery.isNotEmpty()) {
+                                viewModel.onEvent(DownloadsUiEvent.UpdateSearchQuery(""))
+                                true
+                            } else {
+                                false
+                            }
+                        },
                 )
 
                 com.lagradost.cloudstream3.desktop.ui.components.DesktopFilledTonalButton(
@@ -227,7 +241,7 @@ fun DownloadsScreen(
                     val selected = uiState.activeTab == tab
                     val badgeCount = if (tab == DownloadsTab.ACTIVE_QUEUE) uiState.activeTasks.size else null
 
-                    FilterChip(
+                    com.lagradost.cloudstream3.desktop.ui.components.DesktopMaterialFilterChip(
                         selected = selected,
                         onClick = { viewModel.onEvent(DownloadsUiEvent.SelectTab(tab)) },
                         label = {

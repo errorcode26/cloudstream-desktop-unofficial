@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lagradost.cloudstream3.LoadResponse
 import com.lagradost.cloudstream3.MainAPI
+import com.lagradost.cloudstream3.desktop.ui.components.LocalFocusLayerActive
 import com.lagradost.cloudstream3.desktop.ui.components.desktopInteractiveFocus
 import com.lagradost.cloudstream3.desktop.ui.components.getTextShadow
 import com.lagradost.cloudstream3.desktop.ui.screens.details.contract.DetailsUiState
@@ -117,6 +118,9 @@ fun DetailsSidebarStats(
     onTogglePin: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val parentLayerActive = LocalFocusLayerActive.current
+    val sidebarFocusActive = parentLayerActive && (isRightColumnPinned || isRightColumnHovered)
+    CompositionLocalProvider(LocalFocusLayerActive provides sidebarFocusActive) {
     Column(
         modifier = modifier
             .then(if (isNarrow) Modifier.fillMaxWidth() else Modifier.widthIn(max = 420.dp))
@@ -154,6 +158,7 @@ fun DetailsSidebarStats(
                 horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.End),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                CompositionLocalProvider(LocalFocusLayerActive provides (sidebarFocusActive && isRightColumnHovered)) {
                 if (screenshots.isNotEmpty()) {
                     com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton(
                         onClick = {
@@ -182,6 +187,7 @@ fun DetailsSidebarStats(
                         tint = if (isRightColumnPinned) Color.White else Color.White.copy(alpha = 0.4f),
                         modifier = Modifier.size(20.dp),
                     )
+                }
                 }
             }
         }
@@ -218,5 +224,6 @@ fun DetailsSidebarStats(
                 )
             }
         }
+    }
     }
 }

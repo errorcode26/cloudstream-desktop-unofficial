@@ -141,7 +141,7 @@ fun HomeManagementDialog(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text("Enable Multi-Provider Feed", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Switch(
+                        com.lagradost.cloudstream3.desktop.ui.components.DesktopSwitch(
                             checked = isAdvancedMode,
                             onCheckedChange = { enabled ->
                                 isAdvancedMode = enabled

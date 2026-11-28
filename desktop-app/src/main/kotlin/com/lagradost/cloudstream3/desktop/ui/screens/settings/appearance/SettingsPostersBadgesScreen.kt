@@ -15,6 +15,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.lagradost.cloudstream3.desktop.ui.badges.CardMetadataConfig
 import com.lagradost.cloudstream3.desktop.ui.components.DesktopFilledTonalButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopSwitch
 import com.lagradost.cloudstream3.desktop.ui.screens.settings.SettingsDropdownItem
 import com.lagradost.cloudstream3.desktop.ui.screens.settings.SettingsGroupCard
 import com.lagradost.cloudstream3.desktop.ui.screens.settings.SettingsSliderItem
@@ -122,7 +123,7 @@ fun SettingsPostersBadgesScreen(onNavigateToSubScreen: (SettingsSubScreen) -> Un
                     )
                 }
                 Spacer(Modifier.width(16.dp))
-                Switch(
+                DesktopSwitch(
                     checked = cleanModeEnabled,
                     onCheckedChange = { AppearanceConfig.setCleanModeEnabled(it) },
                 )

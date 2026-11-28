@@ -31,7 +31,9 @@ import com.lagradost.cloudstream3.desktop.ui.components.CloudstreamCustomDialog
 import com.lagradost.cloudstream3.desktop.ui.components.DesktopButton
 import com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton
 import com.lagradost.cloudstream3.desktop.ui.components.DesktopOutlinedButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopSwitch
 import com.lagradost.cloudstream3.desktop.ui.components.DesktopTextButton
+import com.lagradost.cloudstream3.desktop.ui.components.desktopTextInputFocus
 import com.lagradost.cloudstream3.desktop.ui.dialogs.TorboxAuthDialog
 import com.lagradost.cloudstream3.desktop.ui.navigation.Config
 import com.lagradost.cloudstream3.desktop.ui.screens.settings.contract.SettingsUiEvent
@@ -342,7 +344,7 @@ fun SettingsAccounts(
                                         style = MaterialTheme.typography.labelMedium,
                                         color = if (autoSyncOn) Color(0xFF4ADE80) else MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
-                                    Switch(
+                                    DesktopSwitch(
                                         checked = autoSyncOn,
                                         onCheckedChange = { enabled ->
                                             scope.launch(Dispatchers.IO) {
@@ -608,7 +610,9 @@ fun SettingsAccounts(
                                 value = torboxKeyInput,
                                 onValueChange = { torboxKeyInput = it },
                                 label = { Text("Torbox API Key / Token") },
-                                modifier = Modifier.weight(1f),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .desktopTextInputFocus(shape = RoundedCornerShape(8.dp), singleLine = true),
                                 singleLine = true,
                                 visualTransformation = if (showTorboxPassword) VisualTransformation.None else PasswordVisualTransformation(),
                                 trailingIcon = {
@@ -740,7 +744,9 @@ fun InAppLoginDialog(api: AuthAPI, onDismiss: () -> Unit, onSuccess: (AuthData) 
                     value = username,
                     onValueChange = { username = it },
                     label = { Text("Username") },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .desktopTextInputFocus(shape = RoundedCornerShape(8.dp), singleLine = true),
                     singleLine = true,
                 )
                 Spacer(modifier = Modifier.height(16.dp))
@@ -751,7 +757,9 @@ fun InAppLoginDialog(api: AuthAPI, onDismiss: () -> Unit, onSuccess: (AuthData) 
                     value = email,
                     onValueChange = { email = it },
                     label = { Text("Email") },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .desktopTextInputFocus(shape = RoundedCornerShape(8.dp), singleLine = true),
                     singleLine = true,
                 )
                 Spacer(modifier = Modifier.height(16.dp))
@@ -763,7 +771,9 @@ fun InAppLoginDialog(api: AuthAPI, onDismiss: () -> Unit, onSuccess: (AuthData) 
                     onValueChange = { password = it },
                     label = { Text("Password") },
                     visualTransformation = PasswordVisualTransformation(),
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .desktopTextInputFocus(shape = RoundedCornerShape(8.dp), singleLine = true),
                     singleLine = true,
                 )
                 Spacer(modifier = Modifier.height(16.dp))
@@ -774,7 +784,9 @@ fun InAppLoginDialog(api: AuthAPI, onDismiss: () -> Unit, onSuccess: (AuthData) 
                     value = server,
                     onValueChange = { server = it },
                     label = { Text("Server") },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .desktopTextInputFocus(shape = RoundedCornerShape(8.dp), singleLine = true),
                     singleLine = true,
                 )
                 Spacer(modifier = Modifier.height(16.dp))
@@ -789,7 +801,9 @@ fun InAppLoginDialog(api: AuthAPI, onDismiss: () -> Unit, onSuccess: (AuthData) 
 
                     },
                     label = { Text("API Key") },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .desktopTextInputFocus(shape = RoundedCornerShape(8.dp), singleLine = true),
                     singleLine = true,
                     visualTransformation = PasswordVisualTransformation(),
                 )

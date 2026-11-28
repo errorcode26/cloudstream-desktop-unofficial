@@ -24,10 +24,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.input.InputMode
 import androidx.compose.ui.input.pointer.PointerButton
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -38,6 +42,7 @@ import com.arkivanov.decompose.extensions.compose.stack.animation.plus
 import com.arkivanov.decompose.extensions.compose.stack.animation.stackAnimation
 import com.arkivanov.decompose.extensions.compose.subscribeAsState
 import com.lagradost.cloudstream3.desktop.ui.components.FocusLayerBoundary
+import com.lagradost.cloudstream3.desktop.ui.components.RootFocusCoordinator
 import com.lagradost.cloudstream3.desktop.ui.components.desktopDirectionalFocusNavigation
 import com.lagradost.cloudstream3.desktop.ui.components.handleBubbledEscapeKey
 import com.lagradost.cloudstream3.desktop.ui.navigation.RootComponent
@@ -251,15 +256,72 @@ fun CloudstreamApp(rootComponent: RootComponent) {
 
                         val rootLayerActive = !com.lagradost.cloudstream3.desktop.ui.components.GlobalDialogState.isAnyDialogOpen &&
                             !com.lagradost.cloudstream3.desktop.ui.components.GlobalContextMenuState.isActive
-                        val activeInstanceSnapshot = childStack.active.instance
                         val isVideoPlayerOpen = currentVideo != null
                         val rootBackEnabled = !isVideoPlayerOpen && rootLayerActive &&
                             (showProfileManagerModal || childStack.backStack.isNotEmpty())
+                        val rootLayerRequester = remember { FocusRequester() }
+                        val inputModeManager = LocalInputModeManager.current
+
+                        val recoverRootFocus = remember(rootLayerRequester, inputModeManager) {
+                            {
+                                val canRecover = !com.lagradost.cloudstream3.desktop.ui.components.GlobalDialogState.isAnyDialogOpen &&
+                                    !com.lagradost.cloudstream3.desktop.ui.components.GlobalContextMenuState.isActive &&
+                                    currentVideo == null
+                                if (!canRecover) {
+                                    false
+                                } else {
+                                    runCatching { inputModeManager.requestInputMode(InputMode.Keyboard) }
+                                    runCatching { rootLayerRequester.requestFocus() }.getOrDefault(false)
+                                }
+                            }
+                        }
+                        val fallbackEscape = remember {
+                            {
+                                val canHandle = !com.lagradost.cloudstream3.desktop.ui.components.GlobalDialogState.isAnyDialogOpen &&
+                                    !com.lagradost.cloudstream3.desktop.ui.components.GlobalContextMenuState.isActive &&
+                                    currentVideo == null
+                                if (!canHandle) {
+                                    false
+                                } else if (showProfileManagerModal) {
+                                    showProfileManagerModal = false
+                                    true
+                                } else if (com.lagradost.cloudstream3.desktop.ui.screens.settings.SettingsSession.activeSubScreen != null) {
+                                    com.lagradost.cloudstream3.desktop.ui.screens.settings.SettingsSession.activeSubScreen = null
+                                    true
+                                } else {
+                                    val activeChild = childStack.active.instance
+                                    if (activeChild is RootComponent.Child.Explore &&
+                                        activeChild.component.viewModel.uiState.value.drilledCatalog != null
+                                    ) {
+                                        activeChild.component.viewModel.onEvent(
+                                            com.lagradost.cloudstream3.desktop.explore.viewmodel.ExploreUiEvent.ReturnToShelves,
+                                        )
+                                        true
+                                    } else if (childStack.backStack.isNotEmpty()) {
+                                        rootComponent.pop()
+                                        true
+                                    } else {
+                                        false
+                                    }
+                                }
+                            }
+                        }
+
+                        DisposableEffect(recoverRootFocus, fallbackEscape) {
+                            RootFocusCoordinator.register(recoverRootFocus, fallbackEscape)
+                            onDispose {
+                                RootFocusCoordinator.clear(recoverRootFocus, fallbackEscape)
+                            }
+                        }
 
                         FocusLayerBoundary(
                             active = rootLayerActive,
                             restoreFocus = true,
+                            focusRequester = rootLayerRequester,
                             modifier = rootContentModifier
+                                .onFocusChanged { focusState ->
+                                    RootFocusCoordinator.notifyRootFocus(focusState.hasFocus)
+                                }
                                 .desktopDirectionalFocusNavigation(
                                     enabled = !isVideoPlayerOpen && rootLayerActive,
                                 )
@@ -436,15 +498,22 @@ fun CloudstreamApp(rootComponent: RootComponent) {
                                         onOpenProfileManager = { showProfileManagerModal = true },
                                     ) {
                                         if (isShowingProfileSelector) {
-                                            com.lagradost.cloudstream3.desktop.ui.screens.profile.ProfileSelectScreen(
-                                                onNavigateHome = {
-                                                    showStartupProfileSelect = false
-                                                    showProfileManagerModal = false
-                                                    com.lagradost.cloudstream3.desktop.profile.ProfileManager.triggerWelcomeToast(
-                                                        com.lagradost.cloudstream3.desktop.profile.ProfileManager.activeProfile.value,
-                                                    )
-                                                },
-                                            )
+                                            FocusLayerBoundary(
+                                                active = rootLayerActive && !isVideoPlayerOpen,
+                                                restoreFocus = true,
+                                                requestFocusWhenActive = rootLayerActive && !isVideoPlayerOpen,
+                                                modifier = androidx.compose.ui.Modifier.fillMaxSize(),
+                                            ) {
+                                                com.lagradost.cloudstream3.desktop.ui.screens.profile.ProfileSelectScreen(
+                                                    onNavigateHome = {
+                                                        showStartupProfileSelect = false
+                                                        showProfileManagerModal = false
+                                                        com.lagradost.cloudstream3.desktop.profile.ProfileManager.triggerWelcomeToast(
+                                                            com.lagradost.cloudstream3.desktop.profile.ProfileManager.activeProfile.value,
+                                                        )
+                                                    },
+                                                )
+                                            }
                                         } else {
                                             Children(
                                                 stack = childStack,
@@ -453,9 +522,11 @@ fun CloudstreamApp(rootComponent: RootComponent) {
                                                     fade(tween(160, easing = FastOutSlowInEasing)),
                                                 ),
                                             ) {
+                                                val isChildActive = (it.instance == activeInstance) && rootLayerActive && !isVideoPlayerOpen
                                                 FocusLayerBoundary(
-                                                    active = (it.instance == activeInstance),
-                                                    restoreFocus = false,
+                                                    active = isChildActive,
+                                                    restoreFocus = true,
+                                                    requestFocusWhenActive = isChildActive,
                                                     modifier = androidx.compose.ui.Modifier.fillMaxSize(),
                                                 ) {
                                                 when (val child = it.instance) {

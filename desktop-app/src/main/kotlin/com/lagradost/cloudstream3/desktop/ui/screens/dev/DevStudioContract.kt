@@ -15,6 +15,7 @@ enum class DevStudioTab(val title: String) {
     NETWORK("Network Inspector"),
     PLAYER("Player & Stream"),
     PROVIDERS("Circuits & Health"),
+    FOCUS_HUD("Focus HUD"),
 }
 
 data class DevStudioUiState(
@@ -99,6 +100,9 @@ sealed interface DevStudioUiEvent : UiEvent {
     // Circuit Breaker Events
     data class ResetCircuit(val providerName: String) : DevStudioUiEvent
     data object ResetAllCircuits : DevStudioUiEvent
+
+    // Visual Focus HUD Events
+    data class ShowHudToast(val message: String) : DevStudioUiEvent
 }
 
 sealed interface DevStudioUiEffect : UiEffect {

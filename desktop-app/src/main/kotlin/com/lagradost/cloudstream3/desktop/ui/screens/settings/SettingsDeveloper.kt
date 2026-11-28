@@ -1,5 +1,6 @@
 package com.lagradost.cloudstream3.desktop.ui.screens.settings
 
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -14,6 +15,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.lagradost.cloudstream3.desktop.ui.components.DesktopTextButton
+import com.lagradost.cloudstream3.desktop.ui.components.desktopInteractiveFocus
 import com.lagradost.cloudstream3.desktop.ui.screens.dev.DevStudioState
 
 @Composable
@@ -86,12 +88,16 @@ fun SettingsDeveloper(
             ) {
                 tabs.forEachIndexed { index, tab ->
                     val isSelected = selectedTabIndex == index
+                    val tabInteraction = remember { MutableInteractionSource() }
+                    val tabShape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.medium
                     Surface(
                         modifier = Modifier
                             .weight(1f)
-                            .padding(horizontal = 4.dp),
+                            .padding(horizontal = 4.dp)
+                            .desktopInteractiveFocus(interactionSource = tabInteraction, shape = tabShape),
                         onClick = { selectedTabIndex = index },
-                        shape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.medium,
+                        shape = tabShape,
+                        interactionSource = tabInteraction,
                         color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
                         contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
                     ) {

@@ -43,6 +43,7 @@ fun rememberFullscreenHelper(): FullscreenHelperState {
     // Snapshot the drawable content area before hiding the title bar.
     var savedContentPxBeforeFullscreen = remember<Pair<Int, Int>?> { null }
     var lastToggleTime = remember { 0L }
+    var fullscreenEscapeConsumed = remember { false }
 
     val toggleFunc = remember(controller) {
         {
@@ -81,16 +82,76 @@ fun rememberFullscreenHelper(): FullscreenHelperState {
             } else if (keyEvent.key == Key.F11 && keyEvent.type == KeyEventType.KeyDown) {
                 toggleFunc()
                 true
-            } else if (keyEvent.key == Key.F12 && keyEvent.type == KeyEventType.KeyDown) {
-                com.lagradost.cloudstream3.desktop.ui.screens.dev.DevStudioState.toggle()
-                true
-            } else if (keyEvent.key == Key.Escape && keyEvent.type == KeyEventType.KeyDown) {
-                if (controller.isFullscreen) {
-                    toggleFunc()
+            } else if (keyEvent.key == Key.F9 && keyEvent.type == KeyEventType.KeyDown) {
+                if (keyEvent.isCtrlPressed && keyEvent.isShiftPressed && !keyEvent.isAltPressed) {
+                    com.lagradost.cloudstream3.desktop.ui.screens.dev.VisualFocusInspectorRegistry.copySnapshotToClipboard(showToast = true)
+                    true
+                } else if (keyEvent.isShiftPressed && !keyEvent.isCtrlPressed && !keyEvent.isAltPressed) {
+                    val nextMode = com.lagradost.cloudstream3.desktop.ui.screens.dev.DevStudioState.cycleVisualFocusHudMode()
+                    com.lagradost.cloudstream3.desktop.ui.components.AppToastManager.showInfo("Focus HUD: ${nextMode.label}")
+                    true
+                } else if (!keyEvent.isCtrlPressed && !keyEvent.isShiftPressed && !keyEvent.isAltPressed) {
+                    val nowOn = com.lagradost.cloudstream3.desktop.ui.screens.dev.DevStudioState.toggleVisualFocusHud()
+                    com.lagradost.cloudstream3.desktop.ui.components.AppToastManager.showInfo(
+                        if (nowOn) "Visual Focus HUD ON (Shift+F9 mode • Ctrl+Shift+F9 copy)" else "Visual Focus HUD OFF",
+                    )
                     true
                 } else {
                     false
                 }
+            } else if (keyEvent.key == Key.F12 && keyEvent.type == KeyEventType.KeyDown) {
+                com.lagradost.cloudstream3.desktop.ui.screens.dev.DevStudioState.toggle()
+                true
+            } else if (keyEvent.key == Key.Escape && !keyEvent.isCtrlPressed && !keyEvent.isAltPressed && !keyEvent.isShiftPressed) {
+                when (keyEvent.type) {
+                    KeyEventType.KeyDown -> {
+                        if (controller.isFullscreen) {
+                            fullscreenEscapeConsumed = true
+                            toggleFunc()
+                            true
+                        } else {
+                            fullscreenEscapeConsumed = false
+                            false
+                        }
+                    }
+                    KeyEventType.KeyUp -> {
+                        if (fullscreenEscapeConsumed) {
+                            fullscreenEscapeConsumed = false
+                            if (com.lagradost.cloudstream3.desktop.ui.screens.dev.DevStudioState.isVisualFocusHudEnabled.value) {
+                                com.lagradost.cloudstream3.desktop.ui.screens.dev.VisualFocusInspectorRegistry.recordKeyTrace("Esc(Window)", "FULLSCREEN_EXIT")
+                            }
+                            true
+                        } else {
+                            val handled = com.lagradost.cloudstream3.desktop.ui.components.RootFocusCoordinator.triggerEscapeFallbackIfNull()
+                            if (com.lagradost.cloudstream3.desktop.ui.screens.dev.DevStudioState.isVisualFocusHudEnabled.value) {
+                                com.lagradost.cloudstream3.desktop.ui.screens.dev.VisualFocusInspectorRegistry.recordKeyTrace(
+                                    action = "Esc(Window)",
+                                    outcome = if (handled) "FALLBACK_BACK" else "IGNORED(focus=${com.lagradost.cloudstream3.desktop.ui.components.RootFocusCoordinator.isAnyNodeFocused()})",
+                                )
+                            }
+                            handled
+                        }
+                    }
+                    else -> false
+                }
+            } else if (!keyEvent.isCtrlPressed && !keyEvent.isAltPressed && keyEvent.type == KeyEventType.KeyDown &&
+                (
+                    keyEvent.key == Key.DirectionUp ||
+                        keyEvent.key == Key.DirectionDown ||
+                        keyEvent.key == Key.DirectionLeft ||
+                        keyEvent.key == Key.DirectionRight ||
+                        keyEvent.key == Key.Tab
+                    )
+            ) {
+                val recovered = com.lagradost.cloudstream3.desktop.ui.components.RootFocusCoordinator.recoverFocusIfNull()
+                if (recovered && com.lagradost.cloudstream3.desktop.ui.screens.dev.DevStudioState.isVisualFocusHudEnabled.value) {
+                    com.lagradost.cloudstream3.desktop.ui.screens.dev.VisualFocusInspectorRegistry.recordKeyTrace(
+                        action = "${keyEvent.key}(Window)",
+                        outcome = "RECOVERED(from null)",
+                        focusWasNull = true,
+                    )
+                }
+                recovered
             } else if (keyEvent.key == Key.F5 && keyEvent.type == KeyEventType.KeyDown) {
                 com.lagradost.cloudstream3.desktop.ui.GlobalRefreshHandler.triggerRefresh()
                 true

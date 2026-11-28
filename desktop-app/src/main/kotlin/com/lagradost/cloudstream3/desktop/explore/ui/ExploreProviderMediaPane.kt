@@ -446,6 +446,8 @@ private fun ExploreProviderAddonSection(
                     StremioAddonType.CATALOG -> catalogAddons.size
                     StremioAddonType.OTHER -> 0
                 }
+                val pillShape = RoundedCornerShape(6.dp)
+                val chipInteraction = remember { MutableInteractionSource() }
                 val chipBg = if (isSelected) {
                     MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
                 } else {
@@ -463,10 +465,18 @@ private fun ExploreProviderAddonSection(
                 }
 
                 Surface(
-                    shape = RoundedCornerShape(6.dp),
+                    shape = pillShape,
                     color = chipBg,
                     border = BorderStroke(0.5.dp, chipBorder),
-                    modifier = Modifier.clickable { selectedAddonType = type },
+                    modifier = Modifier
+                        .clip(pillShape)
+                        .hoverable(chipInteraction)
+                        .desktopInteractiveFocus(interactionSource = chipInteraction, shape = pillShape)
+                        .clickable(
+                            interactionSource = chipInteraction,
+                            indication = null,
+                            onClick = { selectedAddonType = type },
+                        ),
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),

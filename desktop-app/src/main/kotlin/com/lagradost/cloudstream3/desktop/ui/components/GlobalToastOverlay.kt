@@ -6,6 +6,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -187,7 +188,7 @@ private fun ToastCard(
         modifier = Modifier
             .width(360.dp)
             .shadow(elevation = 10.dp, shape = RoundedCornerShape(12.dp), spotColor = Color.Black.copy(alpha = 0.55f))
-            .clickable { onDismiss() },
+            .nonFocusableTap { onDismiss() },
         shape = RoundedCornerShape(12.dp),
         color = containerBg,
         border = BorderStroke(1.dp, visuals.borderTint),
@@ -244,14 +245,18 @@ private fun ToastCard(
 
                     if (!toast.actionLabel.isNullOrBlank() && toast.onAction != null) {
                         Spacer(modifier = Modifier.height(6.dp))
+                        val actionInteraction = remember { MutableInteractionSource() }
+                        val actionShape = RoundedCornerShape(6.dp)
                         Surface(
                             onClick = {
                                 toast.onAction.invoke()
                                 onDismiss()
                             },
-                            shape = RoundedCornerShape(6.dp),
+                            interactionSource = actionInteraction,
+                            shape = actionShape,
                             color = visuals.accentColor.copy(alpha = 0.18f),
                             border = BorderStroke(1.dp, visuals.accentColor.copy(alpha = 0.45f)),
+                            modifier = Modifier.desktopInteractiveFocus(interactionSource = actionInteraction, shape = actionShape),
                         ) {
                             Text(
                                 text = toast.actionLabel,

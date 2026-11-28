@@ -29,6 +29,7 @@ import com.lagradost.cloudstream3.desktop.ui.DesktopDimens
 import com.lagradost.cloudstream3.desktop.ui.components.AppToastManager
 import com.lagradost.cloudstream3.desktop.ui.components.CloudstreamAlertDialog
 import com.lagradost.cloudstream3.desktop.ui.components.DesktopButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopMaterialFilterChip
 import com.lagradost.cloudstream3.desktop.ui.components.DesktopOutlinedButton
 import com.lagradost.cloudstream3.desktop.ui.components.DesktopTextButton
 import com.lagradost.cloudstream3.desktop.ui.components.DesktopVerticalScrollbar
@@ -95,7 +96,7 @@ fun ComposeLibraryScreen(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                FilterChip(
+                DesktopMaterialFilterChip(
                     selected = currentSection == LibrarySection.LocalBookmarks,
                     onClick = { viewModel.onEvent(LibraryUiEvent.OnSelectSection(LibrarySection.LocalBookmarks)) },
                     shape = chipShape,
@@ -121,7 +122,7 @@ fun ComposeLibraryScreen(
                     val brandColor = Color(tracker.accentColorHex)
                     val count = uiState.trackerTotalCountByProvider[tracker.id]
                         ?: uiState.trackerEntriesByProvider[tracker.id]?.size
-                    FilterChip(
+                    DesktopMaterialFilterChip(
                         selected = selected,
                         onClick = { viewModel.onEvent(LibraryUiEvent.OnSelectSection(target)) },
                         shape = chipShape,
@@ -144,7 +145,7 @@ fun ComposeLibraryScreen(
 
                 if (uiState.isTorboxConfigured) {
                     val selected = currentSection == LibrarySection.TorboxCloud
-                    FilterChip(
+                    DesktopMaterialFilterChip(
                         selected = selected,
                         onClick = { viewModel.onEvent(LibraryUiEvent.OnSelectSection(LibrarySection.TorboxCloud)) },
                         shape = chipShape,
@@ -213,7 +214,7 @@ fun ComposeLibraryScreen(
                 ) {
                     activeTabs.forEach { tab ->
                         val count = activeCounts[tab] ?: 0
-                        FilterChip(
+                        DesktopMaterialFilterChip(
                             selected = uiState.selectedTab == tab,
                             onClick = { viewModel.onEvent(LibraryUiEvent.OnSelectTab(tab)) },
                             shape = chipShape,

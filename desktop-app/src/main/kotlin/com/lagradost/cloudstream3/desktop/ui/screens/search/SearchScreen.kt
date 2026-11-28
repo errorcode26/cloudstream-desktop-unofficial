@@ -43,6 +43,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.lagradost.cloudstream3.desktop.ui.components.desktopTextInputFocus
 import androidx.compose.ui.zIndex
 import coil3.compose.AsyncImage
 import com.lagradost.cloudstream3.TvType
@@ -143,9 +144,9 @@ fun ComposeSearchScreen(
                         color = Color(0xFF14141A).copy(alpha = 0.75f),
                         shape = RoundedCornerShape(16.dp),
                         border = BorderStroke(
-                            0.5.dp,
+                            if (isSearchFocused) 2.dp else 0.5.dp,
                             if (isSearchFocused) {
-                                Color.White.copy(alpha = 0.35f)
+                                MaterialTheme.colorScheme.primary
                             } else {
                                 Color.White.copy(alpha = 0.12f)
                             },
@@ -192,6 +193,23 @@ fun ComposeSearchScreen(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .focusRequester(focusRequester)
+                                        .desktopTextInputFocus(
+                                            shape = RoundedCornerShape(16.dp),
+                                            singleLine = true,
+                                            showRing = false,
+                                        ) {
+                                            when {
+                                                uiState.showSuggestions -> {
+                                                    viewModel.onEvent(SearchUiEvent.OnDismissSuggestions)
+                                                    true
+                                                }
+                                                uiState.searchQuery.isNotEmpty() -> {
+                                                    viewModel.onEvent(SearchUiEvent.OnClearSearch)
+                                                    true
+                                                }
+                                                else -> false
+                                            }
+                                        }
                                         .onFocusChanged { isSearchFocused = it.isFocused },
                                 )
                             }

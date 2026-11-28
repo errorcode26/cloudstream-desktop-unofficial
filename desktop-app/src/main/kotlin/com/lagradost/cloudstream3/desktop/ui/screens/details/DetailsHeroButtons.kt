@@ -20,6 +20,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
@@ -33,6 +34,7 @@ import com.lagradost.cloudstream3.desktop.tracking.MatchResolution
 import com.lagradost.cloudstream3.desktop.ui.badges.DesktopBadgeComponents
 import com.lagradost.cloudstream3.desktop.ui.components.CloudstreamAlertDialog
 import com.lagradost.cloudstream3.desktop.ui.components.LocalDesktopTheme
+import com.lagradost.cloudstream3.desktop.ui.components.desktopInteractiveFocus
 import com.lagradost.cloudstream3.desktop.utils.ExternalLinkHandler
 import com.lagradost.cloudstream3.fixUrl
 import com.lagradost.common.storage.DesktopBookmark
@@ -83,9 +85,10 @@ fun DetailsLibraryStatusDialog(
                             val itemInteraction = remember { MutableInteractionSource() }
                             val isHovered by itemInteraction.collectIsHoveredAsState()
 
+                            val tileShape = RoundedCornerShape(14.dp)
                             Surface(
                                 onClick = { onSetWatchType(type) },
-                                shape = RoundedCornerShape(14.dp),
+                                shape = tileShape,
                                 color = if (isSelected) {
                                     primaryColor.copy(alpha = 0.18f)
                                 } else if (isHovered) {
@@ -104,7 +107,11 @@ fun DetailsLibraryStatusDialog(
                                     },
                                 ),
                                 interactionSource = itemInteraction,
-                                modifier = Modifier.weight(1f).height(84.dp),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(84.dp)
+                                    .clip(tileShape)
+                                    .desktopInteractiveFocus(interactionSource = itemInteraction, shape = tileShape),
                             ) {
                                 Box(
                                     modifier = Modifier.fillMaxSize().padding(horizontal = 6.dp, vertical = 8.dp),

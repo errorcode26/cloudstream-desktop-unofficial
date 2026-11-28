@@ -256,7 +256,7 @@ fun PosterCard(
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .then(if (isHoverEnabled || isFocused) Modifier.posterHoverEffect(shape, isFocused = isFocused) else Modifier)
+                    .posterHoverEffect(shape, isFocused = isFocused, hoverEnabled = isHoverEnabled)
                     .clip(shape)
                     .hoverable(interactionSource)
                     .onGloballyPositioned { coordinates ->

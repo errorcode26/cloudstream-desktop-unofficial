@@ -121,6 +121,7 @@ fun calculateShellContentPadding(
 @Composable
 internal fun NavigationDock(
     modifier: Modifier = Modifier,
+    dockFocusModifier: Modifier = Modifier,
     currentTitle: String,
     dockPosition: DockPosition,
     onNavigate: (Config) -> Unit,
@@ -297,6 +298,7 @@ internal fun NavigationDock(
                     .then(seamlessHazeModifier)
                     .then(borderModifier)
                     .then(hoverModifier)
+                    .then(dockFocusModifier)
                     .pointerInput(Unit) {
                         detectTapGestures { }
                     },
@@ -423,6 +425,7 @@ internal fun NavigationDock(
                             },
                         )
                         .border(1.2.dp, borderGradient, pillShape)
+                        .then(dockFocusModifier)
                         .pointerInput(Unit) {
                             detectTapGestures { }
                         },

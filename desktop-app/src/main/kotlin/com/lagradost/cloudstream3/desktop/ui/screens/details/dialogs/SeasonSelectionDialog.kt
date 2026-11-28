@@ -2,6 +2,8 @@ package com.lagradost.cloudstream3.desktop.ui.screens.details.dialogs
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -11,14 +13,17 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lagradost.cloudstream3.Episode
 import com.lagradost.cloudstream3.desktop.ui.components.CloudstreamCustomDialog
+import com.lagradost.cloudstream3.desktop.ui.components.desktopInteractiveFocus
 import com.lagradost.cloudstream3.desktop.ui.screens.details.contract.SeasonMetadata
 
 @Composable
@@ -79,8 +84,10 @@ fun SeasonSelectionDialog(
                     val customSubtitle = meta?.name?.takeIf { it.isNotBlank() && it != seasonName && !it.equals("Season $season", ignoreCase = true) }
                     val epCount = allEpisodesList.count { it.season == season || (it.season == null && season == 1) }
 
+                    val seasonShape = RoundedCornerShape(12.dp)
+                    val rowInteraction = remember { MutableInteractionSource() }
                     Surface(
-                        shape = RoundedCornerShape(12.dp),
+                        shape = seasonShape,
                         color = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.18f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
                         border = BorderStroke(
                             1.dp,
@@ -88,7 +95,10 @@ fun SeasonSelectionDialog(
                         ),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable {
+                            .clip(seasonShape)
+                            .desktopInteractiveFocus(interactionSource = rowInteraction, shape = seasonShape)
+                            .hoverable(rowInteraction)
+                            .clickable(interactionSource = rowInteraction, indication = null) {
                                 onSelectSeason(season)
                                 onDismissRequest()
                             },

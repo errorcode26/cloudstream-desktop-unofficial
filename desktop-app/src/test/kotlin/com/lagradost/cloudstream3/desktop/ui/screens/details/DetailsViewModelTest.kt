@@ -10,11 +10,15 @@ import com.lagradost.cloudstream3.desktop.ui.screens.details.contract.DetailsUiE
 import com.lagradost.cloudstream3.desktop.ui.screens.details.contract.DetailsUiState
 import com.lagradost.cloudstream3.newEpisode
 import com.lagradost.cloudstream3.newTvSeriesLoadResponse
+import com.lagradost.common.storage.DesktopDataStore
 import com.lagradost.common.storage.WatchHistory
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import java.io.File
+import java.nio.file.Files
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
@@ -24,11 +28,31 @@ import kotlin.test.assertTrue
 class DetailsViewModelTest {
 
     private var activeVm: DetailsViewModel? = null
+    private lateinit var tempDir: File
+    private var prevDataDir: String? = null
+
+    @BeforeEach
+    fun setUp() {
+        prevDataDir = System.getProperty("cloudstream.data.dir")
+        DesktopDataStore.resetForTesting()
+        tempDir = Files.createTempDirectory("cs_details_vm_test_").toFile()
+        System.setProperty("cloudstream.data.dir", tempDir.absolutePath)
+        DesktopDataStore.resetForTesting()
+        DesktopDataStore.init()
+    }
 
     @AfterEach
     fun tearDown() {
         activeVm?.dispose()
         activeVm = null
+        runBlocking { DesktopDataStore.awaitPendingIoForTesting() }
+        DesktopDataStore.resetForTesting()
+        if (prevDataDir != null) {
+            System.setProperty("cloudstream.data.dir", prevDataDir)
+        } else {
+            System.clearProperty("cloudstream.data.dir")
+        }
+        tempDir.deleteRecursively()
     }
 
     private val testApi = object : MainAPI() {

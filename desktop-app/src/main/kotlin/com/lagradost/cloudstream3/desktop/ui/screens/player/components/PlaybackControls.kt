@@ -4,7 +4,9 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
@@ -19,6 +21,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import com.lagradost.cloudstream3.desktop.ui.components.desktopInteractiveFocus
 import com.lagradost.cloudstream3.desktop.ui.screens.player.PlayerState
 
 @Composable
@@ -57,12 +60,13 @@ fun PlaybackControls(
         // Play / Pause button
         val interactionSource = remember { MutableInteractionSource() }
         val isHovered by interactionSource.collectIsHoveredAsState()
+        val isFocused by interactionSource.collectIsFocusedAsState()
         val isPressed by interactionSource.collectIsPressedAsState()
 
         val scale by animateFloatAsState(
             targetValue = if (isPressed) {
                 0.9f
-            } else if (isHovered) {
+            } else if (isHovered || isFocused) {
                 1.05f
             } else {
                 1f
@@ -76,7 +80,9 @@ fun PlaybackControls(
                 .size(80.dp)
                 .scale(scale)
                 .clip(CircleShape)
-                .background(Color.Black.copy(alpha = if (isHovered) 0.6f else 0.4f))
+                .background(Color.Black.copy(alpha = if (isHovered || isFocused) 0.6f else 0.4f))
+                .desktopInteractiveFocus(interactionSource = interactionSource, shape = CircleShape)
+                .hoverable(interactionSource)
                 .clickable(
                     interactionSource = interactionSource,
                     indication = androidx.compose.material3.ripple(color = Color.White),
@@ -124,12 +130,13 @@ private fun GlassIconButton(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
+    val isFocused by interactionSource.collectIsFocusedAsState()
     val isPressed by interactionSource.collectIsPressedAsState()
 
     val scale by animateFloatAsState(
         targetValue = if (isPressed) {
             0.9f
-        } else if (isHovered) {
+        } else if (isHovered || isFocused) {
             1.1f
         } else {
             1f
@@ -143,7 +150,9 @@ private fun GlassIconButton(
             .size(56.dp)
             .scale(scale)
             .clip(CircleShape)
-            .background(Color.Black.copy(alpha = if (isHovered) 0.6f else 0.4f))
+            .background(Color.Black.copy(alpha = if (isHovered || isFocused) 0.6f else 0.4f))
+            .desktopInteractiveFocus(interactionSource = interactionSource, shape = CircleShape)
+            .hoverable(interactionSource)
             .clickable(
                 interactionSource = interactionSource,
                 indication = androidx.compose.material3.ripple(color = Color.White),

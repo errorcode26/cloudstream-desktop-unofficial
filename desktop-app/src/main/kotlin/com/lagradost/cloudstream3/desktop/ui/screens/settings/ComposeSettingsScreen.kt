@@ -32,7 +32,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton
 import com.lagradost.cloudstream3.desktop.ui.components.FocusLayerBoundary
+import com.lagradost.cloudstream3.desktop.ui.components.desktopFocusZone
 import com.lagradost.cloudstream3.desktop.ui.components.desktopInteractiveFocus
+import com.lagradost.cloudstream3.desktop.ui.components.desktopTextInputFocus
 import com.lagradost.cloudstream3.desktop.ui.components.handleEscapeKey
 import com.lagradost.cloudstream3.desktop.ui.navigation.Config
 import com.lagradost.cloudstream3.desktop.ui.screens.settings.appearance.*
@@ -129,7 +131,13 @@ fun ComposeSettingsScreen(
     val settingsViewModel = SettingsSession.settingsViewModel
 
     if (activeSubScreen == SettingsSubScreen.POSTER_EDITOR) {
-        SettingsPosterEditorScreen(onBack = { activeSubScreen = null })
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .handleEscapeKey { activeSubScreen = null },
+        ) {
+            SettingsPosterEditorScreen(onBack = { activeSubScreen = null })
+        }
     } else {
         BoxWithConstraints(
             modifier = Modifier
@@ -148,9 +156,22 @@ fun ComposeSettingsScreen(
             val dividerVerticalPadding = if (isCompactHeight) 4.dp else 8.dp
             val rightPaneStartPadding = if (isCompactWidth) 14.dp else 24.dp
 
+            val leftPaneRequester = remember { androidx.compose.ui.focus.FocusRequester() }
+            val rightPaneRequester = remember { androidx.compose.ui.focus.FocusRequester() }
+
             Row(modifier = Modifier.fillMaxSize().padding(horizontal = screenHorizontalPadding, vertical = screenVerticalPadding)) {
                 // ── Left Pane ─────────────────────────────────────────────
-                Column(modifier = Modifier.width(210.dp).fillMaxHeight().padding(end = 12.dp)) {
+                Column(
+                    modifier = Modifier
+                        .width(210.dp)
+                        .fillMaxHeight()
+                        .padding(end = 12.dp)
+                        .desktopFocusZone(
+                            zoneRequester = leftPaneRequester,
+                            restoreFocus = true,
+                            right = rightPaneRequester,
+                        ),
+                ) {
                     Text(
                         text = "Settings",
                         style = if (isCompactHeight) MaterialTheme.typography.titleLarge else MaterialTheme.typography.headlineMedium,
@@ -182,7 +203,20 @@ fun ComposeSettingsScreen(
                                 }
                             }
                         },
-                        modifier = Modifier.fillMaxWidth().padding(bottom = searchBottomPadding),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = searchBottomPadding)
+                            .desktopTextInputFocus(
+                                shape = RoundedCornerShape(10.dp),
+                                singleLine = true,
+                            ) {
+                                if (searchQuery.isNotEmpty()) {
+                                    searchQuery = ""
+                                    true
+                                } else {
+                                    false
+                                }
+                            },
                         shape = RoundedCornerShape(10.dp),
                         singleLine = true,
                         colors = TextFieldDefaults.colors(
@@ -311,7 +345,15 @@ fun ComposeSettingsScreen(
 
                 // ── Right Pane ────────────────────────────────────────────
                 Box(
-                    modifier = Modifier.weight(1f).fillMaxHeight().padding(start = rightPaneStartPadding),
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .padding(start = rightPaneStartPadding)
+                        .desktopFocusZone(
+                            zoneRequester = rightPaneRequester,
+                            restoreFocus = false,
+                            left = leftPaneRequester,
+                        ),
                     contentAlignment = Alignment.TopStart,
                 ) {
                     Box(modifier = Modifier.fillMaxSize()) {

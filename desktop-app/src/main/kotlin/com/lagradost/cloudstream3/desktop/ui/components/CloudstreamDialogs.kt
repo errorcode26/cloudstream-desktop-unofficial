@@ -35,15 +35,80 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.foundation.focusGroup
+import com.lagradost.cloudstream3.desktop.ui.screens.dev.VisualFocusOverlayHud
 
 object GlobalDialogState {
     var activeDialogCount by mutableStateOf(0)
     val isAnyDialogOpen: Boolean get() = activeDialogCount > 0
+}
+
+@Composable
+private fun CloudstreamDialogHost(
+    show: Boolean,
+    onDismissRequest: () -> Unit,
+    content: @Composable () -> Unit,
+) {
+    val transitionState = remember { MutableTransitionState(false) }
+    transitionState.targetState = show
+
+    val isVisible = transitionState.currentState || transitionState.targetState
+
+    DisposableEffect(isVisible) {
+        if (isVisible) GlobalDialogState.activeDialogCount++
+        onDispose {
+            if (isVisible) GlobalDialogState.activeDialogCount--
+        }
+    }
+
+    if (isVisible) {
+        val dialogContentRequester = remember { FocusRequester() }
+        Dialog(
+            onDismissRequest = onDismissRequest,
+            properties = DialogProperties(usePlatformDefaultWidth = false),
+        ) {
+            FocusLayerBoundary(
+                active = show,
+                trapFocus = true,
+                restoreFocus = true,
+                initialFocusRequester = dialogContentRequester,
+                requestFocusWhenActive = show,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .handleEscapeKey { onDismissRequest() }
+                    .desktopDirectionalFocusNavigation(),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .nonFocusableTap { onDismissRequest() },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    AnimatedVisibility(
+                        visibleState = transitionState,
+                        enter = fadeIn(tween(140)) + scaleIn(tween(140), initialScale = 0.96f),
+                        exit = fadeOut(tween(100)) + scaleOut(tween(100), targetScale = 0.96f),
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .focusRequester(dialogContentRequester)
+                                .focusGroup(),
+                        ) {
+                            content()
+                        }
+                    }
+                }
+                VisualFocusOverlayHud(modifier = Modifier.fillMaxSize())
+            }
+        }
+    }
 }
 
 /**
@@ -64,52 +129,20 @@ fun CloudstreamAlertDialog(
     dismissButton: @Composable (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
-    val transitionState = remember { MutableTransitionState(false) }
-    transitionState.targetState = show
-
-    val isVisible = transitionState.currentState || transitionState.targetState
-
-    DisposableEffect(isVisible) {
-        if (isVisible) GlobalDialogState.activeDialogCount++
-        onDispose {
-            if (isVisible) GlobalDialogState.activeDialogCount--
-        }
-    }
-
-    if (isVisible) {
+    CloudstreamDialogHost(
+        show = show,
+        onDismissRequest = onDismissRequest,
+    ) {
         val isAmoled = LocalDesktopTheme.current.isAmoled
-
-        Dialog(
+        AlertDialog(
             onDismissRequest = onDismissRequest,
-            properties = DialogProperties(usePlatformDefaultWidth = false),
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                        onClick = onDismissRequest,
-                    ),
-                contentAlignment = Alignment.Center,
-            ) {
-                AnimatedVisibility(
-                    visibleState = transitionState,
-                    enter = fadeIn(tween(140)) + scaleIn(tween(140), initialScale = 0.96f),
-                    exit = fadeOut(tween(100)) + scaleOut(tween(100), targetScale = 0.96f),
-                ) {
-                    AlertDialog(
-                        onDismissRequest = onDismissRequest,
-                        containerColor = if (isAmoled) Color(0xFF101010) else MaterialTheme.colorScheme.surface,
-                        modifier = modifier.then(if (isAmoled) Modifier.border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(28.dp)) else Modifier),
-                        title = title,
-                        text = text,
-                        confirmButton = confirmButton,
-                        dismissButton = dismissButton,
-                    )
-                }
-            }
-        }
+            containerColor = if (isAmoled) Color(0xFF101010) else MaterialTheme.colorScheme.surface,
+            modifier = modifier.then(if (isAmoled) Modifier.border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(28.dp)) else Modifier),
+            title = title,
+            text = text,
+            confirmButton = confirmButton,
+            dismissButton = dismissButton,
+        )
     }
 }
 
@@ -131,58 +164,23 @@ fun CloudstreamCustomDialog(
     shape: Shape = RoundedCornerShape(28.dp),
     content: @Composable () -> Unit,
 ) {
-    val transitionState = remember { MutableTransitionState(false) }
-    transitionState.targetState = show
-
-    val isVisible = transitionState.currentState || transitionState.targetState
-
-    DisposableEffect(isVisible) {
-        if (isVisible) GlobalDialogState.activeDialogCount++
-        onDispose {
-            if (isVisible) GlobalDialogState.activeDialogCount--
-        }
-    }
-
-    if (isVisible) {
+    CloudstreamDialogHost(
+        show = show,
+        onDismissRequest = onDismissRequest,
+    ) {
         val isAmoled = LocalDesktopTheme.current.isAmoled
         val effectiveColor = containerColor ?: (if (isAmoled) Color(0xFF101010) else MaterialTheme.colorScheme.surface)
         val showBorder = isAmoled && containerColor == null
 
-        Dialog(
-            onDismissRequest = onDismissRequest,
-            properties = DialogProperties(usePlatformDefaultWidth = false),
+        Surface(
+            shape = shape,
+            color = effectiveColor,
+            contentColor = if (isAmoled) Color.White else androidx.compose.material3.contentColorFor(MaterialTheme.colorScheme.surface),
+            modifier = modifier
+                .nonFocusableTap {}
+                .then(if (showBorder) Modifier.border(1.dp, Color.White.copy(alpha = 0.1f), shape) else Modifier),
         ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                        onClick = onDismissRequest,
-                    ),
-                contentAlignment = Alignment.Center,
-            ) {
-                AnimatedVisibility(
-                    visibleState = transitionState,
-                    enter = fadeIn(tween(140)) + scaleIn(tween(140), initialScale = 0.96f),
-                    exit = fadeOut(tween(100)) + scaleOut(tween(100), targetScale = 0.96f),
-                ) {
-                    Surface(
-                        shape = shape,
-                        color = effectiveColor,
-                        contentColor = if (isAmoled) Color.White else androidx.compose.material3.contentColorFor(MaterialTheme.colorScheme.surface),
-                        modifier = modifier
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null,
-                                onClick = {},
-                            )
-                            .then(if (showBorder) Modifier.border(1.dp, Color.White.copy(alpha = 0.1f), shape) else Modifier),
-                    ) {
-                        content()
-                    }
-                }
-            }
+            content()
         }
     }
 }

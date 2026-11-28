@@ -4,6 +4,8 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -30,6 +32,8 @@ import com.lagradost.cloudstream3.desktop.ui.components.DesktopButton
 import com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton
 import com.lagradost.cloudstream3.desktop.ui.components.DesktopOutlinedButton
 import com.lagradost.cloudstream3.desktop.ui.components.HeroPrimaryCtaButton
+import com.lagradost.cloudstream3.desktop.ui.components.desktopInteractiveFocus
+import com.lagradost.cloudstream3.desktop.ui.components.desktopTextInputFocus
 import com.lagradost.cloudstream3.desktop.ui.screens.settings.SettingsGroupCard
 import com.lagradost.cloudstream3.desktop.ui.theme.AppearanceConfig
 import com.lagradost.cloudstream3.desktop.ui.theme.BuiltInPresets
@@ -122,15 +126,21 @@ fun SettingsThemeWallpaperScreen() {
                 )
                 modes.forEach { (mode, title, desc) ->
                     val isSelected = currentThemeMode == mode
+                    val modeInteraction = remember { MutableInteractionSource() }
+                    val modeShape = RoundedCornerShape(12.dp)
                     Surface(
                         onClick = { AppearanceConfig.setThemeMode(mode) },
-                        shape = RoundedCornerShape(12.dp),
+                        shape = modeShape,
                         color = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.14f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
                         border = BorderStroke(
                             width = if (isSelected) 2.dp else 1.dp,
                             color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.25f),
                         ),
-                        modifier = Modifier.weight(1f).height(104.dp),
+                        interactionSource = modeInteraction,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(104.dp)
+                            .desktopInteractiveFocus(interactionSource = modeInteraction, shape = modeShape),
                     ) {
                         Column(
                             modifier = Modifier.fillMaxSize().padding(14.dp),
@@ -395,15 +405,20 @@ fun SettingsThemeWallpaperScreen() {
                 ) {
                     curatedAccents.forEach { (name, color) ->
                         val isSelected = themeAccent == name
+                        val chipInteraction = remember { MutableInteractionSource() }
+                        val chipShape = RoundedCornerShape(10.dp)
                         Surface(
                             onClick = { AppearanceConfig.setThemeAccent(name) },
-                            shape = RoundedCornerShape(10.dp),
+                            shape = chipShape,
                             color = if (isSelected) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
                             border = BorderStroke(
                                 width = if (isSelected) 2.dp else 1.dp,
                                 color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.25f),
                             ),
-                            modifier = Modifier.height(42.dp),
+                            interactionSource = chipInteraction,
+                            modifier = Modifier
+                                .height(42.dp)
+                                .desktopInteractiveFocus(interactionSource = chipInteraction, shape = chipShape),
                         ) {
                             Row(
                                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
@@ -437,15 +452,20 @@ fun SettingsThemeWallpaperScreen() {
                     // Custom Color Chip
                     val isCustom = themeAccent == "Custom"
                     val customColor = remember(customThemeAccent) { parseHexColor(customThemeAccent, Color(0xFF7C6BFF)) }
+                    val customAccentInteraction = remember { MutableInteractionSource() }
+                    val customAccentShape = RoundedCornerShape(10.dp)
                     Surface(
                         onClick = { showAccentPickerDialog = true },
-                        shape = RoundedCornerShape(10.dp),
+                        shape = customAccentShape,
                         color = if (isCustom) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
                         border = BorderStroke(
                             width = if (isCustom) 2.dp else 1.dp,
                             color = if (isCustom) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.25f),
                         ),
-                        modifier = Modifier.height(42.dp),
+                        interactionSource = customAccentInteraction,
+                        modifier = Modifier
+                            .height(42.dp)
+                            .desktopInteractiveFocus(interactionSource = customAccentInteraction, shape = customAccentShape),
                     ) {
                         Row(
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
@@ -531,15 +551,20 @@ fun SettingsThemeWallpaperScreen() {
                         activeBackgrounds.forEach { (key, pair) ->
                             val (label, color) = pair
                             val isSelected = appThemeBackground == key
+                            val bgInteraction = remember { MutableInteractionSource() }
+                            val bgShape = RoundedCornerShape(10.dp)
                             Surface(
                                 onClick = { AppearanceConfig.setAppThemeBackground(key) },
-                                shape = RoundedCornerShape(10.dp),
+                                shape = bgShape,
                                 color = color,
                                 border = BorderStroke(
                                     width = if (isSelected) 2.dp else 1.dp,
                                     color = if (isSelected) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.15f),
                                 ),
-                                modifier = Modifier.height(42.dp),
+                                interactionSource = bgInteraction,
+                                modifier = Modifier
+                                    .height(42.dp)
+                                    .desktopInteractiveFocus(interactionSource = bgInteraction, shape = bgShape),
                             ) {
                                 Row(
                                     modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
@@ -567,15 +592,20 @@ fun SettingsThemeWallpaperScreen() {
                         // Custom Canvas Chip
                         val isCustomBg = appThemeBackground == "Custom"
                         val customBgColor = remember(customAppThemeBackground) { parseHexColor(customAppThemeBackground, Color(0xFF0C0C16)) }
+                        val customBgInteraction = remember { MutableInteractionSource() }
+                        val customBgShape = RoundedCornerShape(10.dp)
                         Surface(
                             onClick = { showBackgroundPickerDialog = true },
-                            shape = RoundedCornerShape(10.dp),
+                            shape = customBgShape,
                             color = customBgColor,
                             border = BorderStroke(
                                 width = if (isCustomBg) 2.dp else 1.dp,
                                 color = if (isCustomBg) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.25f),
                             ),
-                            modifier = Modifier.height(42.dp),
+                            interactionSource = customBgInteraction,
+                            modifier = Modifier
+                                .height(42.dp)
+                                .desktopInteractiveFocus(interactionSource = customBgInteraction, shape = customBgShape),
                         ) {
                             Row(
                                 modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
@@ -760,19 +790,23 @@ private fun <T> ShapePickerTray(
         ) {
             options.forEach { option ->
                 val isSelected = selectedOption == option
+                val trayInteraction = remember { MutableInteractionSource() }
+                val trayShape = RoundedCornerShape(7.dp)
                 Surface(
                     onClick = { onSelect(option) },
-                    shape = RoundedCornerShape(7.dp),
+                    shape = trayShape,
                     color = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.16f) else Color.Transparent,
                     border = if (isSelected) {
                         BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.85f))
                     } else {
                         null
                     },
+                    interactionSource = trayInteraction,
                     modifier = Modifier
                         .weight(1f)
                         .height(34.dp)
-                        .pointerHoverIcon(PointerIcon.Hand),
+                        .pointerHoverIcon(PointerIcon.Hand)
+                        .desktopInteractiveFocus(interactionSource = trayInteraction, shape = trayShape),
                 ) {
                     Row(
                         modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp),
@@ -822,15 +856,20 @@ private fun ThemePresetCard(
         }
     }
 
+    val presetInteraction = remember { MutableInteractionSource() }
+    val presetShape = RoundedCornerShape(12.dp)
     Surface(
         onClick = onClick,
-        shape = RoundedCornerShape(12.dp),
+        shape = presetShape,
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
         border = BorderStroke(
             width = if (isSelected) 2.dp else 1.dp,
             color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.25f),
         ),
-        modifier = modifier.height(112.dp),
+        interactionSource = presetInteraction,
+        modifier = modifier
+            .height(112.dp)
+            .desktopInteractiveFocus(interactionSource = presetInteraction, shape = presetShape),
     ) {
         Column(
             modifier = Modifier.fillMaxSize().padding(10.dp),
@@ -1034,45 +1073,18 @@ private fun CustomColorPickerDialog(
                             Text("Enter a valid 6-character hex (e.g. #7C6BFF)", color = MaterialTheme.colorScheme.error)
                         }
                     },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .desktopTextInputFocus(shape = RoundedCornerShape(8.dp), singleLine = true),
                     shape = RoundedCornerShape(8.dp),
                 )
 
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text("RGB Sliders", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
 
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("R", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Color(0xFFEF4444), modifier = Modifier.width(16.dp))
-                        Slider(
-                            value = red.toFloat(),
-                            onValueChange = { updateRgb(it.toInt(), green, blue) },
-                            valueRange = 0f..255f,
-                            modifier = Modifier.weight(1f),
-                        )
-                        Text("$red", style = MaterialTheme.typography.labelSmall, modifier = Modifier.width(32.dp))
-                    }
-
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("G", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Color(0xFF10B981), modifier = Modifier.width(16.dp))
-                        Slider(
-                            value = green.toFloat(),
-                            onValueChange = { updateRgb(red, it.toInt(), blue) },
-                            valueRange = 0f..255f,
-                            modifier = Modifier.weight(1f),
-                        )
-                        Text("$green", style = MaterialTheme.typography.labelSmall, modifier = Modifier.width(32.dp))
-                    }
-
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("B", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Color(0xFF3B82F6), modifier = Modifier.width(16.dp))
-                        Slider(
-                            value = blue.toFloat(),
-                            onValueChange = { updateRgb(red, green, it.toInt()) },
-                            valueRange = 0f..255f,
-                            modifier = Modifier.weight(1f),
-                        )
-                        Text("$blue", style = MaterialTheme.typography.labelSmall, modifier = Modifier.width(32.dp))
-                    }
+                    ColorChannelSliderRow("R", Color(0xFFEF4444), red) { updateRgb(it, green, blue) }
+                    ColorChannelSliderRow("G", Color(0xFF10B981), green) { updateRgb(red, it, blue) }
+                    ColorChannelSliderRow("B", Color(0xFF3B82F6), blue) { updateRgb(red, green, it) }
                 }
 
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -1084,6 +1096,7 @@ private fun CustomColorPickerDialog(
                     ) {
                         quickSwatches.forEach { swatchHex ->
                             val swatchColor = parseHexColor(swatchHex, Color.Gray)
+                            val swatchInteraction = remember { MutableInteractionSource() }
                             Box(
                                 modifier = Modifier
                                     .size(26.dp)
@@ -1094,7 +1107,9 @@ private fun CustomColorPickerDialog(
                                         color = if (hexText.equals(swatchHex, ignoreCase = true)) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.25f),
                                         shape = CircleShape,
                                     )
-                                    .clickable { hexText = swatchHex },
+                                    .hoverable(swatchInteraction)
+                                    .desktopInteractiveFocus(interactionSource = swatchInteraction, shape = CircleShape)
+                                    .clickable(interactionSource = swatchInteraction, indication = null) { hexText = swatchHex },
                             )
                         }
                     }
@@ -1102,4 +1117,27 @@ private fun CustomColorPickerDialog(
             }
         },
     )
+}
+
+@Composable
+private fun ColorChannelSliderRow(
+    label: String,
+    color: Color,
+    value: Int,
+    onValueChange: (Int) -> Unit,
+) {
+    val sliderInteraction = remember { MutableInteractionSource() }
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(label, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = color, modifier = Modifier.width(16.dp))
+        Slider(
+            value = value.toFloat(),
+            onValueChange = { onValueChange(it.toInt()) },
+            valueRange = 0f..255f,
+            interactionSource = sliderInteraction,
+            modifier = Modifier
+                .weight(1f)
+                .desktopInteractiveFocus(interactionSource = sliderInteraction, shape = CircleShape),
+        )
+        Text("$value", style = MaterialTheme.typography.labelSmall, modifier = Modifier.width(32.dp))
+    }
 }

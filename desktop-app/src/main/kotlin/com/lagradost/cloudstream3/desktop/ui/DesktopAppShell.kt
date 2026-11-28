@@ -1,9 +1,11 @@
 package com.lagradost.cloudstream3.desktop.ui
 
+import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -13,6 +15,11 @@ import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.focusRestorer
+import com.lagradost.cloudstream3.desktop.ui.components.desktopFocusZone
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.lagradost.cloudstream3.desktop.ui.components.LocalPosterCardStyle
@@ -57,6 +64,10 @@ fun DesktopAppShell(
             BoxWithConstraints(Modifier.fillMaxSize()) {
                 val isCompact = maxWidth < 600.dp
                 val effectiveDockPosition = if (isCompact) DockPosition.BOTTOM else dockPosition
+                val topBarRequester = remember { FocusRequester() }
+                val dockRequester = remember { FocusRequester() }
+                val contentRequester = remember { FocusRequester() }
+                val hasSeparateDock = showDock && (isCompact || effectiveDockPosition != DockPosition.TOP)
 
                 // Main Viewport Container
                 Box(
@@ -78,7 +89,33 @@ fun DesktopAppShell(
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .then(if (applySafePadding) Modifier.padding(contentPadding) else Modifier),
+                            .then(if (applySafePadding) Modifier.padding(contentPadding) else Modifier)
+                            .desktopFocusZone(
+                                zoneRequester = contentRequester,
+                                restoreFocus = true,
+                                up = if (showTopBar) {
+                                    topBarRequester
+                                } else if (hasSeparateDock && !isCompact && effectiveDockPosition == DockPosition.TOP) {
+                                    dockRequester
+                                } else {
+                                    null
+                                },
+                                down = if (hasSeparateDock && (isCompact || effectiveDockPosition == DockPosition.BOTTOM)) {
+                                    dockRequester
+                                } else {
+                                    null
+                                },
+                                left = if (hasSeparateDock && !isCompact && effectiveDockPosition == DockPosition.LEFT) {
+                                    dockRequester
+                                } else {
+                                    null
+                                },
+                                right = if (hasSeparateDock && !isCompact && effectiveDockPosition == DockPosition.RIGHT) {
+                                    dockRequester
+                                } else {
+                                    null
+                                },
+                            ),
                     ) {
                         CompositionLocalProvider(LocalSafeArea provides contentPadding) {
                             content()
@@ -87,17 +124,42 @@ fun DesktopAppShell(
                 }
 
                 if (showTopBar) {
-                    TopBar(
-                        isHome = title == "Home",
-                        homeUiState = homeUiState,
-                        homeActionDispatcher = homeActionDispatcher,
-                        onBack = onBack,
-                        onOpenProfileManager = onOpenProfileManager,
-                        showDock = showDock,
-                        currentTitle = title ?: "",
-                        onNavigate = onNavigate,
-                        onSearchClick = { onNavigate(Config.Search) },
-                    )
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .align(Alignment.TopCenter)
+                            .desktopFocusZone(
+                                zoneRequester = topBarRequester,
+                                restoreFocus = true,
+                                down = if (hasSeparateDock && !isCompact && effectiveDockPosition == DockPosition.TOP) {
+                                    dockRequester
+                                } else {
+                                    contentRequester
+                                },
+                                left = if (hasSeparateDock && !isCompact && effectiveDockPosition == DockPosition.LEFT) {
+                                    dockRequester
+                                } else {
+                                    null
+                                },
+                                right = if (hasSeparateDock && !isCompact && effectiveDockPosition == DockPosition.RIGHT) {
+                                    dockRequester
+                                } else {
+                                    null
+                                },
+                            ),
+                    ) {
+                        TopBar(
+                            isHome = title == "Home",
+                            homeUiState = homeUiState,
+                            homeActionDispatcher = homeActionDispatcher,
+                            onBack = onBack,
+                            onOpenProfileManager = onOpenProfileManager,
+                            showDock = showDock,
+                            currentTitle = title ?: "",
+                            onNavigate = onNavigate,
+                            onSearchClick = { onNavigate(Config.Search) },
+                        )
+                    }
                 }
 
                 DesktopShellOfflineBanner(
@@ -109,7 +171,14 @@ fun DesktopAppShell(
                 if (showDock) {
                     if (isCompact) {
                         MobileBottomNavBar(
-                            modifier = Modifier.align(Alignment.BottomCenter).zIndex(90f),
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .zIndex(90f)
+                                .desktopFocusZone(
+                                    zoneRequester = dockRequester,
+                                    restoreFocus = true,
+                                    up = contentRequester,
+                                ),
                             currentTitle = title ?: "",
                             onNavigate = onNavigate,
                             onSearchClick = { onNavigate(Config.Search) },
@@ -122,6 +191,14 @@ fun DesktopAppShell(
                         }
                         NavigationDock(
                             modifier = Modifier.align(dockAlignment),
+                            dockFocusModifier = Modifier.desktopFocusZone(
+                                zoneRequester = dockRequester,
+                                restoreFocus = true,
+                                up = if (showTopBar && effectiveDockPosition != DockPosition.BOTTOM) topBarRequester else if (effectiveDockPosition == DockPosition.BOTTOM) contentRequester else null,
+                                down = if (effectiveDockPosition == DockPosition.TOP) contentRequester else null,
+                                left = if (effectiveDockPosition == DockPosition.RIGHT) contentRequester else null,
+                                right = if (effectiveDockPosition == DockPosition.LEFT) contentRequester else null,
+                            ),
                             currentTitle = title ?: "",
                             dockPosition = effectiveDockPosition,
                             onNavigate = onNavigate,

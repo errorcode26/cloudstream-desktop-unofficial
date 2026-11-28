@@ -7,8 +7,10 @@ import androidx.compose.animation.core.spring
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -31,7 +33,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.lagradost.cloudstream3.desktop.ui.DockPosition
 import com.lagradost.cloudstream3.desktop.ui.components.DesktopOutlinedButton
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopSwitch
 import com.lagradost.cloudstream3.desktop.ui.components.DesktopTextButton
+import com.lagradost.cloudstream3.desktop.ui.components.desktopInteractiveFocus
 import com.lagradost.cloudstream3.desktop.ui.screens.settings.SettingsDropdownItem
 import com.lagradost.cloudstream3.desktop.ui.screens.settings.SettingsGroupCard
 import com.lagradost.cloudstream3.desktop.ui.theme.AppearanceConfig
@@ -116,12 +120,16 @@ fun SettingsNavDockScreen() {
                         }
                     }
                 }
+                val sliderInteraction = remember { MutableInteractionSource() }
                 Slider(
                     value = globalUiScale,
                     onValueChange = { AppearanceConfig.setGlobalUiScale(it, notify = false) },
                     valueRange = 0.70f..1.80f,
                     steps = 10,
-                    modifier = Modifier.padding(top = 4.dp),
+                    interactionSource = sliderInteraction,
+                    modifier = Modifier
+                        .padding(top = 4.dp)
+                        .desktopInteractiveFocus(interactionSource = sliderInteraction, shape = CircleShape),
                 )
             }
         }
@@ -370,7 +378,7 @@ private fun DraggableDockOrderList(
                     }
 
                     if (!item.isRequired) {
-                        Switch(
+                        DesktopSwitch(
                             checked = isEnabled,
                             onCheckedChange = { AppearanceConfig.toggleDockItem(item, it) },
                             modifier = Modifier.scale(0.85f),

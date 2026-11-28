@@ -27,8 +27,10 @@ import coil3.compose.AsyncImage
 import com.lagradost.cloudstream3.desktop.repo.DesktopRepositoryManager
 import com.lagradost.cloudstream3.desktop.ui.DesktopDimens
 import com.lagradost.cloudstream3.desktop.ui.components.AppDropdownMenu
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopDropdownMenuItem
 import com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton
 import com.lagradost.cloudstream3.desktop.ui.components.DesktopOutlinedButton
+import com.lagradost.cloudstream3.desktop.ui.components.desktopTextInputFocus
 import com.lagradost.cloudstream3.desktop.ui.screens.library.contract.LibrarySection
 import com.lagradost.cloudstream3.desktop.ui.screens.library.contract.LibraryUiState
 import com.lagradost.cloudstream3.desktop.ui.screens.library.contract.SortOption
@@ -61,25 +63,14 @@ fun LibraryActionBar(
                 .padding(horizontal = 8.dp, vertical = 4.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            OutlinedTextField(
-                value = uiState.searchQuery,
-                onValueChange = onSearch,
-                placeholder = { Text(searchPlaceholder, fontSize = 13.sp) },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search", modifier = Modifier.size(18.dp)) },
-                trailingIcon = if (uiState.searchQuery.isNotEmpty()) {
-                    {
-                        IconButton(onClick = { onSearch("") }) {
-                            Icon(Icons.Default.Close, contentDescription = "Clear", modifier = Modifier.size(16.dp))
-                        }
-                    }
-                } else null,
-                modifier = Modifier.fillMaxWidth().height(48.dp),
-                singleLine = true,
+            LibrarySearchField(
+                query = uiState.searchQuery,
+                placeholder = searchPlaceholder,
+                onSearch = onSearch,
                 shape = RoundedCornerShape(10.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    unfocusedBorderColor = MaterialTheme.colorScheme.surfaceVariant,
-                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                ),
+                placeholderFontSize = 13.sp,
+                iconModifier = Modifier.size(18.dp),
+                modifier = Modifier.fillMaxWidth().height(48.dp),
             )
 
             Row(
@@ -170,25 +161,12 @@ fun LibraryActionBar(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            OutlinedTextField(
-                value = uiState.searchQuery,
-                onValueChange = onSearch,
-                placeholder = { Text(searchPlaceholder) },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search") },
-                trailingIcon = if (uiState.searchQuery.isNotEmpty()) {
-                    {
-                        IconButton(onClick = { onSearch("") }) {
-                            Icon(Icons.Default.Close, contentDescription = "Clear", modifier = Modifier.size(16.dp))
-                        }
-                    }
-                } else null,
-                modifier = Modifier.weight(1f),
-                singleLine = true,
+            LibrarySearchField(
+                query = uiState.searchQuery,
+                placeholder = searchPlaceholder,
+                onSearch = onSearch,
                 shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    unfocusedBorderColor = MaterialTheme.colorScheme.surfaceVariant,
-                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                ),
+                modifier = Modifier.weight(1f),
             )
 
             if (showLocalProviderDropdown) {
@@ -250,6 +228,45 @@ fun LibraryActionBar(
 }
 
 @Composable
+private fun LibrarySearchField(
+    query: String,
+    placeholder: String,
+    onSearch: (String) -> Unit,
+    shape: RoundedCornerShape,
+    modifier: Modifier = Modifier,
+    placeholderFontSize: androidx.compose.ui.unit.TextUnit = androidx.compose.ui.unit.TextUnit.Unspecified,
+    iconModifier: Modifier = Modifier,
+) {
+    OutlinedTextField(
+        value = query,
+        onValueChange = onSearch,
+        placeholder = { Text(placeholder, fontSize = placeholderFontSize) },
+        leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search", modifier = iconModifier) },
+        trailingIcon = if (query.isNotEmpty()) {
+            {
+                DesktopIconButton(onClick = { onSearch("") }, modifier = Modifier.size(28.dp)) {
+                    Icon(Icons.Default.Close, contentDescription = "Clear", modifier = Modifier.size(16.dp))
+                }
+            }
+        } else null,
+        modifier = modifier.desktopTextInputFocus(shape = shape, singleLine = true) {
+            if (query.isNotEmpty()) {
+                onSearch("")
+                true
+            } else {
+                false
+            }
+        },
+        singleLine = true,
+        shape = shape,
+        colors = OutlinedTextFieldDefaults.colors(
+            unfocusedBorderColor = MaterialTheme.colorScheme.surfaceVariant,
+            focusedBorderColor = MaterialTheme.colorScheme.primary,
+        ),
+    )
+}
+
+@Composable
 private fun ProviderFilterMenu(
     expanded: Boolean,
     selectedProvider: String?,
@@ -258,7 +275,7 @@ private fun ProviderFilterMenu(
     onSelect: (String?) -> Unit,
 ) {
     AppDropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
-        DropdownMenuItem(
+        DesktopDropdownMenuItem(
             text = {
                 Text(
                     "All Extensions",
@@ -269,7 +286,7 @@ private fun ProviderFilterMenu(
         )
         availableProviders.forEach { prov ->
             val provIcon = DesktopRepositoryManager.getPluginIcon(prov)
-            DropdownMenuItem(
+            DesktopDropdownMenuItem(
                 leadingIcon = {
                     if (provIcon != null) {
                         AsyncImage(
@@ -315,7 +332,7 @@ private fun SortOptionsMenu(
 ) {
     AppDropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
         SortOption.entries.forEach { option ->
-            DropdownMenuItem(
+            DesktopDropdownMenuItem(
                 text = {
                     Text(
                         option.title,

@@ -359,6 +359,9 @@ class DevStudioViewModel : BaseMviViewModel<DevStudioUiState, DevStudioUiEvent, 
                 PluginCircuitBreaker.resetAll()
                 sendEffect(DevStudioUiEffect.ShowToast("All plugin circuit breakers reset!"))
             }
+            is DevStudioUiEvent.ShowHudToast -> {
+                sendEffect(DevStudioUiEffect.ShowToast(event.message))
+            }
         }
     }
 

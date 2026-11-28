@@ -34,6 +34,7 @@ import com.lagradost.player.impl.PlayerLinkHandler
 @Composable
 fun DetailsPlayButton(
     modifier: Modifier = Modifier,
+    buttonModifier: Modifier = Modifier,
     data: LoadResponse,
     provider: MainAPI,
     latestHistory: WatchHistory? = null,
@@ -202,7 +203,8 @@ fun DetailsPlayButton(
             modifier = Modifier
                 .wrapContentWidth()
                 .widthIn(min = if (isNarrow) 240.dp else 420.dp, max = 580.dp)
-                .height(if (isNarrow) 44.dp else 52.dp),
+                .height(if (isNarrow) 44.dp else 52.dp)
+                .then(buttonModifier),
             onClick = {
                 if (isUnavailable) {
                     com.lagradost.cloudstream3.desktop.ui.components.AppToastManager.showInfo(

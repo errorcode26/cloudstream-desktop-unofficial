@@ -330,14 +330,20 @@ private fun ProductionCompanySectionLayout(
             )
 
             if (canExpand) {
+                val expandInteraction = remember { MutableInteractionSource() }
+                val expandShape = RoundedCornerShape(8.dp)
                 Surface(
-                    shape = RoundedCornerShape(8.dp),
+                    shape = expandShape,
                     color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
                     border = androidx.compose.foundation.BorderStroke(
                         1.dp,
                         Color.White.copy(alpha = 0.08f),
                     ),
-                    modifier = Modifier.clickable { expanded = !expanded },
+                    modifier = Modifier
+                        .clip(expandShape)
+                        .desktopInteractiveFocus(interactionSource = expandInteraction, shape = expandShape)
+                        .hoverable(expandInteraction)
+                        .clickable(interactionSource = expandInteraction, indication = null) { expanded = !expanded },
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),

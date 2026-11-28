@@ -149,7 +149,7 @@ fun WatchHistoryCard(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .then(if (isActiveVisual) Modifier.border(2.dp, MaterialTheme.colorScheme.primary, shape) else Modifier)
+                .border(2.dp, if (isActiveVisual) MaterialTheme.colorScheme.primary else Color.Transparent, shape)
                 .clip(shape)
                 .hoverable(interactionSource)
                 .onGloballyPositioned { coordinates ->
@@ -584,7 +584,7 @@ fun WatchHistoryCardDetailed(
         Row(
             modifier = Modifier
                 .fillMaxSize()
-                .then(if (isActiveVisual) Modifier.border(2.dp, primary, cardShape) else Modifier)
+                .border(2.dp, if (isActiveVisual) primary else Color.Transparent, cardShape)
                 .clip(cardShape)
                 .background(backgroundColor)
                 .hoverable(interactionSource)

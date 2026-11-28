@@ -22,11 +22,13 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
@@ -157,6 +159,7 @@ fun HomeHeroCarousel(
         mutableIntStateOf(0)
     }
     var userInteractionTrigger by remember { mutableIntStateOf(0) }
+    var heroHasFocus by remember { mutableStateOf(false) }
 
     LaunchedEffect(displayItems.size) {
         if (displayItems.isEmpty() || currentIndex >= displayItems.size) {
@@ -164,8 +167,8 @@ fun HomeHeroCarousel(
         }
     }
 
-    LaunchedEffect(displayItems.size, autoSlideDelay, userInteractionTrigger) {
-        if (displayItems.isNotEmpty() && autoSlideDelay > 0) {
+    LaunchedEffect(displayItems.size, autoSlideDelay, userInteractionTrigger, heroHasFocus) {
+        if (displayItems.isNotEmpty() && autoSlideDelay > 0 && !heroHasFocus) {
             while (isActive) {
                 delay(autoSlideDelay * 1000L)
                 currentIndex = (currentIndex + 1) % displayItems.size
@@ -240,6 +243,7 @@ fun HomeHeroCarousel(
         modifier = Modifier
             .fillMaxWidth()
             .height(dynamicHeight)
+            .onFocusChanged { heroHasFocus = it.hasFocus }
             .graphicsLayer { clip = false },
     ) {
         val safeArea = LocalSafeArea.current

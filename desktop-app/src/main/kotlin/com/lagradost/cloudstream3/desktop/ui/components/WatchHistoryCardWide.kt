@@ -182,7 +182,11 @@ fun WatchHistoryCardWide(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .then(if (isActiveVisual) Modifier.border(2.dp, primary, cardShape) else Modifier.border(0.5.dp, Color.White.copy(alpha = 0.08f), cardShape))
+                .border(
+                    width = if (isActiveVisual) 2.dp else 0.5.dp,
+                    color = if (isActiveVisual) primary else Color.White.copy(alpha = 0.08f),
+                    shape = cardShape,
+                )
                 .clip(cardShape)
                 .background(backgroundColor)
                 .hoverable(interactionSource)

@@ -227,7 +227,7 @@ internal fun HomeCatalogCustomizationView(
 
                     Spacer(modifier = Modifier.width(16.dp))
 
-                    Switch(
+                    com.lagradost.cloudstream3.desktop.ui.components.DesktopSwitch(
                         checked = isEnabled,
                         onCheckedChange = { onToggleCatalog(catalog.name, it) },
                     )

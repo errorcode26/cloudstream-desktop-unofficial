@@ -4,6 +4,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
@@ -23,6 +24,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.lagradost.cloudstream3.desktop.debrid.torbox.TorboxTorrentData
+import com.lagradost.cloudstream3.desktop.ui.components.desktopInteractiveFocus
 import com.lagradost.common.storage.WatchHistory
 import com.lagradost.player.impl.PlayerLinkHandler
 
@@ -82,6 +84,9 @@ internal fun TorboxRecentCard(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
+    val isFocused by interactionSource.collectIsFocusedAsState()
+    val isActiveVisual = isHovered || isFocused
+    val cardShape = RoundedCornerShape(10.dp)
 
     val duration = history.duration.coerceAtLeast(0L)
     val position = history.position.coerceAtLeast(0L)
@@ -93,9 +98,9 @@ internal fun TorboxRecentCard(
         ?: if (history.episode != null) "Episode ${history.episode}" else null
 
     Card(
-        shape = RoundedCornerShape(10.dp),
+        shape = cardShape,
         colors = CardDefaults.cardColors(
-            containerColor = if (isHovered) {
+            containerColor = if (isActiveVisual) {
                 MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.70f)
             } else {
                 MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
@@ -103,7 +108,7 @@ internal fun TorboxRecentCard(
         ),
         border = BorderStroke(
             1.dp,
-            if (isHovered) {
+            if (isActiveVisual) {
                 MaterialTheme.colorScheme.primary.copy(alpha = 0.80f)
             } else {
                 MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)
@@ -111,9 +116,10 @@ internal fun TorboxRecentCard(
         ),
         modifier = modifier
             .width(260.dp)
-            .clip(RoundedCornerShape(10.dp))
+            .clip(cardShape)
+            .desktopInteractiveFocus(interactionSource = interactionSource, shape = cardShape)
             .hoverable(interactionSource)
-            .clickable(onClick = onResume),
+            .clickable(interactionSource = interactionSource, indication = null, onClick = onResume),
     ) {
         Column(
             modifier = Modifier.padding(10.dp),

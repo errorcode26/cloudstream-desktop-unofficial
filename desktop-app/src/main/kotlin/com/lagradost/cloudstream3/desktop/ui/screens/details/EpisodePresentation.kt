@@ -4,6 +4,8 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -34,6 +36,7 @@ import com.lagradost.cloudstream3.MainAPI
 import com.lagradost.cloudstream3.desktop.tracking.EpisodeSyncCheck
 import com.lagradost.cloudstream3.desktop.tracking.TrackerRegistry
 import com.lagradost.cloudstream3.desktop.ui.badges.DesktopBadgeComponents
+import com.lagradost.cloudstream3.desktop.ui.components.desktopInteractiveFocus
 import com.lagradost.cloudstream3.desktop.ui.screens.details.contract.DetailsTrackersUiState
 import com.lagradost.cloudstream3.desktop.ui.screens.details.contract.DetailsUiState
 import com.lagradost.cloudstream3.desktop.utils.TitleUtils
@@ -143,6 +146,7 @@ fun EpisodeTrackerSyncPillsRow(
                     }
                 }
             } else {
+                val pillInteraction = remember { MutableInteractionSource() }
                 Box(
                     modifier = Modifier
                         .clip(pillShape)
@@ -152,7 +156,11 @@ fun EpisodeTrackerSyncPillsRow(
                             if (!badge.isSyncing) {
                                 Modifier
                                     .pointerHoverIcon(PointerIcon.Hand)
-                                    .clickable { onSyncClick(badge.providerId) }
+                                    .desktopInteractiveFocus(interactionSource = pillInteraction, shape = pillShape)
+                                    .hoverable(pillInteraction)
+                                    .clickable(interactionSource = pillInteraction, indication = null) {
+                                        onSyncClick(badge.providerId)
+                                    }
                             } else {
                                 Modifier
                             },

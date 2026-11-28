@@ -1,7 +1,11 @@
 package com.lagradost.cloudstream3.desktop.ui.screens
 
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.focusGroup
+import androidx.compose.foundation.gestures.BringIntoViewSpec
+import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -12,12 +16,16 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import coil3.request.crossfade
 import com.lagradost.cloudstream3.desktop.explore.ui.ExploreProviderDialog
 import com.lagradost.cloudstream3.desktop.ui.components.DesktopVerticalScrollbar
+import com.lagradost.cloudstream3.desktop.ui.components.desktopLazyColumnBoundaryScroll
 import com.lagradost.cloudstream3.desktop.ui.navigation.Config
 import com.lagradost.cloudstream3.desktop.ui.screens.home.*
 import com.lagradost.cloudstream3.desktop.ui.screens.home.contract.HomeUiEvent
@@ -191,11 +199,48 @@ fun ComposeHomeScreen(
                 }
             }
 
+            val density = LocalDensity.current
+            val topClearPx = with(density) { (safeTop + 12.dp).toPx() }
+            val bottomClearPx = with(density) { (safeBottom + 16.dp).toPx() }
+            @OptIn(ExperimentalFoundationApi::class)
+            val verticalBringIntoViewSpec = remember(topClearPx, bottomClearPx) {
+                object : BringIntoViewSpec {
+                    override fun calculateScrollDistance(
+                        offset: Float,
+                        size: Float,
+                        containerSize: Float,
+                    ): Float {
+                        val safeBottomBound = (containerSize - bottomClearPx).coerceAtLeast(topClearPx + 1f)
+                        val availableSpan = safeBottomBound - topClearPx
+                        val trailing = offset + size
+                        if (size >= availableSpan) {
+                            return when {
+                                offset > topClearPx -> offset - topClearPx
+                                trailing < containerSize -> 0f
+                                else -> 0f
+                            }
+                        }
+                        return when {
+                            offset < topClearPx -> offset - topClearPx
+                            trailing > safeBottomBound -> trailing - safeBottomBound
+                            else -> 0f
+                        }
+                    }
+                }
+            }
+
+            val heroFocusRequester = remember { FocusRequester() }
             Box(modifier = Modifier.fillMaxSize()) {
+                @OptIn(ExperimentalFoundationApi::class)
+                CompositionLocalProvider(LocalBringIntoViewSpec provides verticalBringIntoViewSpec) {
                 LazyColumn(
                     state = listState,
                     modifier = Modifier
                         .fillMaxSize()
+                        .desktopLazyColumnBoundaryScroll(
+                            listState = listState,
+                            topItemFocusRequester = if (isHeroShowing) heroFocusRequester else null,
+                        )
                         .then(
                             if (hazeState != null) {
                                 Modifier.graphicsLayer { }.hazeSource(state = hazeState)
@@ -211,34 +256,40 @@ fun ComposeHomeScreen(
                 ) {
                     if (isHeroShowing) {
                         item(key = "home_hero_banner_${uiState.refreshEpoch}") {
-                            if (heroCandidates.isNotEmpty()) {
-                                HomeHeroCarousel(
-                                    items = heroCandidates,
-                                    provider = primaryProvider,
-                                    heroMetaMap = uiState.heroMetaMap,
-                                    allBookmarks = uiState.bookmarks,
-                                    onPrefetchHeroItem = { prov, item ->
-                                        viewModel.onEvent(HomeUiEvent.OnPrefetchHeroItem(prov ?: primaryProvider, item))
-                                    },
-                                    onHeroBackgroundChanged = { url ->
-                                        currentHeroImageUrl = url
-                                    },
-                                    onItemClick = { item, backdrop, autoPlay ->
-                                        val provName = item.apiName.takeIf { it.isNotBlank() } ?: primaryProvider?.name ?: ""
-                                        onNavigate(
-                                            Config.Details(
-                                                providerName = provName,
-                                                url = item.url,
-                                                preloadedName = item.name,
-                                                preloadedPoster = item.posterUrl,
-                                                preloadedBg = backdrop,
-                                                autoPlay = autoPlay,
-                                            ),
-                                        )
-                                    },
-                                )
-                            } else {
-                                HomeHeroCarouselPlaceholder()
+                            Box(
+                                modifier = Modifier
+                                    .focusRequester(heroFocusRequester)
+                                    .focusGroup(),
+                            ) {
+                                if (heroCandidates.isNotEmpty()) {
+                                    HomeHeroCarousel(
+                                        items = heroCandidates,
+                                        provider = primaryProvider,
+                                        heroMetaMap = uiState.heroMetaMap,
+                                        allBookmarks = uiState.bookmarks,
+                                        onPrefetchHeroItem = { prov, item ->
+                                            viewModel.onEvent(HomeUiEvent.OnPrefetchHeroItem(prov ?: primaryProvider, item))
+                                        },
+                                        onHeroBackgroundChanged = { url ->
+                                            currentHeroImageUrl = url
+                                        },
+                                        onItemClick = { item, backdrop, autoPlay ->
+                                            val provName = item.apiName.takeIf { it.isNotBlank() } ?: primaryProvider?.name ?: ""
+                                            onNavigate(
+                                                Config.Details(
+                                                    providerName = provName,
+                                                    url = item.url,
+                                                    preloadedName = item.name,
+                                                    preloadedPoster = item.posterUrl,
+                                                    preloadedBg = backdrop,
+                                                    autoPlay = autoPlay,
+                                                ),
+                                            )
+                                        },
+                                    )
+                                } else {
+                                    HomeHeroCarouselPlaceholder()
+                                }
                             }
                         }
                     }
@@ -287,6 +338,7 @@ fun ComposeHomeScreen(
                             )
                         }
                     }
+                }
                 }
 
                 DesktopVerticalScrollbar(

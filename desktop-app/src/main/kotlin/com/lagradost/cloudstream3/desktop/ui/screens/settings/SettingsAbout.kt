@@ -13,6 +13,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -70,14 +71,17 @@ fun SettingsAbout() {
                     SuggestionChip(
                         onClick = {},
                         label = { Text("v${AppConfig.APP_VERSION} (Alpha)") },
+                        modifier = Modifier.focusProperties { canFocus = false },
                     )
                     SuggestionChip(
                         onClick = {},
                         label = { Text("Java ${System.getProperty("java.version", "JVM")}") },
+                        modifier = Modifier.focusProperties { canFocus = false },
                     )
                     SuggestionChip(
                         onClick = {},
                         label = { Text("Windows x64") },
+                        modifier = Modifier.focusProperties { canFocus = false },
                     )
                 }
 

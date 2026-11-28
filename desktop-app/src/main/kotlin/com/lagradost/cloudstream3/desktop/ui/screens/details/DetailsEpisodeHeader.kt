@@ -2,6 +2,9 @@ package com.lagradost.cloudstream3.desktop.ui.screens.details
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
@@ -15,10 +18,13 @@ import androidx.compose.material.icons.filled.TableRows
 import androidx.compose.material.icons.filled.ViewCarousel
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -31,6 +37,7 @@ import com.lagradost.cloudstream3.desktop.ui.components.DesktopActionBadge
 import com.lagradost.cloudstream3.desktop.ui.components.DesktopFilterChip
 import com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton
 import com.lagradost.cloudstream3.desktop.ui.components.desktopDragScroll
+import com.lagradost.cloudstream3.desktop.ui.components.desktopInteractiveFocus
 import com.lagradost.cloudstream3.desktop.ui.components.shimmerBackground
 import com.lagradost.cloudstream3.desktop.ui.screens.details.contract.DetailsUiState
 import com.lagradost.cloudstream3.desktop.ui.theme.AppearanceConfig
@@ -271,12 +278,25 @@ private fun AntiSpoilerToggleButton(
     isCompact: Boolean,
 ) {
     val toggleShape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact
+    val interactionSource = remember { MutableInteractionSource() }
+    val isFocused by interactionSource.collectIsFocusedAsState()
+    val isHovered by interactionSource.collectIsHoveredAsState()
+    val borderColor = if (isFocused) {
+        MaterialTheme.colorScheme.primary
+    } else if (isHovered) {
+        Color.White.copy(alpha = 0.28f)
+    } else {
+        Color.White.copy(alpha = 0.1f)
+    }
     Surface(
         onClick = { AppearanceConfig.setAntiSpoilerEnabled(!isAntiSpoiler) },
         shape = toggleShape,
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
-        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.1f)),
-        modifier = Modifier.height(if (isCompact) 34.dp else 40.dp),
+        border = BorderStroke(if (isFocused) 1.5.dp else 1.dp, borderColor),
+        interactionSource = interactionSource,
+        modifier = Modifier
+            .height(if (isCompact) 34.dp else 40.dp)
+            .desktopInteractiveFocus(interactionSource = interactionSource, shape = toggleShape),
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -292,7 +312,9 @@ private fun AntiSpoilerToggleButton(
             Switch(
                 checked = isAntiSpoiler,
                 onCheckedChange = { AppearanceConfig.setAntiSpoilerEnabled(it) },
-                modifier = Modifier.scale(if (isCompact) 0.7f else 0.8f),
+                modifier = Modifier
+                    .scale(if (isCompact) 0.7f else 0.8f)
+                    .focusProperties { canFocus = false },
                 colors = SwitchDefaults.colors(
                     checkedThumbColor = Color.White,
                     checkedTrackColor = Color.White.copy(alpha = 0.35f),
