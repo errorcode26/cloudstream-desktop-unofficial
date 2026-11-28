@@ -8,6 +8,9 @@ object BadgeManager {
     const val PREF_BADGE_STYLE = "pref_badge_style"
     const val DEFAULT_STYLE = "Badges-Black-White"
 
+    @Volatile
+    internal var badgesRootOverrideForTesting: File? = null
+
     val currentStyle: String
         get() = DesktopDataStore.getKey<String>(PREF_BADGE_STYLE) ?: DEFAULT_STYLE
 
@@ -15,6 +18,7 @@ object BadgeManager {
      * Resolves the root directory containing all badge styles.
      */
     fun getBadgesRootDir(): File {
+        badgesRootOverrideForTesting?.let { return it }
         val devDir = File("desktop-app/src/main/resources/badges").takeIf { it.exists() && it.isDirectory }
             ?: File("src/main/resources/badges").takeIf { it.exists() && it.isDirectory }
         if (devDir != null) return devDir

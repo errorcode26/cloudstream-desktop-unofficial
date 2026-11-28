@@ -1,12 +1,21 @@
 package com.lagradost.cloudstream3.desktop.explore.viewmodel
 
 import com.lagradost.cloudstream3.desktop.explore.models.ExploreItem
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class ExploreViewModelTest {
+
+    private var activeVm: ExploreViewModel? = null
+
+    @AfterEach
+    fun tearDown() {
+        activeVm?.dispose()
+        activeVm = null
+    }
 
     private fun createItem(
         id: String,
@@ -24,7 +33,7 @@ class ExploreViewModelTest {
 
     @Test
     fun testApplyFilters_YearFiltering() {
-        val viewModel = ExploreViewModel()
+        val viewModel = ExploreViewModel().also { activeVm = it }
         val items = listOf(
             createItem("1", "Modern Movie", "2024"),
             createItem("2", "Twenty Ten Movie", "2015"),
@@ -60,7 +69,7 @@ class ExploreViewModelTest {
 
     @Test
     fun testApplyFilters_QueryFiltering() {
-        val viewModel = ExploreViewModel()
+        val viewModel = ExploreViewModel().also { activeVm = it }
         val items = listOf(
             createItem("1", "Interstellar", "2014", listOf("Sci-Fi", "Drama")),
             createItem("2", "The Dark Knight", "2008", listOf("Action", "Crime")),
@@ -83,7 +92,7 @@ class ExploreViewModelTest {
 
     @Test
     fun testIsTitleRelevant() {
-        val viewModel = ExploreViewModel()
+        val viewModel = ExploreViewModel().also { activeVm = it }
 
         // Exact & case-insensitive
         assertTrue(viewModel.isTitleRelevant("Inception", "Inception"))

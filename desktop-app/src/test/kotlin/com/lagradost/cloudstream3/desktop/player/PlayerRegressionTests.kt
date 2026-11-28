@@ -110,11 +110,22 @@ class PlayerRegressionTests {
         System.setProperty("cloudstream.data.dir", tempDir.absolutePath)
         DesktopDataStore.resetForTesting()
         DesktopDataStore.init()
+        val testBadgesDir = File(tempDir, "badges").apply { mkdirs() }
+        val defaultStyleDir = File(testBadgesDir, BadgeManager.DEFAULT_STYLE).apply { mkdirs() }
+        listOf("hevc.png", "torbox.png").forEach { name ->
+            File(defaultStyleDir, name).writeBytes(byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47))
+        }
+        listOf("rating_imdb.png", "rating_tmdb.png").forEach { name ->
+            File(testBadgesDir, name).writeBytes(byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47))
+        }
+        File(testBadgesDir, "tracker_anilist.svg").writeText("<svg xmlns=\"http://www.w3.org/2000/svg\"/>")
+        BadgeManager.badgesRootOverrideForTesting = testBadgesDir
         testScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     }
 
     @AfterEach
     fun teardown() {
+        BadgeManager.badgesRootOverrideForTesting = null
         testScope.cancel()
         DesktopDataStore.resetForTesting()
         if (prevDataDir != null) {

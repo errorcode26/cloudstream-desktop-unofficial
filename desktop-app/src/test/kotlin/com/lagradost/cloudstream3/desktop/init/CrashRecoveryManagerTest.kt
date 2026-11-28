@@ -1,6 +1,7 @@
 package com.lagradost.cloudstream3.desktop.init
 
 import com.lagradost.common.platform.PlatformPaths
+import com.lagradost.common.storage.DesktopDataStore
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -19,6 +20,7 @@ class CrashRecoveryManagerTest {
 
     @BeforeEach
     fun setup() {
+        DesktopDataStore.resetForTesting()
         prevDataDir = System.getProperty("cloudstream.data.dir")
         System.setProperty("cloudstream.data.dir", tempDir.toFile().absolutePath)
         CrashRecoveryManager.resetForTesting()
@@ -27,6 +29,7 @@ class CrashRecoveryManagerTest {
     @AfterEach
     fun teardown() {
         CrashRecoveryManager.resetForTesting()
+        DesktopDataStore.resetForTesting()
         if (prevDataDir != null) {
             System.setProperty("cloudstream.data.dir", prevDataDir)
         } else {
