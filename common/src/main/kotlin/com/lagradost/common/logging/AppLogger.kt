@@ -12,38 +12,32 @@ object AppLogger {
 
     @JvmOverloads
     fun v(tag: String, message: String, t: Throwable? = null) {
-        if (t != null) logger.trace("[$tag] $message", t) else logger.trace("[$tag] $message")
-        LogBuffer.record(LogLevel.VERBOSE, tag, message, t)
+        logAndRecord(LogLevel.VERBOSE, tag, message, t)
     }
 
     @JvmOverloads
     fun v(message: String, t: Throwable? = null) {
-        if (t != null) logger.trace(message, t) else logger.trace(message)
-        LogBuffer.record(LogLevel.VERBOSE, "General", message, t)
+        logAndRecord(LogLevel.VERBOSE, null, message, t)
     }
 
     @JvmOverloads
     fun d(tag: String, message: String, t: Throwable? = null) {
-        if (t != null) logger.debug("[$tag] $message", t) else logger.debug("[$tag] $message")
-        LogBuffer.record(LogLevel.DEBUG, tag, message, t)
+        logAndRecord(LogLevel.DEBUG, tag, message, t)
     }
 
     @JvmOverloads
     fun d(message: String, t: Throwable? = null) {
-        if (t != null) logger.debug(message, t) else logger.debug(message)
-        LogBuffer.record(LogLevel.DEBUG, "General", message, t)
+        logAndRecord(LogLevel.DEBUG, null, message, t)
     }
 
     @JvmOverloads
     fun i(tag: String, message: String, t: Throwable? = null) {
-        if (t != null) logger.info("[$tag] $message", t) else logger.info("[$tag] $message")
-        LogBuffer.record(LogLevel.INFO, tag, message, t)
+        logAndRecord(LogLevel.INFO, tag, message, t)
     }
 
     @JvmOverloads
     fun i(message: String, t: Throwable? = null) {
-        if (t != null) logger.info(message, t) else logger.info(message)
-        LogBuffer.record(LogLevel.INFO, "General", message, t)
+        logAndRecord(LogLevel.INFO, null, message, t)
     }
 
     private fun isIgnorableException(t: Throwable?): Boolean {
@@ -57,29 +51,41 @@ object AppLogger {
 
     @JvmOverloads
     fun w(tag: String, message: String, t: Throwable? = null) {
-        if (isIgnorableException(t)) return
-        if (t != null) logger.warn("[$tag] $message", t) else logger.warn("[$tag] $message")
-        LogBuffer.record(LogLevel.WARN, tag, message, t)
+        logAndRecord(LogLevel.WARN, tag, message, t)
     }
 
     @JvmOverloads
     fun w(message: String, t: Throwable? = null) {
-        if (isIgnorableException(t)) return
-        if (t != null) logger.warn(message, t) else logger.warn(message)
-        LogBuffer.record(LogLevel.WARN, "General", message, t)
+        logAndRecord(LogLevel.WARN, null, message, t)
     }
 
     @JvmOverloads
     fun e(tag: String, message: String, t: Throwable? = null) {
-        if (isIgnorableException(t)) return
-        if (t != null) logger.error("[$tag] $message", t) else logger.error("[$tag] $message")
-        LogBuffer.record(LogLevel.ERROR, tag, message, t)
+        logAndRecord(LogLevel.ERROR, tag, message, t)
     }
 
     @JvmOverloads
     fun e(message: String, t: Throwable? = null) {
-        if (isIgnorableException(t)) return
-        if (t != null) logger.error(message, t) else logger.error(message)
-        LogBuffer.record(LogLevel.ERROR, "General", message, t)
+        logAndRecord(LogLevel.ERROR, null, message, t)
+    }
+
+    private fun logAndRecord(level: LogLevel, tag: String?, message: String, t: Throwable?) {
+        if ((level == LogLevel.WARN || level == LogLevel.ERROR) && isIgnorableException(t)) return
+        val safeMessage = LogBuffer.sanitize(message)
+        val slf4jText = if (tag != null) "[$tag] $safeMessage" else safeMessage
+        val rawTrace = t?.let { LogBuffer.rawStackTrace(it) }
+        val safeTrace = rawTrace?.let { LogBuffer.sanitize(it) }
+        // Omit raw Throwable when its formatted trace needed redaction so SLF4J appenders never write secrets.
+        val passThrowable = t != null && safeTrace == rawTrace
+        val finalSlf4jText = if (t != null && !passThrowable) "$slf4jText\n$safeTrace" else slf4jText
+
+        when (level) {
+            LogLevel.VERBOSE -> if (passThrowable) logger.trace(finalSlf4jText, t) else logger.trace(finalSlf4jText)
+            LogLevel.DEBUG -> if (passThrowable) logger.debug(finalSlf4jText, t) else logger.debug(finalSlf4jText)
+            LogLevel.INFO -> if (passThrowable) logger.info(finalSlf4jText, t) else logger.info(finalSlf4jText)
+            LogLevel.WARN -> if (passThrowable) logger.warn(finalSlf4jText, t) else logger.warn(finalSlf4jText)
+            LogLevel.ERROR -> if (passThrowable) logger.error(finalSlf4jText, t) else logger.error(finalSlf4jText)
+        }
+        LogBuffer.record(level, tag ?: "General", safeMessage, t)
     }
 }

@@ -107,7 +107,7 @@ fun copyDiagnosticLogsToClipboard(): Boolean {
             appendLine("============================================================")
         }
         val clipboard = Toolkit.getDefaultToolkit().systemClipboard
-        clipboard.setContents(StringSelection(diagnosticInfo), null)
+        clipboard.setContents(StringSelection(LogBuffer.sanitize(diagnosticInfo)), null)
         true
     } catch (_: Throwable) {
         false

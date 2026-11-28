@@ -1,7 +1,5 @@
 package com.lagradost.common.logging
 
-import java.io.PrintWriter
-import java.io.StringWriter
 import java.time.Instant
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
@@ -25,11 +23,7 @@ data class LogEntry(
     }
 
     val stackTraceString: String? by lazy {
-        throwable?.let { t ->
-            val sw = StringWriter()
-            t.printStackTrace(PrintWriter(sw))
-            sw.toString()
-        }
+        throwable?.let { LogBuffer.formatThrowable(it) }
     }
 
     companion object {

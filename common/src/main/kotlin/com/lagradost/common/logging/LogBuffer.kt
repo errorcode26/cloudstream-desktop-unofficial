@@ -4,6 +4,8 @@ import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import java.io.PrintWriter
+import java.io.StringWriter
 import java.util.concurrent.ConcurrentLinkedDeque
 import java.util.concurrent.atomic.AtomicLong
 
@@ -25,22 +27,48 @@ object LogBuffer {
     val logFlow: SharedFlow<LogEntry> = _logFlow.asSharedFlow()
 
     private val SENSITIVE_PARAM_REGEX = Regex(
-        "(?i)(token|password|secret|auth|apikey|api_key|access_token|authorization)=([^&\\s\"',]+)",
+        "(?i)\\b(access_token|refresh_token|id_token|client_secret|code_verifier|api_key|apikey|authorization|password|secret|token|auth)=([^&\\s\"',]+)",
     )
-    private val AUTH_HEADER_REGEX = Regex(
-        "(?i)(Authorization:\\s*(?:Bearer|Basic)\\s+)([^\\s\\r\\n]+)",
+    private val OAUTH_QUERY_CODE_REGEX = Regex(
+        "(?i)([?&]code=)([^&\\s\"',]+)",
+    )
+    private val SENSITIVE_JSON_STRING_REGEX = Regex(
+        "(?i)(\"(?:access_token|refresh_token|id_token|client_secret|code_verifier|api_key|apikey|password|secret|token)\"\\s*:\\s*\")([^\"]+)(\")",
+    )
+    private val SENSITIVE_HEADER_REGEX = Regex(
+        "(?im)((?:authorization|proxy-authorization|x-api-key|api-key|simkl-api-key|x-auth-token|cookie|set-cookie)\\s*:\\s*(?:(?:Bearer|Basic|Token)\\s+)?)([^\\r\\n\"]+)",
+    )
+    private val URL_USERINFO_REGEX = Regex(
+        "(?i)(https?://)([^/@\\s:]+):([^/@\\s]+)@",
     )
 
     fun sanitize(text: String): String {
         var sanitized = text
+        sanitized = URL_USERINFO_REGEX.replace(sanitized) { matchResult ->
+            "${matchResult.groupValues[1]}${matchResult.groupValues[2]}:***MASKED***@"
+        }
         sanitized = SENSITIVE_PARAM_REGEX.replace(sanitized) { matchResult ->
             "${matchResult.groupValues[1]}=***MASKED***"
         }
-        sanitized = AUTH_HEADER_REGEX.replace(sanitized) { matchResult ->
+        sanitized = OAUTH_QUERY_CODE_REGEX.replace(sanitized) { matchResult ->
+            "${matchResult.groupValues[1]}***MASKED***"
+        }
+        sanitized = SENSITIVE_JSON_STRING_REGEX.replace(sanitized) { matchResult ->
+            "${matchResult.groupValues[1]}***MASKED***${matchResult.groupValues[3]}"
+        }
+        sanitized = SENSITIVE_HEADER_REGEX.replace(sanitized) { matchResult ->
             "${matchResult.groupValues[1]}***MASKED***"
         }
         return sanitized
     }
+
+    internal fun rawStackTrace(t: Throwable): String {
+        val sw = StringWriter()
+        t.printStackTrace(PrintWriter(sw))
+        return sw.toString()
+    }
+
+    fun formatThrowable(t: Throwable): String = sanitize(rawStackTrace(t))
 
     fun record(
         level: LogLevel,
@@ -95,7 +123,7 @@ object LogBuffer {
                 val matches = entry.tag.lowercase().contains(cleanQuery) ||
                     entry.message.lowercase().contains(cleanQuery) ||
                     entry.threadName.lowercase().contains(cleanQuery) ||
-                    (entry.throwable?.message?.lowercase()?.contains(cleanQuery) == true)
+                    (entry.throwable?.message?.let { sanitize(it) }?.lowercase()?.contains(cleanQuery) == true)
                 if (!matches) return@filter false
             }
             true
@@ -135,7 +163,7 @@ object LogBuffer {
             if (targetEntry.throwable != null) {
                 appendLine("#### Exception Stack Trace:")
                 appendLine("```text")
-                appendLine(targetEntry.stackTraceString ?: targetEntry.throwable.toString())
+                appendLine(targetEntry.stackTraceString ?: sanitize(targetEntry.throwable.toString()))
                 appendLine("```")
                 appendLine()
             }

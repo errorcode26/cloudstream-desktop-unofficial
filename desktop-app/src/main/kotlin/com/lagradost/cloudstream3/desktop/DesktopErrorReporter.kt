@@ -1,6 +1,7 @@
 package com.lagradost.cloudstream3.desktop
 
 import com.lagradost.common.logging.AppLogger
+import com.lagradost.common.logging.LogBuffer
 
 object DesktopErrorReporter {
     private val lock = Any()
@@ -14,10 +15,10 @@ object DesktopErrorReporter {
             append("[")
             append(System.currentTimeMillis())
             append("] ")
-            append(title)
+            append(LogBuffer.sanitize(title))
             if (throwable != null) {
                 append("\n")
-                append(throwable.stackTraceToString())
+                append(LogBuffer.formatThrowable(throwable))
             }
         }
         synchronized(lock) {

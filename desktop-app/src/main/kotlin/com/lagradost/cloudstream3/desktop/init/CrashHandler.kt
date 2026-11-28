@@ -59,7 +59,7 @@ fun showFatalCrashDialog(thread: Thread, throwable: Throwable) {
             val crashDir = PlatformPaths.appDataDir
             crashDir.mkdirs()
             val crashFile = File(crashDir, "crash.log")
-            val stackTrace = StringWriter().also { throwable.printStackTrace(PrintWriter(it)) }.toString()
+            val stackTrace = LogBuffer.formatThrowable(throwable)
             crashFile.appendText("\n\n[Secondary Fatal Error on ${thread.name}]:\n$stackTrace\n")
         } catch (e: Throwable) { System.err.println("CrashHandler internal note: ${e.message}") }
         return
@@ -82,12 +82,12 @@ private fun renderAndShowCrashDialog(thread: Thread, throwable: Throwable) {
         crashDir.mkdirs()
         val crashFile = File(crashDir, "crash.log")
 
-        val stackTrace = StringWriter().also { throwable.printStackTrace(PrintWriter(it)) }.toString()
+        val stackTrace = LogBuffer.formatThrowable(throwable)
         val time = SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(Date())
 
         val rootCause = generateSequence(throwable) { it.cause }.last()
         val rootCauseClass = rootCause.javaClass.name
-        val rootCauseMsg = rootCause.message ?: throwable.message ?: "No detailed error message available."
+        val rootCauseMsg = LogBuffer.sanitize(rootCause.message ?: throwable.message ?: "No detailed error message available.")
         val subsystem = classifySubsystem(rootCause)
 
         val failingElement = throwable.stackTrace.firstOrNull { it.className.startsWith("com.lagradost") }

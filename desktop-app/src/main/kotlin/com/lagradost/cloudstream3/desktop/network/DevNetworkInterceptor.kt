@@ -22,6 +22,7 @@ class DevNetworkInterceptor : Interceptor {
         "set-cookie",
         "x-api-key",
         "api-key",
+        "simkl-api-key",
         "token",
         "x-auth-token",
         "proxy-authorization",
@@ -63,9 +64,13 @@ class DevNetworkInterceptor : Interceptor {
         } catch (e: Exception) {
             val durationMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNs)
             val isCanceled = chain.call().isCanceled() || e.message?.contains("Canceled", ignoreCase = true) == true
+            val safeError = if (isCanceled) {
+                "Canceled"
+            } else {
+                com.lagradost.common.logging.LogBuffer.sanitize(e.message ?: e.javaClass.simpleName)
+            }
             if (workerId != null) {
-                val errSummary = if (isCanceled) "Canceled" else (e.message ?: e.javaClass.simpleName)
-                System.err.println("[CS_NET] END|$workerId|-1|$durationMs|$errSummary")
+                System.err.println("[CS_NET] END|$workerId|-1|$durationMs|$safeError")
             }
             NetworkTrafficBuffer.recordComplete(
                 id = requestId,
@@ -76,7 +81,7 @@ class DevNetworkInterceptor : Interceptor {
                 responseBody = null,
                 responseSize = 0L,
                 contentType = null,
-                error = e.message ?: e.javaClass.simpleName,
+                error = safeError,
             )
             if (isCanceled && e !is java.io.InterruptedIOException) {
                 val interrupted = java.io.InterruptedIOException(e.message ?: "Canceled")

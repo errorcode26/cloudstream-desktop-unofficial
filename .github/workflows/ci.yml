@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [ "main", "dev" ]
 
+permissions:
+  contents: read
+
 jobs:
   build-and-test:
     runs-on: windows-latest
@@ -24,7 +27,38 @@ jobs:
       uses: gradle/actions/setup-gradle@v3
 
     - name: Run Tests, Build, and Coverage
-      run: ./gradlew :common:test :plugin-runtime:test :player-abstraction:test :desktop-app:test :desktop-app:assemble jacocoTestReport --no-daemon
+      env:
+        ANILIST_KEY: ${{ secrets.ANILIST_KEY }}
+        ANILIST_SECRET: ${{ secrets.ANILIST_SECRET }}
+        TMDB_KEY: ${{ secrets.TMDB_KEY }}
+        MAL_KEY: ${{ secrets.MAL_KEY }}
+        MAL_SECRET: ${{ secrets.MAL_SECRET }}
+        SIMKL_KEY: ${{ secrets.SIMKL_KEY }}
+      run: ./gradlew :common:test :plugin-runtime:test :player-abstraction:test :desktop-app:test :desktop-app:assemble jacocoTestReport --no-daemon --no-build-cache
+
+    - name: Verify Baked Tracker Config Injection (Masked)
+      if: github.event_name == 'push'
+      shell: pwsh
+      run: |
+        $propPath = "desktop-app/build/generated/version-resources/tracker.properties"
+        if (-not (Test-Path $propPath)) {
+          Write-Error "tracker.properties was not generated at $propPath"
+          exit 1
+        }
+        $configuredCount = 0
+        foreach ($line in Get-Content $propPath) {
+          if ($line -match '^([^=]+)=(.*)$') {
+            $k = $Matches[1].Trim()
+            $isSet = -not [string]::IsNullOrWhiteSpace($Matches[2])
+            if ($isSet) { $configuredCount++ }
+            $status = if ($isSet) { "configured (masked)" } else { "empty" }
+            Write-Output "$k : $status"
+          }
+        }
+        if ($configuredCount -eq 0) {
+          Write-Error "Zero secrets were injected into tracker.properties on push."
+          exit 1
+        }
 
     - name: Upload Test and Coverage Reports
       if: always()

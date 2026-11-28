@@ -83,13 +83,6 @@ jobs:
 
     - name: Verify Test Suite
       shell: bash
-      env:
-        ANILIST_KEY: ${{ secrets.ANILIST_KEY }}
-        ANILIST_SECRET: ${{ secrets.ANILIST_SECRET }}
-        TMDB_KEY: ${{ secrets.TMDB_KEY }}
-        MAL_KEY: ${{ secrets.MAL_KEY }}
-        MAL_SECRET: ${{ secrets.MAL_SECRET }}
-        SIMKL_KEY: ${{ secrets.SIMKL_KEY }}
       run: ./gradlew :common:test :plugin-runtime:test :player-abstraction:test :desktop-app:test --no-daemon
 
     - name: Build App (createDistributable and packageMsi)
@@ -104,7 +97,7 @@ jobs:
       run: |
         # Extract version from tag (e.g., v0.1.4 -> 0.1.4)
         VERSION=${GITHUB_REF_NAME#v}
-        ./gradlew :desktop-app:createDistributable :desktop-app:packageMsi :desktop-app:packagePortableZip -PAPP_VERSION=$VERSION --no-daemon
+        ./gradlew :desktop-app:createDistributable :desktop-app:packageMsi :desktop-app:packagePortableZip -PAPP_VERSION=$VERSION --no-daemon --no-build-cache
 
     - name: Install Inno Setup
       run: choco install innosetup --yes
