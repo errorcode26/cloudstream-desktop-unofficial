@@ -11,7 +11,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -87,6 +86,7 @@ import com.lagradost.cloudstream3.desktop.ui.DockPosition
 import com.lagradost.cloudstream3.desktop.ui.LocalSafeArea
 import com.lagradost.cloudstream3.desktop.ui.badges.DesktopBadgeComponents
 import com.lagradost.cloudstream3.desktop.ui.components.HeroPrimaryCtaButton
+import com.lagradost.cloudstream3.desktop.ui.components.collectIsKeyboardFocusedAsState
 import com.lagradost.cloudstream3.desktop.ui.components.desktopInteractiveFocus
 import com.lagradost.cloudstream3.desktop.ui.theme.AppearanceConfig
 import com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes
@@ -864,7 +864,7 @@ private fun HeroCarouselChevronButton(
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
-    val isFocused by interactionSource.collectIsFocusedAsState()
+    val isFocused by interactionSource.collectIsKeyboardFocusedAsState()
     val isHighlighted = isHovered || isFocused
     Box(
         modifier = modifier

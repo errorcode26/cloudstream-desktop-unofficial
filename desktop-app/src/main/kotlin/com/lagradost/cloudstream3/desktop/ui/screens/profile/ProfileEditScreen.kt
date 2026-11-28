@@ -12,7 +12,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -105,6 +104,7 @@ import com.lagradost.cloudstream3.desktop.ui.components.DesktopOutlinedButton
 import com.lagradost.cloudstream3.desktop.ui.components.DesktopTextButton
 import com.lagradost.cloudstream3.desktop.ui.components.DesktopVerticalScrollbar
 import com.lagradost.cloudstream3.desktop.ui.components.LocalDesktopTheme
+import com.lagradost.cloudstream3.desktop.ui.components.collectIsKeyboardFocusedAsState
 import com.lagradost.cloudstream3.desktop.ui.components.desktopInteractiveFocus
 import com.lagradost.cloudstream3.desktop.ui.components.handleEscapeKey
 import com.lagradost.cloudstream3.desktop.ui.screens.profile.contract.DiceBearBackground
@@ -794,7 +794,7 @@ private fun SegmentedModePill(
     val theme = LocalDesktopTheme.current
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
-    val isFocused by interactionSource.collectIsFocusedAsState()
+    val isFocused by interactionSource.collectIsKeyboardFocusedAsState()
     val isActiveVisual = isHovered || isFocused
     val pillShape = RoundedCornerShape(7.dp)
 
@@ -864,7 +864,7 @@ private fun GradientsArtworkSection(
                 val isSelected = state.selectedColorIndex == index
                 val interactionSource = remember { MutableInteractionSource() }
                 val isHovered by interactionSource.collectIsHoveredAsState()
-                val isFocused by interactionSource.collectIsFocusedAsState()
+                val isFocused by interactionSource.collectIsKeyboardFocusedAsState()
                 val isActiveVisual = isHovered || isFocused
 
                 Box(
@@ -1284,7 +1284,7 @@ private fun BackgroundSwatchDot(
     val theme = LocalDesktopTheme.current
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
-    val isFocused by interactionSource.collectIsFocusedAsState()
+    val isFocused by interactionSource.collectIsKeyboardFocusedAsState()
     val isActiveVisual = isHovered || isFocused
 
     val borderStrokeColor = when {
@@ -1355,7 +1355,7 @@ private fun StyleRailItem(
     val theme = LocalDesktopTheme.current
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
-    val isFocused by interactionSource.collectIsFocusedAsState()
+    val isFocused by interactionSource.collectIsKeyboardFocusedAsState()
     val isActiveVisual = isHovered || isFocused
     val itemShape = RoundedCornerShape(8.dp)
 
@@ -1415,7 +1415,7 @@ private fun AvatarGalleryTile(
     var loadState by remember(thumbUrl) { mutableStateOf(TileLoadState.LOADING) }
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
-    val isFocused by interactionSource.collectIsFocusedAsState()
+    val isFocused by interactionSource.collectIsKeyboardFocusedAsState()
     val isActiveVisual = isHovered || isFocused
 
     val tileShape = RoundedCornerShape(14.dp)

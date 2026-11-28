@@ -13,7 +13,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -51,6 +50,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.Dp
+import com.lagradost.cloudstream3.desktop.ui.components.collectIsKeyboardFocusedAsState
 import com.lagradost.cloudstream3.desktop.ui.components.desktopInteractiveFocus
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
@@ -137,7 +137,7 @@ internal fun BoxScope.HeroFilmstrip(
                         modifier = Modifier.alpha(thumbAlpha),
                     ) {
                         val thumbInteraction = remember { MutableInteractionSource() }
-                        val isThumbFocused by thumbInteraction.collectIsFocusedAsState()
+                        val isThumbFocused by thumbInteraction.collectIsKeyboardFocusedAsState()
                         val thumbShape = RoundedCornerShape(8.dp)
                         Box(
                             modifier = Modifier

@@ -7,7 +7,6 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -73,7 +72,7 @@ fun WatchHistoryCard(
 
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
-    val isFocused by interactionSource.collectIsFocusedAsState()
+    val isFocused by interactionSource.collectIsKeyboardFocusedAsState()
     val isActiveVisual = isHovered || isFocused
     val scale by animateFloatAsState(
         targetValue = if (isActiveVisual) 1.03f else 1f,
@@ -509,7 +508,7 @@ fun WatchHistoryCardDetailed(
 
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
-    val isFocused by interactionSource.collectIsFocusedAsState()
+    val isFocused by interactionSource.collectIsKeyboardFocusedAsState()
     val isActiveVisual = isHovered || isFocused
     val scale by animateFloatAsState(
         targetValue = if (isActiveVisual) 1.025f else 1f,

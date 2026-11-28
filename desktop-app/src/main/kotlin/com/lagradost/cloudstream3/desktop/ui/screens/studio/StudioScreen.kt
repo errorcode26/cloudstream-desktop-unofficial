@@ -4,7 +4,6 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.*
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -32,6 +31,7 @@ import coil3.compose.AsyncImage
 import com.lagradost.cloudstream3.TvType
 import com.lagradost.cloudstream3.desktop.ui.components.DesktopDrilldownScaffold
 import com.lagradost.cloudstream3.desktop.ui.components.LocalDesktopTheme
+import com.lagradost.cloudstream3.desktop.ui.components.collectIsKeyboardFocusedAsState
 import com.lagradost.cloudstream3.desktop.ui.components.desktopFocusRing
 import com.lagradost.cloudstream3.desktop.ui.components.desktopInteractiveFocus
 import com.lagradost.cloudstream3.desktop.ui.navigation.Config
@@ -539,7 +539,7 @@ private fun StudioMediaCard(
     val theme = LocalDesktopTheme.current
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
-    val isFocused by interactionSource.collectIsFocusedAsState()
+    val isFocused by interactionSource.collectIsKeyboardFocusedAsState()
     val isActiveVisual = isHovered || isFocused
     val cardShape = RoundedCornerShape(12.dp)
 

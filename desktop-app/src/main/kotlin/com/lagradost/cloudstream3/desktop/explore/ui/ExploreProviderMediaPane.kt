@@ -7,7 +7,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -39,6 +38,7 @@ import com.lagradost.cloudstream3.desktop.stremio.matchesType
 import com.lagradost.cloudstream3.desktop.ui.PremiumIcons
 import com.lagradost.cloudstream3.desktop.ui.badges.DesktopBadgeComponents
 import com.lagradost.cloudstream3.desktop.ui.components.LocalDesktopTheme
+import com.lagradost.cloudstream3.desktop.ui.components.collectIsKeyboardFocusedAsState
 import com.lagradost.cloudstream3.desktop.ui.components.desktopInteractiveFocus
 import com.lagradost.common.storage.WatchHistory
 import com.lagradost.player.impl.PlayerLinkHandler
@@ -675,7 +675,7 @@ private fun ExploreProviderAddonCta(
     val theme = LocalDesktopTheme.current
     val buttonInteractionSource = remember { MutableInteractionSource() }
     val isButtonHovered by buttonInteractionSource.collectIsHoveredAsState()
-    val isButtonFocused by buttonInteractionSource.collectIsFocusedAsState()
+    val isButtonFocused by buttonInteractionSource.collectIsKeyboardFocusedAsState()
     val isActiveVisual = isButtonHovered || isButtonFocused
     val ctaShape = RoundedCornerShape(14.dp)
 

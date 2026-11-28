@@ -3,7 +3,6 @@ package com.lagradost.cloudstream3.desktop.ui.screens.details
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyListState
@@ -36,6 +35,7 @@ import com.lagradost.cloudstream3.Episode
 import com.lagradost.cloudstream3.desktop.ui.components.DesktopActionBadge
 import com.lagradost.cloudstream3.desktop.ui.components.DesktopFilterChip
 import com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton
+import com.lagradost.cloudstream3.desktop.ui.components.collectIsKeyboardFocusedAsState
 import com.lagradost.cloudstream3.desktop.ui.components.desktopDragScroll
 import com.lagradost.cloudstream3.desktop.ui.components.desktopInteractiveFocus
 import com.lagradost.cloudstream3.desktop.ui.components.shimmerBackground
@@ -279,7 +279,7 @@ private fun AntiSpoilerToggleButton(
 ) {
     val toggleShape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact
     val interactionSource = remember { MutableInteractionSource() }
-    val isFocused by interactionSource.collectIsFocusedAsState()
+    val isFocused by interactionSource.collectIsKeyboardFocusedAsState()
     val isHovered by interactionSource.collectIsHoveredAsState()
     val borderColor = if (isFocused) {
         MaterialTheme.colorScheme.primary

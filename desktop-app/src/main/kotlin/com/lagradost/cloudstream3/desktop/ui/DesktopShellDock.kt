@@ -10,7 +10,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -55,6 +54,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.lagradost.cloudstream3.desktop.ui.components.collectIsKeyboardFocusedAsState
 import com.lagradost.cloudstream3.desktop.ui.components.desktopInteractiveFocus
 import androidx.compose.ui.zIndex
 import com.lagradost.cloudstream3.desktop.ui.components.DockItemsList
@@ -537,7 +537,7 @@ internal fun MobileTabItem(
     val primaryColor = MaterialTheme.colorScheme.primary
     val unselectedColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
     val interactionSource = remember { MutableInteractionSource() }
-    val isFocused by interactionSource.collectIsFocusedAsState()
+    val isFocused by interactionSource.collectIsKeyboardFocusedAsState()
     val isHovered by interactionSource.collectIsHoveredAsState()
     val isHighlighted = selected || isHovered || isFocused
     val shape = RoundedCornerShape(10.dp)

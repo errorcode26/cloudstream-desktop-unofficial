@@ -8,7 +8,6 @@ import androidx.compose.foundation.TooltipArea
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -35,7 +34,11 @@ import coil3.compose.AsyncImage
 import com.lagradost.cloudstream3.desktop.repo.DesktopRepositoryManager
 import com.lagradost.cloudstream3.desktop.stremio.StremioAddonManager
 import com.lagradost.cloudstream3.desktop.ui.badges.BadgeManager
+import com.lagradost.cloudstream3.desktop.ui.badges.StreamTechTagExtractor
+import com.lagradost.cloudstream3.desktop.ui.badges.TechTag
+import com.lagradost.cloudstream3.desktop.ui.badges.TechTagType
 import com.lagradost.cloudstream3.desktop.ui.components.DesktopUi
+import com.lagradost.cloudstream3.desktop.ui.components.collectIsKeyboardFocusedAsState
 import com.lagradost.cloudstream3.desktop.ui.components.desktopInteractiveFocus
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.ExtractorLinkType
@@ -71,229 +74,8 @@ internal fun extractCleanSize(rawName: String): String? {
     }
 }
 
-enum class TechTagType { FORMAT, CODEC, HDR, AUDIO }
-data class TechTag(val text: String, val type: TechTagType, val badgeFile: String? = null)
-
-private val REGEX_HIN = Regex("""\b(HIN|HINDI)\b""", RegexOption.IGNORE_CASE)
-private val REGEX_ENG = Regex("""\b(ENG|ENGLISH)\b""", RegexOption.IGNORE_CASE)
-private val REGEX_TAM = Regex("""\b(TAM|TAMIL)\b""", RegexOption.IGNORE_CASE)
-private val REGEX_TEL = Regex("""\b(TEL|TELUGU)\b""", RegexOption.IGNORE_CASE)
-private val REGEX_MAL = Regex("""\b(MAL|MALAYALAM)\b""", RegexOption.IGNORE_CASE)
-private val REGEX_KAN = Regex("""\b(KAN|KANNADA)\b""", RegexOption.IGNORE_CASE)
-private val REGEX_SPA = Regex("""\b(SPA|SPANISH|CASTELLANO)\b""", RegexOption.IGNORE_CASE)
-private val REGEX_FRE = Regex("""\b(FRE|FRA|FRENCH|VFF|VFQ)\b""", RegexOption.IGNORE_CASE)
-private val REGEX_GER = Regex("""\b(GER|DEU|GERMAN|DEUTSCH)\b""", RegexOption.IGNORE_CASE)
-private val REGEX_ITA = Regex("""\b(ITA|ITALIAN)\b""", RegexOption.IGNORE_CASE)
-private val REGEX_POR = Regex("""\b(POR|PORTUGUESE)\b""", RegexOption.IGNORE_CASE)
-private val REGEX_RUS = Regex("""\b(RUS|RUSSIAN)\b""", RegexOption.IGNORE_CASE)
-private val REGEX_JPN = Regex("""\b(JPN|JAPANESE)\b""", RegexOption.IGNORE_CASE)
-private val REGEX_KOR = Regex("""\b(KOR|KOREAN)\b""", RegexOption.IGNORE_CASE)
-private val REGEX_CHI = Regex("""\b(CHI|CHINESE|MANDARIN|CANTONESE)\b""", RegexOption.IGNORE_CASE)
-private val REGEX_ARA = Regex("""\b(ARA|ARABIC)\b""", RegexOption.IGNORE_CASE)
-private val REGEX_TUR = Regex("""\b(TUR|TURKISH)\b""", RegexOption.IGNORE_CASE)
-private val REGEX_CAM = Regex("""\b(CAM|HDCAM|CAMRIP|CAM-RIP)\b""", RegexOption.IGNORE_CASE)
-private val REGEX_TS = Regex("""\b(TS|HDTS|HD-TS|TELESYNC)\b""", RegexOption.IGNORE_CASE)
-private val REGEX_TC = Regex("""\b(TC|HDTC|TELECINE)\b""", RegexOption.IGNORE_CASE)
-private val REGEX_SCR = Regex("""\b(SCR|SCREENER|DVDSCR)\b""", RegexOption.IGNORE_CASE)
-private val REGEX_DVD = Regex("""\b(DVD|DVDRIP|DVD-RIP)\b""", RegexOption.IGNORE_CASE)
-private val REGEX_PROPER = Regex("""\bPROPER\b""", RegexOption.IGNORE_CASE)
-private val REGEX_DC = Regex("""\b(DIRECTORS CUT|DIRECTOR'S CUT|DC)\b""", RegexOption.IGNORE_CASE)
-private val REGEX_DUB = Regex("""\b(DUBBED|DUB)\b""", RegexOption.IGNORE_CASE)
-
-internal fun extractStructuredTechTags(rawName: String): List<TechTag> {
-    if (rawName.isBlank()) return emptyList()
-    return try {
-        val tags = mutableListOf<TechTag>()
-        val upper = rawName.uppercase()
-
-    // 0. Debrid providers
-    if (upper.contains("[RD") || upper.contains("RD+") || upper.contains("REAL-DEBRID")) {
-        tags.add(TechTag("Real-Debrid", TechTagType.FORMAT, "rd.png"))
-    } else if (upper.contains("[TB") || upper.contains("TB+") || upper.contains("TORBOX")) {
-        tags.add(TechTag("TorBox", TechTagType.FORMAT, "torbox.png"))
-    } else if (upper.contains("[AD") || upper.contains("AD+") || upper.contains("ALLDEBRID")) {
-        tags.add(TechTag("AllDebrid", TechTagType.FORMAT, "alldebrid.png"))
-    } else if (upper.contains("[PM") || upper.contains("PM+") || upper.contains("PREMIUMIZE")) {
-        tags.add(TechTag("Premiumize", TechTagType.FORMAT, "premiumize.png"))
-    } else if (upper.contains("[DL") || upper.contains("DL+") || upper.contains("DEBRID-LINK") || upper.contains("DEBRIDLINK")) {
-        tags.add(TechTag("Debrid-Link", TechTagType.FORMAT, "debridlink.png"))
-    }
-
-    // 1. Format / Rip
-    if (upper.contains("REMUX")) {
-        tags.add(TechTag("REMUX", TechTagType.FORMAT, "source-remux.png"))
-    } else if (upper.contains("BLURAY") || upper.contains("BLU-RAY") || upper.contains("BDRIP") || upper.contains("BRRIP")) {
-        tags.add(TechTag("BluRay", TechTagType.FORMAT, "source-bluray.png"))
-    } else if (upper.contains("WEB-DL") || upper.contains("WEBDL")) {
-        tags.add(TechTag("WEB-DL", TechTagType.FORMAT, "source-webdl.png"))
-    } else if (upper.contains("WEBRIP") || upper.contains("WEB-RIP")) {
-        tags.add(TechTag("WEBRip", TechTagType.FORMAT, "source-webrip.png"))
-    } else if (REGEX_CAM.containsMatchIn(rawName)) {
-        tags.add(TechTag("CAM", TechTagType.FORMAT, "cam.png"))
-    } else if (REGEX_TS.containsMatchIn(rawName)) {
-        tags.add(TechTag("TeleSync", TechTagType.FORMAT, "telesync.png"))
-    } else if (REGEX_TC.containsMatchIn(rawName)) {
-        tags.add(TechTag("TeleCine", TechTagType.FORMAT, "tc.png"))
-    } else if (REGEX_SCR.containsMatchIn(rawName)) {
-        tags.add(TechTag("SCR", TechTagType.FORMAT, "scr.png"))
-    } else if (upper.contains("HDTV") || upper.contains("PDTV")) {
-        tags.add(TechTag("HDTV", TechTagType.FORMAT, "source-hdtv.png"))
-    } else if (REGEX_DVD.containsMatchIn(rawName)) {
-        tags.add(TechTag("DVD", TechTagType.FORMAT, "source-dvd.png"))
-    }
-
-    // Editions
-    if (upper.contains("IMAX ENHANCED")) {
-        tags.add(TechTag("IMAX Enhanced", TechTagType.FORMAT, "imax-enhanced.png"))
-    } else if (upper.contains("IMAX")) {
-        tags.add(TechTag("IMAX", TechTagType.FORMAT, "imax.png"))
-    }
-    if (REGEX_DC.containsMatchIn(rawName)) {
-        tags.add(TechTag("Director's Cut", TechTagType.FORMAT, "directors-cut.png"))
-    } else if (upper.contains("EXTENDED")) {
-        tags.add(TechTag("Extended", TechTagType.FORMAT, "extended.png"))
-    } else if (upper.contains("REMASTERED") || upper.contains("REMASTER")) {
-        tags.add(TechTag("Remastered", TechTagType.FORMAT, "remastered.png"))
-    } else if (REGEX_PROPER.containsMatchIn(rawName)) {
-        tags.add(TechTag("PROPER", TechTagType.FORMAT, "proper.png"))
-    }
-
-    // 2. Dynamic Range / HDR
-    if (upper.contains("DOLBY VISION") || upper.contains("DOVI") || upper.contains("DV ") || upper.contains(".DV.") || upper.contains("-DV-") || upper.contains("[DV]")) {
-        tags.add(TechTag("Dolby Vision", TechTagType.HDR, "dolby-vision.png"))
-    } else if (upper.contains("HDR10+")) {
-        tags.add(TechTag("HDR10+", TechTagType.HDR, "hdr10plus.png"))
-    } else if (upper.contains("HDR10")) {
-        tags.add(TechTag("HDR10", TechTagType.HDR, "hdr10.png"))
-    } else if (Regex("""\bHDR\b""").containsMatchIn(upper) || upper.contains("[HDR]")) {
-        tags.add(TechTag("HDR", TechTagType.HDR, "hdr.png"))
-    }
-
-    // 3. Video Codec
-    if (upper.contains("AV1")) {
-        tags.add(TechTag("AV1", TechTagType.CODEC, "av1.png"))
-    } else if (upper.contains("HEVC") || upper.contains("X265") || upper.contains("H.265") || upper.contains("H265")) {
-        tags.add(TechTag("HEVC", TechTagType.CODEC, "hevc.png"))
-    } else if (upper.contains("X264") || upper.contains("H.264") || upper.contains("H264") || upper.contains("AVC")) {
-        tags.add(TechTag("AVC", TechTagType.CODEC, "avc.png"))
-    } else if (upper.contains("PRORES")) {
-        tags.add(TechTag("ProRes", TechTagType.CODEC, "prores.png"))
-    } else if (upper.contains("VP9")) {
-        tags.add(TechTag("VP9", TechTagType.CODEC, "vp9.png"))
-    }
-    if (upper.contains("10BIT") || upper.contains("10-BIT") || upper.contains("10 BIT")) {
-        tags.add(TechTag("10-bit", TechTagType.CODEC, "10bit.png"))
-    }
-
-    // 4. Audio Codec
-    if (upper.contains("ATMOS")) {
-        tags.add(TechTag("Atmos", TechTagType.AUDIO, "atmos.png"))
-    }
-    if (upper.contains("TRUEHD")) {
-        tags.add(TechTag("TrueHD", TechTagType.AUDIO, "truehd.png"))
-    } else if (upper.contains("DTS:X") || upper.contains("DTS-X")) {
-        tags.add(TechTag("DTS:X", TechTagType.AUDIO, "dtsx.png"))
-    } else if (upper.contains("DTS-HD") || upper.contains("DTSHD")) {
-        tags.add(TechTag("DTS-HD", TechTagType.AUDIO, "dtshd-ma.png"))
-    } else if (upper.contains("DTS")) {
-        tags.add(TechTag("DTS", TechTagType.AUDIO, "dts.png"))
-    } else if (upper.contains("DDP5.1") || upper.contains("DDP 5.1") || upper.contains("EAC3 5.1") || upper.contains("E-AC-3 5.1") || upper.contains("DDP5")) {
-        tags.add(TechTag("DDP 5.1", TechTagType.AUDIO, "ddplus.png"))
-    } else if (upper.contains("DDP7.1") || upper.contains("DDP 7.1") || upper.contains("EAC3 7.1")) {
-        tags.add(TechTag("DDP 7.1", TechTagType.AUDIO, "ddplus.png"))
-    } else if (upper.contains("DDP2") || upper.contains("DDP 2.0") || upper.contains("DDP") || upper.contains("DD+") || upper.contains("EAC3") || upper.contains("E-AC-3")) {
-        tags.add(TechTag("DD+", TechTagType.AUDIO, "ddplus.png"))
-    } else if (upper.contains("DD5.1") || upper.contains("DD 5.1") || upper.contains("AC3 5.1") || upper.contains("AC-3 5.1")) {
-        tags.add(TechTag("DD 5.1", TechTagType.AUDIO, "dd.png"))
-    } else if (upper.contains("FLAC")) {
-        tags.add(TechTag("FLAC", TechTagType.AUDIO, "flac.png"))
-    } else if (upper.contains("AAC 5.1") || upper.contains("AAC5.1")) {
-        tags.add(TechTag("AAC 5.1", TechTagType.AUDIO, "aac.png"))
-    } else if (upper.contains("AAC")) {
-        tags.add(TechTag("AAC", TechTagType.AUDIO, "aac.png"))
-    } else if (upper.contains("OPUS")) {
-        tags.add(TechTag("Opus", TechTagType.AUDIO, "opus.png"))
-    }
-
-    // Audio Channels
-    if (upper.contains("7.1") || upper.contains("8CH") || upper.contains("8 CH")) {
-        tags.add(TechTag("7.1", TechTagType.AUDIO, "7-1.png"))
-    } else if (upper.contains("5.1") || upper.contains("6CH") || upper.contains("6 CH")) {
-        tags.add(TechTag("5.1", TechTagType.AUDIO, "5-1.png"))
-    } else if (upper.contains("2.0") || upper.contains("2CH") || upper.contains("STEREO")) {
-        tags.add(TechTag("2.0", TechTagType.AUDIO, "2-0.png"))
-    }
-
-    // Audio & Subtitle Features
-    if (upper.contains("DUAL AUDIO") || upper.contains("DUAL-AUDIO") || upper.contains("DUALAUDIO")) {
-        tags.add(TechTag("Dual Audio", TechTagType.AUDIO, "dual-audio.png"))
-    } else if (upper.contains("MULTI AUDIO") || upper.contains("MULTI-AUDIO") || upper.contains("MULTIAUDIO")) {
-        tags.add(TechTag("Multi Audio", TechTagType.AUDIO, "multi-audio.png"))
-    } else if (REGEX_DUB.containsMatchIn(rawName)) {
-        tags.add(TechTag("Dubbed", TechTagType.AUDIO, "dubbed.png"))
-    }
-    if (upper.contains("MULTI SUB") || upper.contains("MULTI-SUB") || upper.contains("MULTISUB")) {
-        tags.add(TechTag("Multi Sub", TechTagType.FORMAT, "multi-sub.png"))
-    }
-
-    // 5. Languages
-    if (REGEX_HIN.containsMatchIn(rawName)) {
-        tags.add(TechTag("HIN", TechTagType.FORMAT, "lang-hi.png"))
-    }
-    if (REGEX_ENG.containsMatchIn(rawName)) {
-        tags.add(TechTag("ENG", TechTagType.FORMAT, "lang-en.png"))
-    }
-    if (REGEX_TAM.containsMatchIn(rawName)) {
-        tags.add(TechTag("TAM", TechTagType.FORMAT, "lang-ta.png"))
-    }
-    if (REGEX_TEL.containsMatchIn(rawName)) {
-        tags.add(TechTag("TEL", TechTagType.FORMAT, "lang-te.png"))
-    }
-    if (REGEX_MAL.containsMatchIn(rawName)) {
-        tags.add(TechTag("MAL", TechTagType.FORMAT, "lang-ml.png"))
-    }
-    if (REGEX_KAN.containsMatchIn(rawName)) {
-        tags.add(TechTag("KAN", TechTagType.FORMAT, "lang-kn.png"))
-    }
-    if (REGEX_SPA.containsMatchIn(rawName)) {
-        tags.add(TechTag("SPA", TechTagType.FORMAT, "lang-es.png"))
-    }
-    if (REGEX_FRE.containsMatchIn(rawName)) {
-        tags.add(TechTag("FRE", TechTagType.FORMAT, "lang-fr.png"))
-    }
-    if (REGEX_GER.containsMatchIn(rawName)) {
-        tags.add(TechTag("GER", TechTagType.FORMAT, "lang-de.png"))
-    }
-    if (REGEX_ITA.containsMatchIn(rawName)) {
-        tags.add(TechTag("ITA", TechTagType.FORMAT, "lang-it.png"))
-    }
-    if (REGEX_POR.containsMatchIn(rawName)) {
-        tags.add(TechTag("POR", TechTagType.FORMAT, "lang-pt.png"))
-    }
-    if (REGEX_RUS.containsMatchIn(rawName)) {
-        tags.add(TechTag("RUS", TechTagType.FORMAT, "lang-ru.png"))
-    }
-    if (REGEX_JPN.containsMatchIn(rawName)) {
-        tags.add(TechTag("JPN", TechTagType.FORMAT, "lang-ja.png"))
-    }
-    if (REGEX_KOR.containsMatchIn(rawName)) {
-        tags.add(TechTag("KOR", TechTagType.FORMAT, "lang-ko.png"))
-    }
-    if (REGEX_CHI.containsMatchIn(rawName)) {
-        tags.add(TechTag("CHI", TechTagType.FORMAT, "lang-zh.png"))
-    }
-    if (REGEX_ARA.containsMatchIn(rawName)) {
-        tags.add(TechTag("ARA", TechTagType.FORMAT, "lang-ar.png"))
-    }
-    if (REGEX_TUR.containsMatchIn(rawName)) {
-        tags.add(TechTag("TUR", TechTagType.FORMAT, "lang-tr.png"))
-    }
-
-    tags.distinctBy { it.text }
-    } catch (_: Exception) {
-        emptyList()
-    }
-}
+internal fun extractStructuredTechTags(rawName: String): List<TechTag> =
+    StreamTechTagExtractor.extract(rawName)
 
 internal fun extractTechTags(rawName: String): List<String> = extractStructuredTechTags(rawName).map { it.text }
 
@@ -310,7 +92,7 @@ private fun StreamActionIconButton(
 ) {
     val interaction = remember { MutableInteractionSource() }
     val isHovered by interaction.collectIsHoveredAsState()
-    val isFocused by interaction.collectIsFocusedAsState()
+    val isFocused by interaction.collectIsKeyboardFocusedAsState()
     val isHighlighted = isHovered || isFocused
 
     val containerBg = when {
@@ -395,7 +177,7 @@ fun StreamLinkCard(
 ) {
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
-    val focused by interaction.collectIsFocusedAsState()
+    val focused by interaction.collectIsKeyboardFocusedAsState()
     val isHighlighted = hovered || focused
     val scale by animateFloatAsState(
         targetValue = if (isHighlighted) 1.005f else 1f,

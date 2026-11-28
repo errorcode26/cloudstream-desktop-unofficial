@@ -23,6 +23,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.min
 import com.lagradost.cloudstream3.TvType
@@ -268,20 +270,20 @@ fun ContextMenuOverlay() {
             val screenMaxHeight = this@BoxWithConstraints.maxHeight
 
             // Sizable dimensions adapt dynamically to available window height
-            val posterHeight = if (isEpisode) {
-                (screenMaxHeight * 0.32f).coerceIn(220.dp, 320.dp)
+            val posterHeight: Dp
+            val posterWidth: Dp
+            val actionCardWidth: Dp
+            if (isEpisode) {
+                val targetHeight = (screenMaxHeight * 0.28f).coerceIn(190.dp, 252.dp)
+                posterWidth = (targetHeight * 16f / 9f)
+                    .coerceAtMost(this@BoxWithConstraints.maxWidth * 0.78f)
+                    .coerceIn(338.dp, 448.dp)
+                posterHeight = posterWidth * 9f / 16f
+                actionCardWidth = posterWidth
             } else {
-                (screenMaxHeight * 0.44f).coerceIn(300.dp, 440.dp)
-            }
-            val posterWidth = if (isEpisode) {
-                (posterHeight * 16f / 9f).coerceAtMost(this@BoxWithConstraints.maxWidth * 0.75f)
-            } else {
-                posterHeight * 2f / 3f
-            }
-            val actionCardWidth = if (isEpisode) {
-                min(360.dp, posterWidth.coerceAtLeast(320.dp))
-            } else {
-                min(280.dp, posterWidth.coerceAtLeast(260.dp))
+                posterHeight = (screenMaxHeight * 0.44f).coerceIn(300.dp, 440.dp)
+                posterWidth = posterHeight * 2f / 3f
+                actionCardWidth = min(280.dp, posterWidth.coerceAtLeast(260.dp))
             }
 
             Box(
@@ -327,12 +329,13 @@ fun ContextMenuOverlay() {
                             timeLeftText = timeLeftText,
                         )
 
-                        Spacer(modifier = Modifier.height(14.dp))
+                        Spacer(modifier = Modifier.height(if (isEpisode) 12.dp else 14.dp))
 
                         // 3. Floating Rounded Action List Pill
                         val actionShape = remember { RoundedCornerShape(16.dp) }
                         Surface(
                             modifier = Modifier
+                                .testTag("context_menu_actions_card")
                                 .width(actionCardWidth)
                                 .wrapContentHeight()
                                 .shadow(

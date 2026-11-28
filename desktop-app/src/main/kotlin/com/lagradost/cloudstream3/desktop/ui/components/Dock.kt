@@ -11,7 +11,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -187,7 +186,7 @@ fun DockItem(
 ) {
     val itemInteraction = remember { MutableInteractionSource() }
     val isHovered by itemInteraction.collectIsHoveredAsState()
-    val isFocused by itemInteraction.collectIsFocusedAsState()
+    val isFocused by itemInteraction.collectIsKeyboardFocusedAsState()
     val isActiveVisual = isHovered || isFocused
 
     val theme = LocalDesktopTheme.current
@@ -501,7 +500,7 @@ fun DockProfileAvatar(
 
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
-    val isFocused by interactionSource.collectIsFocusedAsState()
+    val isFocused by interactionSource.collectIsKeyboardFocusedAsState()
     val isActiveVisual = isHovered || isFocused
 
     // PIN prompt modal
@@ -721,7 +720,7 @@ fun DockProfileAvatar(
                 otherProfiles.forEach { profile ->
                     val rowInteractionSource = remember { MutableInteractionSource() }
                     val isRowHovered by rowInteractionSource.collectIsHoveredAsState()
-                    val isRowFocused by rowInteractionSource.collectIsFocusedAsState()
+                    val isRowFocused by rowInteractionSource.collectIsKeyboardFocusedAsState()
                     val rowShape = RoundedCornerShape(10.dp)
 
                     Surface(

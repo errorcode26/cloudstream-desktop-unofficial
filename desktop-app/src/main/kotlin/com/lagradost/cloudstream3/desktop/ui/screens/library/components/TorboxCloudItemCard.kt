@@ -8,7 +8,6 @@ import androidx.compose.foundation.TooltipArea
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -30,6 +29,7 @@ import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import com.lagradost.cloudstream3.desktop.debrid.torbox.TorboxApiClient
 import com.lagradost.cloudstream3.desktop.debrid.torbox.TorboxTorrentData
+import com.lagradost.cloudstream3.desktop.ui.components.collectIsKeyboardFocusedAsState
 import com.lagradost.cloudstream3.desktop.ui.components.desktopFocusableCard
 import com.lagradost.common.logging.AppLogger
 import com.lagradost.common.storage.DesktopDataStore
@@ -84,7 +84,7 @@ internal fun TorboxCloudItemCard(
     }
 
     val cardShape = RoundedCornerShape(12.dp)
-    val isFocused by interactionSource.collectIsFocusedAsState()
+    val isFocused by interactionSource.collectIsKeyboardFocusedAsState()
     val isHighlighted = isHovered || isFocused
 
     Card(

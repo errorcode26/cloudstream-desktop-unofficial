@@ -5,7 +5,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -354,7 +353,7 @@ private fun TopBarProfilePill(
 
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
-    val isFocused by interactionSource.collectIsFocusedAsState()
+    val isFocused by interactionSource.collectIsKeyboardFocusedAsState()
     val isExpanded = showProfileName || isHovered || isFocused || showProfileFlyout
 
     val buttonShapes = LocalDesktopButtonShapes.current
@@ -487,7 +486,7 @@ private fun TopBarProfilePill(
                 otherProfiles.forEach { profile ->
                     val rowInteractionSource = remember { MutableInteractionSource() }
                     val isRowHovered by rowInteractionSource.collectIsHoveredAsState()
-                    val isRowFocused by rowInteractionSource.collectIsFocusedAsState()
+                    val isRowFocused by rowInteractionSource.collectIsKeyboardFocusedAsState()
                     val rowHighlight = isRowHovered || isRowFocused
                     val rowShape = RoundedCornerShape(10.dp)
 
@@ -547,7 +546,7 @@ private fun TopBarProfilePill(
             // Action: Add Profile
             val addInteraction = remember { MutableInteractionSource() }
             val isAddHovered by addInteraction.collectIsHoveredAsState()
-            val isAddFocused by addInteraction.collectIsFocusedAsState()
+            val isAddFocused by addInteraction.collectIsKeyboardFocusedAsState()
             val addHighlight = isAddHovered || isAddFocused
             val flyoutRowShape = RoundedCornerShape(10.dp)
             Surface(
@@ -585,7 +584,7 @@ private fun TopBarProfilePill(
             // Action: Manage Profiles Hub
             val manageInteraction = remember { MutableInteractionSource() }
             val isManageHovered by manageInteraction.collectIsHoveredAsState()
-            val isManageFocused by manageInteraction.collectIsFocusedAsState()
+            val isManageFocused by manageInteraction.collectIsKeyboardFocusedAsState()
             val manageHighlight = isManageHovered || isManageFocused
             Surface(
                 shape = flyoutRowShape,

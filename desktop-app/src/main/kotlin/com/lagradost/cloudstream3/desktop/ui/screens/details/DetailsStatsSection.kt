@@ -7,7 +7,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -30,6 +29,7 @@ import com.lagradost.cloudstream3.AnimeLoadResponse
 import com.lagradost.cloudstream3.LoadResponse
 import com.lagradost.cloudstream3.TvSeriesLoadResponse
 import com.lagradost.cloudstream3.desktop.metadata.MetadataConfig
+import com.lagradost.cloudstream3.desktop.ui.components.collectIsKeyboardFocusedAsState
 import com.lagradost.cloudstream3.desktop.ui.components.desktopInteractiveFocus
 import com.lagradost.cloudstream3.desktop.ui.screens.details.contract.DetailsUiState
 import com.lagradost.cloudstream3.desktop.ui.screens.details.contract.ProductionCompany
@@ -481,7 +481,7 @@ fun ProductionCompanyCard(
 
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
-    val isFocused by interactionSource.collectIsFocusedAsState()
+    val isFocused by interactionSource.collectIsKeyboardFocusedAsState()
     val isActiveVisual = isHovered || isFocused
     val badgeShape = RoundedCornerShape(12.dp)
 

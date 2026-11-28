@@ -5,7 +5,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -168,7 +167,7 @@ fun PosterCard(
     val interactionSource = remember { MutableInteractionSource() }
     val isHoveredRaw by interactionSource.collectIsHoveredAsState()
     val isHovered = isHoveredRaw && isHoverEnabled
-    val isFocused by interactionSource.collectIsFocusedAsState()
+    val isFocused by interactionSource.collectIsKeyboardFocusedAsState()
     val isActiveVisual = isHovered || isFocused
 
     val posterTitlePosition = style.titlePosition

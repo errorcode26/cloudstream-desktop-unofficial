@@ -82,6 +82,7 @@ private fun CloudstreamDialogHost(
                 requestFocusWhenActive = show,
                 modifier = Modifier
                     .fillMaxSize()
+                    .desktopTrackInputMode()
                     .handleEscapeKey { onDismissRequest() }
                     .desktopDirectionalFocusNavigation(),
             ) {

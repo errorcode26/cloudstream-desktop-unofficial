@@ -270,7 +270,7 @@ object EpisodePresentationHelper {
             0f
         }
 
-        val isWatched = progress > 0.9f
+        val isWatched = progress >= com.lagradost.cloudstream3.desktop.domain.history.interactor.UpsertWatchHistory.WATCHED_THRESHOLD
         val hasStartedPlayback = progress > 0f || (history != null && history.position > 5)
         val shouldHideSpoilers = isAntiSpoiler && !hasStartedPlayback && !isWatched
 

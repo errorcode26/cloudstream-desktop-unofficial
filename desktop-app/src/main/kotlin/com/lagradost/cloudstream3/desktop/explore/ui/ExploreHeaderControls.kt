@@ -7,7 +7,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -33,6 +32,7 @@ import com.lagradost.cloudstream3.desktop.explore.viewmodel.ExploreUiState
 import com.lagradost.cloudstream3.desktop.explore.viewmodel.ExploreViewModel
 import com.lagradost.cloudstream3.desktop.ui.LocalHazeState
 import com.lagradost.cloudstream3.desktop.ui.components.LocalDesktopTheme
+import com.lagradost.cloudstream3.desktop.ui.components.collectIsKeyboardFocusedAsState
 import com.lagradost.cloudstream3.desktop.ui.components.desktopInteractiveFocus
 import com.lagradost.cloudstream3.desktop.ui.navigation.Config
 import com.lagradost.cloudstream3.desktop.ui.theme.AppearanceConfig
@@ -270,7 +270,7 @@ internal fun ExploreHeaderControls(
                                     val title = viewModel.formatTypeTitle(type)
                                     val tabInteractionSource = remember { MutableInteractionSource() }
                                     val isTabHovered by tabInteractionSource.collectIsHoveredAsState()
-                                    val isTabFocused by tabInteractionSource.collectIsFocusedAsState()
+                                    val isTabFocused by tabInteractionSource.collectIsKeyboardFocusedAsState()
                                     val isTabHighlighted = isTabHovered || isTabFocused
 
                                     Box(

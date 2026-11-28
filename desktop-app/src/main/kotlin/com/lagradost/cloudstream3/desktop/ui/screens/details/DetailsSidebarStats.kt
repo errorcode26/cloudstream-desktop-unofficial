@@ -4,7 +4,6 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -36,6 +35,7 @@ import androidx.compose.ui.unit.sp
 import com.lagradost.cloudstream3.LoadResponse
 import com.lagradost.cloudstream3.MainAPI
 import com.lagradost.cloudstream3.desktop.ui.components.LocalFocusLayerActive
+import com.lagradost.cloudstream3.desktop.ui.components.collectIsKeyboardFocusedAsState
 import com.lagradost.cloudstream3.desktop.ui.components.desktopInteractiveFocus
 import com.lagradost.cloudstream3.desktop.ui.components.getTextShadow
 import com.lagradost.cloudstream3.desktop.ui.screens.details.contract.DetailsUiState
@@ -63,7 +63,7 @@ fun InfoRowItem(
     interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },
     isHovered: Boolean = interactionSource.collectIsHoveredAsState().value,
 ) {
-    val isFocused by interactionSource.collectIsFocusedAsState()
+    val isFocused by interactionSource.collectIsKeyboardFocusedAsState()
     val isActiveVisual = isHovered || isFocused
     val itemShape = RoundedCornerShape(6.dp)
     Column(

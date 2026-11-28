@@ -45,19 +45,54 @@ object BadgeManager {
         return target
     }
 
+    private fun toNormalizedFileUri(file: File): String {
+        var uri = file.toURI().toString()
+        if (uri.startsWith("file:/") && !uri.startsWith("file:///")) {
+            uri = uri.replaceFirst("file:/", "file:///")
+        }
+        return uri
+    }
+
+    private fun resolveStyleFile(fileName: String, style: String): File? {
+        val dir = getBadgesDir(style)
+        val diskFile = File(dir, fileName)
+        if (diskFile.exists() && diskFile.length() > 0L) return diskFile
+
+        // Packaged installers ship src/main/resources inside the JAR classpath rather than appResources.
+        val cacheDest = File(File(PlatformPaths.appDataDir, "badges/$style"), fileName)
+        return StreamTechTagExtractor.extractClasspathResourceIfNeeded("/badges/$style/$fileName", cacheDest)
+    }
+
     /**
-     * Resolves a local File handle for a badge image.
+     * Resolves a local File handle for a badge image across the active style,
+     * falling back to DEFAULT_STYLE and extracting from JAR resources if needed.
      */
     fun getBadgeFile(fileName: String, style: String = currentStyle): File? {
-        if (fileName.isBlank()) return null
-        val file = File(getBadgesDir(style), fileName)
-        if (file.exists() && file.length() > 0L) return file
-        // Fallback to default style if active style doesn't have it
+        val cleanName = fileName.trim().trimStart('/', '\\')
+        if (cleanName.isBlank() || cleanName.contains("..")) return null
+        resolveStyleFile(cleanName, style)?.let { return it }
         if (style != DEFAULT_STYLE) {
-            val fallbackFile = File(getBadgesDir(DEFAULT_STYLE), fileName)
-            if (fallbackFile.exists() && fallbackFile.length() > 0L) return fallbackFile
+            resolveStyleFile(cleanName, DEFAULT_STYLE)?.let { return it }
         }
         return null
+    }
+
+    /**
+     * Resolves a top-level badge asset (e.g. rating_imdb.png, tracker_anilist.svg)
+     * from disk or JAR classpath resources.
+     */
+    fun getRootAssetFile(fileName: String): File? {
+        val cleanName = fileName.trim().trimStart('/', '\\')
+        if (cleanName.isBlank() || cleanName.contains("..")) return null
+        val diskFile = File(getBadgesRootDir(), cleanName)
+        if (diskFile.exists() && diskFile.length() > 0L) return diskFile
+        val cacheDest = File(File(PlatformPaths.appDataDir, "badges"), cleanName)
+        return StreamTechTagExtractor.extractClasspathResourceIfNeeded("/badges/$cleanName", cacheDest)
+    }
+
+    fun getRootAssetUri(fileName: String): String? {
+        val file = getRootAssetFile(fileName) ?: return null
+        return toNormalizedFileUri(file)
     }
 
     /**
@@ -65,12 +100,7 @@ object BadgeManager {
      */
     fun getBadgeUri(fileName: String, style: String = currentStyle): String? {
         val file = getBadgeFile(fileName, style) ?: return null
-        val uri = file.toURI().toString()
-        return if (uri.startsWith("file:/") && !uri.startsWith("file:///")) {
-            uri.replaceFirst("file:/", "file:///")
-        } else {
-            uri
-        }
+        return toNormalizedFileUri(file)
     }
 
     /**
@@ -79,10 +109,7 @@ object BadgeManager {
      */
     fun getBadgesBaseUri(style: String = currentStyle): String {
         val dir = getBadgesDir(style)
-        var uri = dir.toURI().toString()
-        if (uri.startsWith("file:/") && !uri.startsWith("file:///")) {
-            uri = uri.replaceFirst("file:/", "file:///")
-        }
+        var uri = toNormalizedFileUri(dir)
         if (!uri.endsWith("/")) {
             uri += "/"
         }

@@ -14,7 +14,6 @@ import androidx.compose.foundation.gestures.BringIntoViewSpec
 import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
@@ -274,7 +273,7 @@ fun DesktopDropdownMenuItem(
     enabled: Boolean = true,
     interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },
 ) {
-    val isFocused by interactionSource.collectIsFocusedAsState()
+    val isFocused by interactionSource.collectIsKeyboardFocusedAsState()
     val isHovered by interactionSource.collectIsHoveredAsState()
     val itemShape = RoundedCornerShape(6.dp)
     DropdownMenuItem(
@@ -356,7 +355,7 @@ fun CategoryRowViewAllButton(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
-    val isFocused by interactionSource.collectIsFocusedAsState()
+    val isFocused by interactionSource.collectIsKeyboardFocusedAsState()
     val isPressed by interactionSource.collectIsPressedAsState()
     val isActive = isHovered || isFocused
     val viewAllShape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.compact
@@ -575,7 +574,7 @@ fun ScrollChevron(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
-    val isFocused by interactionSource.collectIsFocusedAsState()
+    val isFocused by interactionSource.collectIsKeyboardFocusedAsState()
     val isPressed by interactionSource.collectIsPressedAsState()
     val isActive = enabled && (isHovered || isFocused)
     val chevronShape = com.lagradost.cloudstream3.desktop.ui.theme.LocalDesktopButtonShapes.current.icon

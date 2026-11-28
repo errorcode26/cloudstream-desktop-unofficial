@@ -14,7 +14,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
@@ -59,7 +58,7 @@ fun DesktopFilterChip(
     shape: Shape = LocalDesktopButtonShapes.current.compact,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
-    val isFocused by interactionSource.collectIsFocusedAsState()
+    val isFocused by interactionSource.collectIsKeyboardFocusedAsState()
 
     Box(
         modifier = modifier
@@ -112,7 +111,7 @@ fun DesktopIconButton(
     shape: Shape = LocalDesktopButtonShapes.current.icon,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
-    val isFocused by interactionSource.collectIsFocusedAsState()
+    val isFocused by interactionSource.collectIsKeyboardFocusedAsState()
     val alpha = if (enabled) (if (isActive) 0.8f else 0.6f) else 0.25f
     val borderColor = if (enabled) {
         if (isFocused) MaterialTheme.colorScheme.primary
@@ -167,7 +166,7 @@ fun DesktopActionBadge(
     shape: Shape = LocalDesktopButtonShapes.current.compact,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
-    val isFocused by interactionSource.collectIsFocusedAsState()
+    val isFocused by interactionSource.collectIsKeyboardFocusedAsState()
     Surface(
         onClick = onClick,
         shape = shape,
@@ -225,7 +224,7 @@ fun HeroPrimaryCtaButton(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
-    val isFocused by interactionSource.collectIsFocusedAsState()
+    val isFocused by interactionSource.collectIsKeyboardFocusedAsState()
     val isActiveVisual = isHovered || isFocused
     val isPressed by interactionSource.collectIsPressedAsState()
     val accentColor = MaterialTheme.colorScheme.primary
@@ -404,7 +403,7 @@ fun HeroSecondaryButton(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
-    val isFocused by interactionSource.collectIsFocusedAsState()
+    val isFocused by interactionSource.collectIsKeyboardFocusedAsState()
     val isActiveVisual = isHovered || isFocused
     val isPressed by interactionSource.collectIsPressedAsState()
 

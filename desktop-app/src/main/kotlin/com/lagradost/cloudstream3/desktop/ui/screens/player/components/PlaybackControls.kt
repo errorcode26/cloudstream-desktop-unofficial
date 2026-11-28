@@ -6,7 +6,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
@@ -21,6 +20,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import com.lagradost.cloudstream3.desktop.ui.components.collectIsKeyboardFocusedAsState
 import com.lagradost.cloudstream3.desktop.ui.components.desktopInteractiveFocus
 import com.lagradost.cloudstream3.desktop.ui.screens.player.PlayerState
 
@@ -60,7 +60,7 @@ fun PlaybackControls(
         // Play / Pause button
         val interactionSource = remember { MutableInteractionSource() }
         val isHovered by interactionSource.collectIsHoveredAsState()
-        val isFocused by interactionSource.collectIsFocusedAsState()
+        val isFocused by interactionSource.collectIsKeyboardFocusedAsState()
         val isPressed by interactionSource.collectIsPressedAsState()
 
         val scale by animateFloatAsState(
@@ -130,7 +130,7 @@ private fun GlassIconButton(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
-    val isFocused by interactionSource.collectIsFocusedAsState()
+    val isFocused by interactionSource.collectIsKeyboardFocusedAsState()
     val isPressed by interactionSource.collectIsPressedAsState()
 
     val scale by animateFloatAsState(

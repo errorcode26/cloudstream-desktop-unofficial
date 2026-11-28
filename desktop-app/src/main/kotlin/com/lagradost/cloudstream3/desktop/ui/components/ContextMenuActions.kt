@@ -7,7 +7,6 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -334,31 +333,6 @@ internal fun EpisodeContextMenuActions(
     val hasCachedLinks = com.lagradost.cloudstream3.desktop.ui.screens.player.LinkCache.get(ep.data) != null
     val isEpisodeLocked = !hasPlayableData && !hasCachedLinks && epReleaseStatus.isUnreleased && lockUnreleasedEpisodes
 
-    ActionMenuItem(
-        text = if (isWatched) "Mark as unwatched" else "Mark as watched",
-        icon = if (isWatched) Icons.Default.CheckCircle else Icons.Default.CheckCircleOutline,
-        onClick = {
-            state.dismiss()
-            if (isWatched) {
-                state.onRemoveEpisodeWatched?.invoke(ep)
-            } else {
-                state.onToggleWatched?.invoke(ep, true)
-            }
-        },
-    )
-
-    val epNum = ep.episode
-    if (state.onMarkPreviousWatched != null && (epNum == null || epNum > 1)) {
-        ActionMenuItem(
-            text = "Mark previous as watched",
-            icon = Icons.Default.DoneAll,
-            onClick = {
-                state.dismiss()
-                state.onMarkPreviousWatched?.invoke(ep)
-            },
-        )
-    }
-
     if (isEpisodeLocked) {
         ActionMenuItem(
             text = "Locked (${epReleaseStatus.statusBadgeText ?: "Unreleased"})",
@@ -385,6 +359,31 @@ internal fun EpisodeContextMenuActions(
             onClick = {
                 state.dismiss()
                 state.onPlayEpisode?.invoke(ep)
+            },
+        )
+    }
+
+    ActionMenuItem(
+        text = if (isWatched) "Mark as unwatched" else "Mark as watched",
+        icon = if (isWatched) Icons.Default.CheckCircle else Icons.Default.CheckCircleOutline,
+        onClick = {
+            state.dismiss()
+            if (isWatched) {
+                state.onRemoveEpisodeWatched?.invoke(ep)
+            } else {
+                state.onToggleWatched?.invoke(ep, true)
+            }
+        },
+    )
+
+    val epNum = ep.episode
+    if (state.onMarkPreviousWatched != null && (epNum == null || epNum > 1)) {
+        ActionMenuItem(
+            text = "Mark previous as watched",
+            icon = Icons.Default.DoneAll,
+            onClick = {
+                state.dismiss()
+                state.onMarkPreviousWatched?.invoke(ep)
             },
         )
     }
@@ -422,7 +421,7 @@ internal fun ActionMenuItem(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
-    val isFocused by interactionSource.collectIsFocusedAsState()
+    val isFocused by interactionSource.collectIsKeyboardFocusedAsState()
     val highlighted = isHovered || isFocused
 
     val bgColor by animateColorAsState(
@@ -470,7 +469,7 @@ internal fun LibraryStatusChip(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
-    val isFocused by interactionSource.collectIsFocusedAsState()
+    val isFocused by interactionSource.collectIsKeyboardFocusedAsState()
     val highlighted = isHovered || isFocused
     val primary = MaterialTheme.colorScheme.primary
 

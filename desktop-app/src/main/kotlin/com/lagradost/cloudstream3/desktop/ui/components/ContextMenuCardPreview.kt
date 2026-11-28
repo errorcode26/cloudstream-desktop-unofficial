@@ -4,6 +4,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -26,6 +27,7 @@ import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -119,6 +121,7 @@ internal fun ContextMenuCardPreview(
     // 1. Poster / Thumbnail Surface with directional bevel lighting and top glass sheen
     Surface(
         modifier = Modifier
+            .testTag("context_menu_thumbnail")
             .width(posterWidth)
             .height(posterHeight)
             .shadow(
@@ -211,6 +214,7 @@ internal fun ContextMenuCardPreview(
 
     // 2. Standalone Centered Title, Subtitle & Plot Summary
     if (!titleText.isNullOrBlank()) {
+        val headerMaxWidth = if (isEpisode) posterWidth else posterWidth.coerceAtLeast(actionCardWidth).coerceAtLeast(360.dp)
         Text(
             text = titleText,
             color = Color.White,
@@ -222,8 +226,8 @@ internal fun ContextMenuCardPreview(
             letterSpacing = (-0.3).sp,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier
-                .widthIn(max = posterWidth.coerceAtLeast(actionCardWidth).coerceAtLeast(360.dp))
-                .padding(horizontal = 12.dp),
+                .then(if (isEpisode) Modifier.width(posterWidth) else Modifier.widthIn(max = headerMaxWidth))
+                .padding(horizontal = if (isEpisode) 8.dp else 12.dp),
         )
         val formattedDate = remember(epDate) {
             epDate?.trim()?.let { raw ->
@@ -249,7 +253,7 @@ internal fun ContextMenuCardPreview(
         }
 
         if (displaySubtitle.isNotBlank()) {
-            Spacer(modifier = Modifier.height(6.dp))
+            Spacer(modifier = Modifier.height(if (isEpisode) 5.dp else 6.dp))
             Text(
                 text = displaySubtitle,
                 color = Color.White.copy(alpha = 0.70f),
@@ -257,26 +261,42 @@ internal fun ContextMenuCardPreview(
                 fontWeight = FontWeight.Medium,
                 textAlign = TextAlign.Center,
                 modifier = Modifier
-                    .widthIn(max = posterWidth.coerceAtLeast(actionCardWidth).coerceAtLeast(360.dp))
-                    .padding(horizontal = 12.dp),
+                    .then(if (isEpisode) Modifier.width(posterWidth) else Modifier.widthIn(max = headerMaxWidth))
+                    .padding(horizontal = if (isEpisode) 8.dp else 12.dp),
             )
         }
 
         // Full Episode Plot Summary
         if (isEpisode && !epCleanPlot.isNullOrBlank()) {
             var isSpoilerRevealed by remember { mutableStateOf(!isAntiSpoiler || isWatched) }
-            Spacer(modifier = Modifier.height(10.dp))
+            val synopsisShape = RoundedCornerShape(12.dp)
+            val spoilerInteraction = remember { MutableInteractionSource() }
+            Spacer(modifier = Modifier.height(12.dp))
             Surface(
                 modifier = Modifier
-                    .widthIn(max = posterWidth.coerceAtMost(520.dp))
-                    .clickable(enabled = isAntiSpoiler && !isSpoilerRevealed) {
-                        isSpoilerRevealed = true
-                    },
-                shape = RoundedCornerShape(12.dp),
+                    .testTag("context_menu_synopsis")
+                    .width(posterWidth)
+                    .clip(synopsisShape)
+                    .then(
+                        if (isAntiSpoiler && !isSpoilerRevealed) {
+                            Modifier
+                                .desktopInteractiveFocus(interactionSource = spoilerInteraction, shape = synopsisShape)
+                                .clickable(interactionSource = spoilerInteraction, indication = null) {
+                                    isSpoilerRevealed = true
+                                }
+                        } else {
+                            Modifier
+                        },
+                    ),
+                shape = synopsisShape,
                 color = Color.White.copy(alpha = 0.05f),
                 border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
             ) {
-                Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 18.dp, vertical = 12.dp),
+                ) {
                     if (!isSpoilerRevealed) {
                         Text(
                             text = "⚠️ Spoiler Hidden (Click to reveal synopsis)",
@@ -294,6 +314,7 @@ internal fun ContextMenuCardPreview(
                             maxLines = 5,
                             overflow = TextOverflow.Ellipsis,
                             textAlign = TextAlign.Start,
+                            modifier = Modifier.fillMaxWidth(),
                         )
                     }
                 }

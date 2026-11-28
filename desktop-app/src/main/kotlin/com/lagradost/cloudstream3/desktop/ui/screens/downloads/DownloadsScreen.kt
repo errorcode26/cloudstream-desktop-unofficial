@@ -4,7 +4,6 @@ import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -39,6 +38,7 @@ import com.lagradost.cloudstream3.desktop.downloader.DesktopDownloadManager
 import com.lagradost.cloudstream3.desktop.downloader.DownloadStatus
 import com.lagradost.cloudstream3.desktop.downloader.DownloadTask
 import com.lagradost.cloudstream3.desktop.ui.components.CloudstreamAlertDialog
+import com.lagradost.cloudstream3.desktop.ui.components.collectIsKeyboardFocusedAsState
 import com.lagradost.cloudstream3.desktop.ui.components.desktopFocusableCard
 import com.lagradost.cloudstream3.desktop.ui.components.desktopTextInputFocus
 import com.lagradost.cloudstream3.desktop.ui.screens.downloads.contract.*
@@ -543,7 +543,7 @@ private fun DownloadedItemCard(
     val isContextMenuEnabled = true
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
-    val isFocused by interactionSource.collectIsFocusedAsState()
+    val isFocused by interactionSource.collectIsKeyboardFocusedAsState()
     val cardShape = RoundedCornerShape(12.dp)
     val showTasks = remember(task.showName, allCompletedTasks) {
         allCompletedTasks.filter { it.showName.equals(task.showName, ignoreCase = true) }

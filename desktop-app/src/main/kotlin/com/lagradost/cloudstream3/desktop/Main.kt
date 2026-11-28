@@ -38,6 +38,8 @@ import com.lagradost.cloudstream3.desktop.init.showFatalCrashDialog
 import com.lagradost.cloudstream3.desktop.init.initNetwork
 import com.lagradost.cloudstream3.desktop.init.initPlugins
 import com.lagradost.cloudstream3.desktop.init.initProviders
+import com.lagradost.cloudstream3.desktop.ui.components.DesktopAwtInputModeEffect
+import com.lagradost.cloudstream3.desktop.ui.components.desktopTrackInputMode
 import com.lagradost.cloudstream3.desktop.init.initProxy
 import com.lagradost.cloudstream3.desktop.init.initSecurity
 import com.lagradost.cloudstream3.desktop.init.initWindowsEnvironment
@@ -338,7 +340,13 @@ fun main(args: Array<String> = emptyArray()) {
                     }
                 }
 
-                Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+                DesktopAwtInputModeEffect()
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black)
+                        .desktopTrackInputMode(),
+                ) {
                     Crossfade<Boolean>(
                         targetState = isAppReady,
                         animationSpec = tween(500),

@@ -5,7 +5,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -36,6 +35,7 @@ import com.lagradost.cloudstream3.TvSeriesLoadResponse
 import com.lagradost.cloudstream3.desktop.ui.VideoLaunchData
 import com.lagradost.cloudstream3.desktop.ui.components.DesktopIconButton
 import com.lagradost.cloudstream3.desktop.ui.components.applyShadowMultiplier
+import com.lagradost.cloudstream3.desktop.ui.components.collectIsKeyboardFocusedAsState
 import com.lagradost.cloudstream3.desktop.ui.components.desktopInteractiveFocus
 
 @Composable
@@ -373,7 +373,7 @@ fun EpisodeCard(
 
     val cardInteraction = remember { MutableInteractionSource() }
     val isHovered by cardInteraction.collectIsHoveredAsState()
-    val isFocused by cardInteraction.collectIsFocusedAsState()
+    val isFocused by cardInteraction.collectIsKeyboardFocusedAsState()
     val cardShape = RoundedCornerShape(8.dp)
 
     Row(

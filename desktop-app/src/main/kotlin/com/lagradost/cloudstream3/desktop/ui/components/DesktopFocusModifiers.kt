@@ -3,6 +3,7 @@ package com.lagradost.cloudstream3.desktop.ui.components
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.interaction.InteractionSource
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Box
@@ -14,12 +15,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
@@ -30,11 +33,13 @@ import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.drawOutline
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.InputMode
+import androidx.compose.ui.input.InputModeManager
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.isAltPressed
@@ -44,6 +49,8 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -54,6 +61,12 @@ import androidx.compose.ui.unit.dp
 import com.lagradost.cloudstream3.desktop.ui.screens.dev.DevStudioState
 import com.lagradost.cloudstream3.desktop.ui.screens.dev.FocusInspectKind
 import com.lagradost.cloudstream3.desktop.ui.screens.dev.VisualFocusInspectorRegistry
+import java.awt.AWTEvent
+import java.awt.GraphicsEnvironment
+import java.awt.Toolkit
+import java.awt.event.AWTEventListener
+import java.awt.event.MouseEvent
+import javax.swing.SwingUtilities
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
@@ -62,6 +75,175 @@ import kotlinx.coroutines.launch
  * Overlays set this to false on covered layers behind them.
  */
 val LocalFocusLayerActive = compositionLocalOf { true }
+
+/**
+ * Tracks whether visible keyboard focus highlights should be shown. Keyboard navigation keys enable
+ * highlights; physical mouse activity clears them immediately.
+ */
+object DesktopKeyboardFocusState {
+    var isKeyboardModeActive by mutableStateOf(false)
+        private set
+
+    private var lastPointerPosition: Offset? = null
+    private var lastPointerSource: Any? = null
+
+    fun onKeyboardNavigation(inputModeManager: InputModeManager? = null) {
+        if (!isKeyboardModeActive) {
+            isKeyboardModeActive = true
+        }
+        if (inputModeManager != null && inputModeManager.inputMode != InputMode.Keyboard) {
+            runCatching { inputModeManager.requestInputMode(InputMode.Keyboard) }
+        }
+    }
+
+    fun onMouseUsed(inputModeManager: InputModeManager? = null) {
+        if (isKeyboardModeActive) {
+            isKeyboardModeActive = false
+        }
+        if (inputModeManager != null && inputModeManager.inputMode != InputMode.Touch) {
+            runCatching { inputModeManager.requestInputMode(InputMode.Touch) }
+        }
+    }
+
+    internal fun onPointerActivity(
+        source: Any,
+        type: PointerEventType,
+        position: Offset?,
+        inputModeManager: InputModeManager? = null,
+    ) {
+        when (type) {
+            PointerEventType.Press,
+            PointerEventType.Release,
+            PointerEventType.Scroll -> {
+                if (position != null) {
+                    lastPointerSource = source
+                    lastPointerPosition = position
+                }
+                onMouseUsed(inputModeManager)
+            }
+            PointerEventType.Enter -> {
+                if (position != null) {
+                    lastPointerSource = source
+                    lastPointerPosition = position
+                }
+            }
+            PointerEventType.Move -> {
+                if (position == null) return
+                val previous = if (lastPointerSource === source) lastPointerPosition else null
+                if (previous == null) {
+                    lastPointerSource = source
+                    lastPointerPosition = position
+                } else if ((position - previous).getDistanceSquared() >= 4f) {
+                    lastPointerPosition = position
+                    onMouseUsed(inputModeManager)
+                }
+            }
+            else -> Unit
+        }
+    }
+
+    internal fun resetForTest() {
+        isKeyboardModeActive = false
+        lastPointerPosition = null
+        lastPointerSource = null
+    }
+}
+
+private fun isKeyboardFocusActivationKey(event: androidx.compose.ui.input.key.KeyEvent): Boolean {
+    if (event.type != KeyEventType.KeyDown) return false
+    if (event.isCtrlPressed || event.isAltPressed) return false
+    return when (event.key) {
+        Key.Tab,
+        Key.Menu -> true
+        Key.F10 -> event.isShiftPressed
+        Key.DirectionUp,
+        Key.DirectionDown,
+        Key.DirectionLeft,
+        Key.DirectionRight,
+        Key.DirectionCenter -> !event.isShiftPressed
+        else -> false
+    }
+}
+
+/**
+ * Observes root key and pointer events to toggle keyboard-only focus highlights accurately without
+ * consuming input events or treating stationary synthetic hover ticks after scrolls as mouse use.
+ */
+@Composable
+fun Modifier.desktopTrackInputMode(): Modifier {
+    val inputModeManager = LocalInputModeManager.current
+    val trackerKey = remember { Any() }
+    return this
+        .onPreviewKeyEvent { keyEvent ->
+            if (isKeyboardFocusActivationKey(keyEvent)) {
+                DesktopKeyboardFocusState.onKeyboardNavigation(inputModeManager)
+            }
+            false
+        }
+        .pointerInput(inputModeManager, trackerKey) {
+            awaitPointerEventScope {
+                while (true) {
+                    val event = awaitPointerEvent(PointerEventPass.Initial)
+                    val position = event.changes.firstOrNull()?.position
+                    DesktopKeyboardFocusState.onPointerActivity(
+                        source = trackerKey,
+                        type = event.type,
+                        position = position,
+                        inputModeManager = inputModeManager,
+                    )
+                }
+            }
+        }
+}
+
+/**
+ * Listens for hardware mouse events at the AWT toolkit level so popups and overlays switch off
+ * keyboard focus highlights immediately on real pointer activity.
+ */
+@Composable
+fun DesktopAwtInputModeEffect() {
+    val inputModeManager = LocalInputModeManager.current
+    DisposableEffect(inputModeManager) {
+        if (GraphicsEnvironment.isHeadless()) {
+            return@DisposableEffect onDispose {}
+        }
+        val awtSource = Any()
+        val mask = AWTEvent.MOUSE_EVENT_MASK or AWTEvent.MOUSE_MOTION_EVENT_MASK or AWTEvent.MOUSE_WHEEL_EVENT_MASK
+        val listener = AWTEventListener { event ->
+            val mouseEvent = event as? MouseEvent ?: return@AWTEventListener
+            val pointerType = when (mouseEvent.id) {
+                MouseEvent.MOUSE_PRESSED -> PointerEventType.Press
+                MouseEvent.MOUSE_RELEASED -> PointerEventType.Release
+                MouseEvent.MOUSE_WHEEL -> PointerEventType.Scroll
+                MouseEvent.MOUSE_ENTERED -> PointerEventType.Enter
+                MouseEvent.MOUSE_MOVED, MouseEvent.MOUSE_DRAGGED -> PointerEventType.Move
+                else -> return@AWTEventListener
+            }
+            val pos = Offset(mouseEvent.xOnScreen.toFloat(), mouseEvent.yOnScreen.toFloat())
+            SwingUtilities.invokeLater {
+                DesktopKeyboardFocusState.onPointerActivity(
+                    source = awtSource,
+                    type = pointerType,
+                    position = pos,
+                    inputModeManager = inputModeManager,
+                )
+            }
+        }
+        runCatching { Toolkit.getDefaultToolkit().addAWTEventListener(listener, mask) }
+        onDispose {
+            runCatching { Toolkit.getDefaultToolkit().removeAWTEventListener(listener) }
+        }
+    }
+}
+
+/**
+ * Returns true only while the interaction source holds focus and keyboard focus highlights are active.
+ */
+@Composable
+fun InteractionSource.collectIsKeyboardFocusedAsState(): State<Boolean> {
+    val isFocused by collectIsFocusedAsState()
+    return rememberUpdatedState(isFocused && DesktopKeyboardFocusState.isKeyboardModeActive)
+}
 
 internal val LocalIsCategoryRowHeader = compositionLocalOf { false }
 
@@ -322,8 +504,10 @@ fun Modifier.desktopFocusRing(
     ringColor: Color = MaterialTheme.colorScheme.primary,
     innerContrastColor: Color = Color.White.copy(alpha = 0.72f),
     ringWidth: Dp = 2.dp,
+    requireKeyboardMode: Boolean = true,
 ): Modifier {
-    if (!isFocused) return this
+    val keyboardVisible = !requireKeyboardMode || DesktopKeyboardFocusState.isKeyboardModeActive
+    if (!isFocused || !keyboardVisible) return this
     return this.drawWithContent {
         drawContent()
         val strokePx = ringWidth.toPx()
@@ -364,7 +548,7 @@ fun Modifier.desktopInteractiveFocus(
             canFocus = effectiveEnabled && !(isCategoryRowHeader && DirectionalFocusFilter.skipRowHeadersDuringVerticalMove)
         }
         .desktopFocusRing(
-            isFocused = isFocused && effectiveEnabled && showRing,
+            isFocused = isFocused && effectiveEnabled && showRing && DesktopKeyboardFocusState.isKeyboardModeActive,
             shape = shape,
             ringColor = ringColor,
             ringWidth = ringWidth,
@@ -514,7 +698,7 @@ fun Modifier.desktopFocusableCard(
             }
         }
         .desktopFocusRing(
-            isFocused = isFocused && effectiveEnabled && showRing,
+            isFocused = isFocused && effectiveEnabled && showRing && DesktopKeyboardFocusState.isKeyboardModeActive,
             shape = shape,
             ringColor = ringColor,
             ringWidth = ringWidth,
@@ -636,7 +820,7 @@ private fun Modifier.directionalZoneBoundaryFallback(
             else -> null
         } ?: return@onKeyEvent false
 
-        runCatching { inputModeManager.requestInputMode(InputMode.Keyboard) }
+        DesktopKeyboardFocusState.onKeyboardNavigation(inputModeManager)
         val hudEnabled = DevStudioState.isVisualFocusHudEnabled.value
         val fromEntry = if (hudEnabled) VisualFocusInspectorRegistry.currentFocusedEntry() else null
         // Scope moveFocus to intra-zone navigation first so Compose cannot skip over a target
@@ -726,7 +910,7 @@ fun Modifier.desktopLazyColumnBoundaryScroll(
             val direction = mapArrowDirection(event) ?: return@onKeyEvent false
             if (direction != FocusDirection.Up && direction != FocusDirection.Down) return@onKeyEvent false
 
-            runCatching { inputModeManager.requestInputMode(InputMode.Keyboard) }
+            DesktopKeyboardFocusState.onKeyboardNavigation(inputModeManager)
             val hudEnabled = DevStudioState.isVisualFocusHudEnabled.value
             val fromEntry = if (hudEnabled) VisualFocusInspectorRegistry.currentFocusedEntry() else null
 
@@ -872,13 +1056,14 @@ fun Modifier.desktopTextInputFocus(
                             if (onEscapeExit?.invoke() == true) {
                                 return@onPreviewKeyEvent true
                             }
-                            runCatching { inputModeManager.requestInputMode(InputMode.Keyboard) }
                             val exited = withDirectionalFocusFilter(FocusDirection.Down) {
                                 focusManager.moveFocus(FocusDirection.Down) ||
                                     focusManager.moveFocus(FocusDirection.Next) ||
                                     focusManager.moveFocus(FocusDirection.Up)
                             }
-                            if (!exited) {
+                            if (exited) {
+                                DesktopKeyboardFocusState.onKeyboardNavigation(inputModeManager)
+                            } else {
                                 focusManager.clearFocus()
                             }
                             return@onPreviewKeyEvent true
@@ -893,7 +1078,7 @@ fun Modifier.desktopTextInputFocus(
                 (event.key == Key.DirectionUp || event.key == Key.DirectionDown)
             ) {
                 val direction = if (event.key == Key.DirectionUp) FocusDirection.Up else FocusDirection.Down
-                runCatching { inputModeManager.requestInputMode(InputMode.Keyboard) }
+                DesktopKeyboardFocusState.onKeyboardNavigation(inputModeManager)
                 val fromEntry = if (hudEnabled) VisualFocusInspectorRegistry.currentFocusedEntry() else null
                 val movedNatively = withDirectionalFocusFilter(direction) {
                     focusManager.moveFocus(direction)
@@ -944,7 +1129,7 @@ fun Modifier.desktopDirectionalFocusNavigation(
         if (!enabled) return@onKeyEvent false
         val direction = mapArrowDirection(event) ?: return@onKeyEvent false
 
-        runCatching { inputModeManager.requestInputMode(InputMode.Keyboard) }
+        DesktopKeyboardFocusState.onKeyboardNavigation(inputModeManager)
         val hudEnabled = DevStudioState.isVisualFocusHudEnabled.value
         val fromEntry = if (hudEnabled) VisualFocusInspectorRegistry.currentFocusedEntry() else null
         val moved = withDirectionalFocusFilter(direction) {

@@ -11,7 +11,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -49,6 +48,7 @@ import com.lagradost.cloudstream3.desktop.tracking.TrackerDescriptor
 import com.lagradost.cloudstream3.desktop.tracking.UnifiedLibraryEntry
 import com.lagradost.cloudstream3.desktop.tracking.UnifiedWatchStatus
 import com.lagradost.cloudstream3.desktop.ui.components.DesktopUi
+import com.lagradost.cloudstream3.desktop.ui.components.collectIsKeyboardFocusedAsState
 import com.lagradost.cloudstream3.desktop.ui.components.desktopFocusableCard
 import com.lagradost.cloudstream3.desktop.ui.components.posterHoverEffect
 import com.lagradost.cloudstream3.desktop.ui.screens.library.contract.LocalBookmarkProgress
@@ -83,7 +83,7 @@ private fun LibraryPosterCardShell(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
-    val isFocused by interactionSource.collectIsFocusedAsState()
+    val isFocused by interactionSource.collectIsKeyboardFocusedAsState()
     val isActiveVisual = isHovered || isFocused
     val posterCornerRadius by AppearanceConfig.posterRoundingDp.collectAsState()
     val shape = remember(posterCornerRadius) { RoundedCornerShape(posterCornerRadius.dp) }

@@ -270,7 +270,7 @@ fun CloudstreamApp(rootComponent: RootComponent) {
                                 if (!canRecover) {
                                     false
                                 } else {
-                                    runCatching { inputModeManager.requestInputMode(InputMode.Keyboard) }
+                                    com.lagradost.cloudstream3.desktop.ui.components.DesktopKeyboardFocusState.onKeyboardNavigation(inputModeManager)
                                     runCatching { rootLayerRequester.requestFocus() }.getOrDefault(false)
                                 }
                             }
