@@ -134,10 +134,17 @@ class PlayerState {
     }
 
     fun detachEngine() {
+        lazyTrackScope.coroutineContext[kotlinx.coroutines.Job]?.let { job ->
+            job.children.forEach { it.cancel() }
+        }
         if (this.engine?.playerState == this) {
             this.engine?.playerState = null
         }
         this.engine = null
+    }
+
+    fun refreshTracksNow() {
+        engine?.refreshTracksNow()
     }
 
     fun attachMpv(handle: com.sun.jna.Pointer) {
@@ -157,6 +164,10 @@ class PlayerState {
     internal val _activeLazyAudioTrackUrl = MutableStateFlow<String?>(null)
     val activeLazyAudioTrackUrl: StateFlow<String?> = _activeLazyAudioTrackUrl.asStateFlow()
 
+    private val lazyTrackScope = kotlinx.coroutines.CoroutineScope(
+        kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO,
+    )
+
     private val processedAutoSkipIntervals = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
 
     @Volatile var hasUserManuallyChangedSub = false
@@ -169,7 +180,9 @@ class PlayerState {
         _isPaused.value = false
         _isBuffering.value = true
         _isProbing.value = false
-        _isMuted.value = false
+        _isMuted.value = com.lagradost.common.storage.DesktopDataStore.getKey<Boolean>(
+            com.lagradost.cloudstream3.desktop.player.PlayerConfig.PREF_AUDIO_MUTED,
+        ) ?: _isMuted.value
         _isSeekable.value = true
         lastSeekTime = 0L
         targetSeekMs = -1L
@@ -855,7 +868,7 @@ class PlayerState {
     }
 
     fun loadLazySubtitleTrack(track: LazyTrack) {
-        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+        lazyTrackScope.launch {
             try {
                 val cleanPath = if (track.url.startsWith("http", ignoreCase = true)) {
                     com.lagradost.cloudstream3.desktop.player.SubtitleExtractionService.downloadAndExtractSubtitle(
@@ -879,11 +892,13 @@ class PlayerState {
                     return@launch
                 }
 
-                val safeName = track.name.replace("\"", "").trim()
-                val safeLang = track.language.replace("\"", "").trim()
-                val cmd = "sub-add \"$cleanPath\" select \"$safeName\" \"$safeLang\""
+                val safePath = cleanPath.replace("\\", "\\\\").replace("\"", "\\\"")
+                val safeName = track.name.replace("\\", "\\\\").replace("\"", "").trim()
+                val safeLang = track.language.replace("\\", "\\\\").replace("\"", "").trim()
+                val cmd = "sub-add \"$safePath\" select \"$safeName\" \"$safeLang\""
                 engine?.executeCommand(cmd)
                 engine?.setPropertyString("sub-visibility", "yes")
+                engine?.refreshTracksNow()
 
                 val proxyState = com.lagradost.player.impl.proxy.LocalStreamProxyState
                 proxyState.lazySubtitleTracks.value = proxyState.lazySubtitleTracks.value.filter { t -> t.url != track.url }

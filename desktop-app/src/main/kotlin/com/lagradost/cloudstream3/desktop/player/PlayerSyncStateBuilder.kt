@@ -2,7 +2,11 @@ package com.lagradost.cloudstream3.desktop.player
 
 import com.lagradost.cloudstream3.ActorData
 import com.lagradost.cloudstream3.Episode
+import com.lagradost.cloudstream3.desktop.domain.history.interactor.UpsertWatchHistory
+import com.lagradost.cloudstream3.desktop.metadata.RatingSource
 import com.lagradost.cloudstream3.desktop.player.skip.SkipInterval
+import com.lagradost.cloudstream3.desktop.ui.badges.BadgeManager
+import com.lagradost.cloudstream3.desktop.ui.badges.StreamTechTagExtractor
 import com.lagradost.cloudstream3.desktop.ui.screens.details.EpisodeHistoryLookup
 import com.lagradost.cloudstream3.desktop.ui.screens.player.PlayerState
 import com.lagradost.cloudstream3.utils.ExtractorLink
@@ -71,6 +75,11 @@ object PlayerSyncStateBuilder {
         exhaustionReason: String?,
         exhaustionDiagnostics: String?,
         resolvedImdbId: String?,
+        imdbScore: Double? = null,
+        tmdbScore: Double? = null,
+        anilistScore: Double? = null,
+        episodeScore: Double? = null,
+        episodeRatingSource: RatingSource? = null,
     ): PlayerUiSyncState {
         val rawBackdrop = backdropUrl?.let { raw -> if (raw.startsWith("//")) "https:$raw" else raw }
         val rawLogo = logoUrl?.let { raw -> if (raw.startsWith("//")) "https:$raw" else raw }
@@ -168,6 +177,14 @@ object PlayerSyncStateBuilder {
                         ?: providerName?.let { com.lagradost.cloudstream3.desktop.repo.DesktopRepositoryManager.getPluginIcon(it) }
                 } else null
                 val safeStreamLogo = resolvedLogo?.let { com.lagradost.cloudstream3.desktop.utils.ImageUtils.getCachedDiskFileUri(it) ?: it }
+                val resolvedTechTags = StreamTechTagExtractor.extract(l.name).map { tag ->
+                    TechTagPayload(
+                        text = tag.text,
+                        type = tag.type.name.lowercase(Locale.ROOT),
+                        badgeFile = tag.badgeFile,
+                        badgeUrl = tag.badgeFile?.let { fileName -> BadgeManager.getBadgeUri(fileName) },
+                    )
+                }
 
                 LinkPayload(
                     index = index,
@@ -181,6 +198,7 @@ object PlayerSyncStateBuilder {
                     source = l.source,
                     size = effectiveSize,
                     logoUrl = safeStreamLogo,
+                    techTags = resolvedTechTags,
                 )
             },
             episodes = episodes.map {
@@ -202,7 +220,10 @@ object PlayerSyncStateBuilder {
                 } else {
                     null
                 }
-                val isWatched = progress != null && (progress >= 0.9 || (hist != null && com.lagradost.player.impl.PlayerLinkHandler.isCompleted(hist.position, hist.duration)))
+                val isWatched = progress != null && (
+                    progress >= UpsertWatchHistory.WATCHED_THRESHOLD.toDouble() ||
+                        (hist != null && com.lagradost.player.impl.PlayerLinkHandler.isCompleted(hist.position, hist.duration))
+                    )
 
                 val normalizedPoster = resolvedEpPoster?.let { url -> if (url.startsWith("//")) "https:$url" else url }
                 val safePoster = com.lagradost.cloudstream3.desktop.utils.ImageUtils.getCachedDiskFileUri(normalizedPoster) ?: normalizedPoster
@@ -303,7 +324,47 @@ object PlayerSyncStateBuilder {
             audioVolumeMax = audioVolumeMax,
             audioDelay = audioDelay,
             imdbId = resolvedImdbId,
+            badgesBaseUrl = BadgeManager.getBadgesBaseUri(),
+            ratingBadges = buildPauseRatingBadges(
+                imdbScore = imdbScore,
+                tmdbScore = tmdbScore,
+                anilistScore = anilistScore,
+                episodeScore = episodeScore,
+                episodeRatingSource = episodeRatingSource,
+            ),
         )
+    }
+
+    private fun buildPauseRatingBadges(
+        imdbScore: Double?,
+        tmdbScore: Double?,
+        anilistScore: Double?,
+        episodeScore: Double?,
+        episodeRatingSource: RatingSource?,
+    ): List<RatingBadgePayload> {
+        val badges = mutableListOf<RatingBadgePayload>()
+        val validImdb = imdbScore?.takeIf { it > 0.0 }
+        val validTmdb = tmdbScore?.takeIf { it > 0.0 }
+        val validAniList = anilistScore?.takeIf { it > 0.0 }
+
+        if (episodeScore != null && episodeScore > 0.0 && (episodeRatingSource == RatingSource.IMDB || episodeRatingSource == RatingSource.TMDB)) {
+            val formatted = String.format(Locale.US, "%.1f", episodeScore)
+            val key = if (episodeRatingSource == RatingSource.IMDB) "imdb" else "tmdb"
+            val asset = if (episodeRatingSource == RatingSource.IMDB) "rating_imdb.png" else "rating_tmdb.png"
+            badges += RatingBadgePayload(source = key, scoreText = formatted, iconUrl = BadgeManager.getRootAssetUri(asset))
+            return badges
+        }
+
+        validImdb?.let {
+            badges += RatingBadgePayload("imdb", String.format(Locale.US, "%.1f", it), BadgeManager.getRootAssetUri("rating_imdb.png"))
+        }
+        validTmdb?.let {
+            badges += RatingBadgePayload("tmdb", String.format(Locale.US, "%.1f", it), BadgeManager.getRootAssetUri("rating_tmdb.png"))
+        }
+        validAniList?.let {
+            badges += RatingBadgePayload("anilist", "${(it * 10).toInt()}%", BadgeManager.getRootAssetUri("tracker_anilist.svg"))
+        }
+        return badges
     }
 
     fun buildAppStateUpdatePayload(

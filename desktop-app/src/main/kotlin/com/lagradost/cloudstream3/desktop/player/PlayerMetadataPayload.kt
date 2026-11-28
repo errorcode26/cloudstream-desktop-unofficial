@@ -62,6 +62,21 @@ data class PlayerUiSyncState(
     val audioVolumeMax: Boolean = false,
     val audioDelay: Float = 0f,
     val imdbId: String? = null,
+    val badgesBaseUrl: String? = null,
+    val ratingBadges: List<RatingBadgePayload> = emptyList(),
+)
+
+data class RatingBadgePayload(
+    val source: String,
+    val scoreText: String,
+    val iconUrl: String? = null,
+)
+
+data class TechTagPayload(
+    val text: String,
+    val type: String,
+    val badgeFile: String? = null,
+    val badgeUrl: String? = null,
 )
 
 data class ActorPayload(
@@ -107,6 +122,7 @@ data class LinkPayload(
     val source: String? = null,
     val size: String? = null,
     val logoUrl: String? = null,
+    val techTags: List<TechTagPayload> = emptyList(),
 )
 
 data class EpisodePayload(

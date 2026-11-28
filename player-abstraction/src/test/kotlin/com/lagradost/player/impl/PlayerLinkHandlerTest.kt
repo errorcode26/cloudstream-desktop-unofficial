@@ -119,9 +119,13 @@ class PlayerLinkHandlerTest {
         assertEquals("CloudStream", PlayerLinkHandler.sanitizeDisplayTitle("   "))
 
         assertEquals(0L, PlayerLinkHandler.resumeStartSeconds(5L, 20L)) // too short (<30s)
-        assertEquals(0L, PlayerLinkHandler.resumeStartSeconds(950L, 1000L)) // >=90%
+        assertEquals(0L, PlayerLinkHandler.resumeStartSeconds(950L, 1000L)) // >=85%
+        assertEquals(0L, PlayerLinkHandler.resumeStartSeconds(850L, 1000L)) // exact 85% boundary
+        assertEquals(835L, PlayerLinkHandler.resumeStartSeconds(840L, 1000L)) // just under 85%
         assertEquals(295L, PlayerLinkHandler.resumeStartSeconds(300L, 1000L)) // 5s rewind context buffer
         assertTrue(PlayerLinkHandler.isCompleted(910L, 1000L))
+        assertTrue(PlayerLinkHandler.isCompleted(850L, 1000L))
+        assertFalse(PlayerLinkHandler.isCompleted(849L, 1000L))
         assertFalse(PlayerLinkHandler.isCompleted(500L, 1000L))
         assertFalse(PlayerLinkHandler.isCompleted(100L, 0L))
 

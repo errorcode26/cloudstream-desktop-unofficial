@@ -167,12 +167,28 @@ class PlaybackCompletionGuard(
             return true
         }
 
-        val wasSubstantialResume = priorDurationSec >= MIN_HISTORY_PERSIST_DURATION_SEC &&
-            (priorPositionSec.toFloat() / priorDurationSec.toFloat()) >= MIN_PRIOR_RESUME_RATIO
-        val resumeWatchFloor = minOf(90L, (durSec * 0.25f).toLong().coerceAtLeast(10L))
-        return wasSubstantialResume &&
-            activeSessionWatchedSec >= resumeWatchFloor &&
-            posSec > priorPositionSec
+        // Valid prior progress on the same media credits already-watched offset alongside current session playback.
+        val hasSameMediaPrior = priorDurationSec >= MIN_HISTORY_PERSIST_DURATION_SEC &&
+            priorPositionSec > 0L &&
+            abs(priorDurationSec - durSec) <= 60L
+        if (!hasSameMediaPrior || posSec <= priorPositionSec) {
+            return false
+        }
+
+        val cappedPriorSec = priorPositionSec.coerceAtMost(durSec)
+        var overlapWithPriorSec = 0L
+        var bucketIdx = watchedBuckets.nextSetBit(1)
+        while (bucketIdx >= 0 && bucketIdx <= cappedPriorSec) {
+            overlapWithPriorSec++
+            bucketIdx = watchedBuckets.nextSetBit(bucketIdx + 1)
+        }
+        val combinedCoveredSec = cappedPriorSec + (uniqueWatchedSec - overlapWithPriorSec).coerceAtLeast(0L)
+        val combinedCoverage = combinedCoveredSec.toFloat() / durSec.toFloat()
+        val priorRatio = priorPositionSec.toFloat() / priorDurationSec.toFloat()
+        val resumeWatchFloor = minOf(20L, (durSec * 0.05f).toLong().coerceAtLeast(10L))
+
+        return activeSessionWatchedSec >= resumeWatchFloor &&
+            (combinedCoverage >= MIN_UNIQUE_COVERAGE_RATIO || priorRatio >= MIN_PRIOR_RESUME_RATIO)
     }
 
     /**

@@ -58,6 +58,7 @@ class PlayerUiValidationTest {
     @Test
     fun testPlayerJsExportsAndContracts() {
         val js = loadResource("player.js")
+        val html = loadResource("player.html")
         assertTrue(js.isNotBlank(), "player.js must not be empty")
 
         // Critical global exports used by Kotlin and C++
@@ -68,6 +69,15 @@ class PlayerUiValidationTest {
         assertTrue(js.contains("'dismiss_probing'"), "player.js must handle 'dismiss_probing' message type")
         assertTrue(js.contains("'metadata_update'"), "player.js must handle 'metadata_update' message type")
         assertTrue(js.contains("'state_update'"), "player.js must handle 'state_update' message type")
+
+        // Graphic badge rendering, fallback, pause brand ratings & hold-speed regressions
+        assertTrue(js.contains("window.__handleBadgeImgError"), "player.js must export __handleBadgeImgError")
+        assertTrue(js.contains("window.renderTechTagsHtml"), "player.js must export renderTechTagsHtml")
+        assertTrue(html.contains("id=\"pauseInfoBrandRatings\""), "player.html must declare #pauseInfoBrandRatings")
+        kotlin.test.assertFalse(
+            js.contains("holdSpeedMapping[parseInt("),
+            "player.js must not index holdSpeedMapping with slider float value",
+        )
     }
 
     @Test

@@ -328,13 +328,30 @@
 
     // ── Paced Probing Status Controller ─────────────────────────────────────────
     // Prevents text flickering and rapid-fire string jumping by enforcing a minimum
-    // readable visual dwell time (650ms) and gentle opacity crossfade between phases.
+    // readable visual dwell time (800ms) while preventing stale timers or status regressions.
     let _probingPacerCurrentText = '';
     let _probingPacerCurrentPhase = '';
     let _probingPacerNextChangeTime = 0;
     let _probingPacerTimer = null;
     let _probingPacerPending = null;
+    let _probingHasDiscoveredSources = false;
     let _scheduledProbingDismissTimer = null;
+    let _dismissFadeOutTimer = null;
+    let _dismissCleanupTimer = null;
+    let _dismissTransitionEl = null;
+    let _dismissTransitionFn = null;
+
+    function cancelProbingDismissalAnimations() {
+        if (_scheduledProbingDismissTimer) { clearTimeout(_scheduledProbingDismissTimer); _scheduledProbingDismissTimer = null; }
+        if (_dismissFadeOutTimer) { clearTimeout(_dismissFadeOutTimer); _dismissFadeOutTimer = null; }
+        if (_dismissCleanupTimer) { clearTimeout(_dismissCleanupTimer); _dismissCleanupTimer = null; }
+        if (window.probingDismissTimer) { clearTimeout(window.probingDismissTimer); window.probingDismissTimer = null; }
+        if (_dismissTransitionEl && _dismissTransitionFn) {
+            _dismissTransitionEl.removeEventListener('transitionend', _dismissTransitionFn);
+        }
+        _dismissTransitionEl = null;
+        _dismissTransitionFn = null;
+    }
 
     function applyProbingStatusDirect(text, phase, isHtml = false) {
         const pStatus = document.getElementById('linkProbingStatus');
@@ -352,7 +369,13 @@
 
     const setProbingStatus = (text, phase = '', immediate = false) => {
         if (!text) return;
-        if (phase && _probingPacerCurrentPhase === phase && _probingPacerCurrentText === text) return;
+        if (phase === 'discovering' && _probingHasDiscoveredSources && !immediate) return;
+
+        if (phase && _probingPacerCurrentPhase === phase && _probingPacerCurrentText === text) {
+            if (_probingPacerTimer) { clearTimeout(_probingPacerTimer); _probingPacerTimer = null; }
+            _probingPacerPending = null;
+            return;
+        }
 
         if (immediate) {
             if (_probingPacerTimer) { clearTimeout(_probingPacerTimer); _probingPacerTimer = null; }
@@ -366,7 +389,7 @@
             _probingPacerPending = { text, phase, isHtml: false };
             if (!_probingPacerTimer) {
                 _probingPacerTimer = setTimeout(() => {
-                    _probingPacerTimer = null; _probingPacerPending = null; _probingPacerCurrentText = ''; _probingPacerCurrentPhase = '';
+                    _probingPacerTimer = null;
                     if (_probingPacerPending) {
                         const next = _probingPacerPending;
                         _probingPacerPending = null;
@@ -490,13 +513,19 @@
 
         // --- Backdrop ---
         const targetBackdrop = meta.backdropUrl || ((meta.episodes || []).find(e => e.isActive) || {}).posterUrl || '';
-        if (pBackdrop && targetBackdrop && pBackdrop.getAttribute('data-src') !== targetBackdrop) {
+        const currentBackdropSrc = pBackdrop ? (pBackdrop.getAttribute('data-src') || pBackdrop.getAttribute('src') || '') : '';
+        if (pBackdrop && targetBackdrop && currentBackdropSrc !== targetBackdrop) {
             pBackdrop.setAttribute('data-src', targetBackdrop);
             pBackdrop.classList.remove('loaded');
             pBackdrop.onload = () => { pBackdrop.classList.add('loaded'); };
             pBackdrop.onerror = () => { pBackdrop.classList.remove('loaded'); };
             pBackdrop.src = targetBackdrop;
             if (pBackdrop.complete && pBackdrop.naturalWidth > 0) pBackdrop.classList.add('loaded');
+        } else if (pBackdrop && targetBackdrop && currentBackdropSrc === targetBackdrop) {
+            if (!pBackdrop.getAttribute('data-src')) pBackdrop.setAttribute('data-src', targetBackdrop);
+            if (!pBackdrop.classList.contains('loaded') && pBackdrop.complete && pBackdrop.naturalWidth > 0) {
+                pBackdrop.classList.add('loaded');
+            }
         }
     }
     window.syncProbingHero = syncProbingHero;
@@ -550,24 +579,35 @@
 
     // ── Hard-reset every overlay/timer atomically when a new playback session begins.
     // This is the single source of truth that kills race conditions on re-entry.
-    function hardResetAllOverlays() {
+    function hardResetAllOverlays(options = {}) {
+        const preservePreloadedHero = !!options.preservePreloadedHero;
+        const hasIncomingLinks = !!options.hasIncomingLinks;
         // Kill all pending timers that could fire from a stale session
         if (window.resumeDismissTimer) { clearTimeout(window.resumeDismissTimer); window.resumeDismissTimer = null; }
-        if (window.probingDismissTimer) { clearTimeout(window.probingDismissTimer); window.probingDismissTimer = null; }
+        cancelProbingDismissalAnimations();
         if (loadingTimer) { clearTimeout(loadingTimer); loadingTimer = null; }
         if (endCountdownTimer) { clearInterval(endCountdownTimer); endCountdownTimer = null; }
         if (_probingPacerTimer) { clearTimeout(_probingPacerTimer); _probingPacerTimer = null; }
-        if (_scheduledProbingDismissTimer) { clearTimeout(_scheduledProbingDismissTimer); _scheduledProbingDismissTimer = null; }
         if (cumulativeSeekTimer) { clearTimeout(cumulativeSeekTimer); cumulativeSeekTimer = null; }
         cumulativeSeekMs = 0;
         lastSeekSign = 0;
+        if (typeof window.__resetSeekLock === 'function') window.__resetSeekLock();
+        if (typeof window.__resetHoldSpeedState === 'function') window.__resetHoldSpeedState();
+        if (typeof window.__resetLoopState === 'function') window.__resetLoopState();
 
         _probingPacerPending = null;
         _probingPacerCurrentText = '';
         _probingPacerCurrentPhase = '';
         _probingPacerNextChangeTime = 0;
-        const pBadge = document.getElementById('probingSourceCountBadge');
-        if (pBadge) pBadge.style.display = 'none';
+        _probingHasDiscoveredSources = hasIncomingLinks;
+        // New episode — treat as probing until first metadata_update arrives.
+        // Prevents a racing state_update from dismissing the overlay before
+        // handleMetadataUpdate has had a chance to set _kotlinIsProbing = true.
+        window._kotlinIsProbing = true;
+        if (!hasIncomingLinks) {
+            const pBadge = document.getElementById('probingSourceCountBadge');
+            if (pBadge && pBadge.style.display !== 'none') pBadge.style.display = 'none';
+        }
 
         // Reset all session-scoped JS state
         resumeHandled = false;
@@ -599,7 +639,9 @@
         if (normActions) normActions.style.display = '';
         const pPlayBtn = document.getElementById('probingPlayBtn');
         if (pPlayBtn) {
-            pPlayBtn.style.display = 'none';
+            if (!hasIncomingLinks) {
+                pPlayBtn.style.display = 'none';
+            }
             pPlayBtn.style.opacity = '';
             pPlayBtn.style.pointerEvents = '';
             pPlayBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg> Skip Loading`;
@@ -651,21 +693,23 @@
         if (timeDisplay) timeDisplay.innerText = '0:00 / 0:00';
         chaptersBtn?.classList.add('hidden');
 
-        // Reset backdrop and logo so stale media from previous session does not persist
-        const pBackdropReset = document.getElementById('linkProbingBackdrop');
-        if (pBackdropReset) {
-            pBackdropReset.removeAttribute('data-src');
-            pBackdropReset.classList.remove('loaded');
-        }
-        const pLogoReset = document.getElementById('linkProbingLogo');
-        if (pLogoReset) {
-            pLogoReset.removeAttribute('data-src');
-            pLogoReset.classList.remove('logo-loaded');
-            pLogoReset.style.display = 'none';
-        }
-        const pTitleReset = document.getElementById('linkProbingTitle');
-        if (pTitleReset) {
-            pTitleReset.classList.remove('title-visible');
+        // Reset backdrop and logo on genuine session/episode switches, without blinking preloaded initial cold-boot art
+        if (!preservePreloadedHero) {
+            const pBackdropReset = document.getElementById('linkProbingBackdrop');
+            if (pBackdropReset) {
+                pBackdropReset.removeAttribute('data-src');
+                pBackdropReset.classList.remove('loaded');
+            }
+            const pLogoReset = document.getElementById('linkProbingLogo');
+            if (pLogoReset) {
+                pLogoReset.removeAttribute('data-src');
+                pLogoReset.classList.remove('logo-loaded');
+                pLogoReset.style.display = 'none';
+            }
+            const pTitleReset = document.getElementById('linkProbingTitle');
+            if (pTitleReset) {
+                pTitleReset.classList.remove('title-visible');
+            }
         }
     }
 
@@ -1457,6 +1501,10 @@
         clearTimeout(seekLockTimer);
         seekLockTimer = setTimeout(() => { isSeeking = false; }, 800);
     };
+    window.__resetSeekLock = () => {
+        clearTimeout(seekLockTimer);
+        isSeeking = false;
+    };
 
     // Backend Messages
     const updateAudioPlayPauseIcon = () => {
@@ -1539,7 +1587,7 @@
                         const activeEpProg = epPanel.querySelector('.ep-row-desk.active .ep-row-prog-fill, .ep-card-desk.active .ep-card-prog-fill');
                         if (activeEpProg) {
                             activeEpProg.style.width = `${pct}%`;
-                            if (pct < 90) {
+                            if (pct < 85) {
                                 activeEpProg.classList.remove('completed');
                             } else {
                                 activeEpProg.classList.add('completed');
@@ -1913,10 +1961,12 @@
             globalIsLoading = s.isLoading;
         }
 
-        // Ensure probing overlay is dismissed once playback is buffered and actively rendering
+        // Guard: only auto-dismiss if Kotlin has confirmed scraping is done.
+        // window._kotlinIsProbing is set synchronously by handleMetadataUpdate, making it
+        // authoritative vs. the one-tick-stale window.lastMeta read that caused false dismissals.
         const pOverlay = document.getElementById('linkProbingOverlay');
         if (pOverlay && pOverlay.classList.contains('active') && !pOverlay.classList.contains('dismissing')) {
-            const isKotlinProbing = (window.lastMeta && window.lastMeta.isProbing === true);
+            const isKotlinProbing = window._kotlinIsProbing === true;
             const forwardBufferMs = (typeof s.bufferMs === 'number' && typeof s.positionMs === 'number') ? (s.bufferMs - s.positionMs) : 0;
             const isBufferHealthy = forwardBufferMs >= 3000 || (typeof s.positionMs === 'number' && s.positionMs >= 400);
             const isActivelyPlaying = globalIsPlaying || (typeof s.positionMs === 'number' && s.positionMs > 200);
@@ -1967,15 +2017,15 @@
         const upper = rawName.toUpperCase();
 
         // 0. Debrid providers
-        if (upper.includes('[RD]') || upper.includes('RD+') || upper.includes('REAL-DEBRID')) {
+        if (upper.includes('[RD') || upper.includes('RD+') || upper.includes('REAL-DEBRID')) {
             tags.push({ text: 'Real-Debrid', type: 'format', badge: 'rd.png' });
-        } else if (upper.includes('[TB]') || upper.includes('TB+') || upper.includes('TORBOX')) {
+        } else if (upper.includes('[TB') || upper.includes('TB+') || upper.includes('TORBOX')) {
             tags.push({ text: 'TorBox', type: 'format', badge: 'torbox.png' });
-        } else if (upper.includes('[AD]') || upper.includes('AD+') || upper.includes('ALLDEBRID')) {
+        } else if (upper.includes('[AD') || upper.includes('AD+') || upper.includes('ALLDEBRID')) {
             tags.push({ text: 'AllDebrid', type: 'format', badge: 'alldebrid.png' });
-        } else if (upper.includes('[PM]') || upper.includes('PM+') || upper.includes('PREMIUMIZE')) {
+        } else if (upper.includes('[PM') || upper.includes('PM+') || upper.includes('PREMIUMIZE')) {
             tags.push({ text: 'Premiumize', type: 'format', badge: 'premiumize.png' });
-        } else if (upper.includes('[DL]') || upper.includes('DL+') || upper.includes('DEBRID-LINK') || upper.includes('DEBRIDLINK')) {
+        } else if (upper.includes('[DL') || upper.includes('DL+') || upper.includes('DEBRID-LINK') || upper.includes('DEBRIDLINK')) {
             tags.push({ text: 'Debrid-Link', type: 'format', badge: 'debridlink.png' });
         }
 
@@ -2158,6 +2208,52 @@
         });
     }
 
+    window.__handleBadgeImgError = (img) => {
+        if (!img) return;
+        const slot = img.closest ? img.closest('.srv-tag-slot') : img.parentNode;
+        const text = (img.dataset && img.dataset.badgeText) || img.alt || '';
+        const type = (img.dataset && img.dataset.badgeType) || 'format';
+        const compact = img.classList && img.classList.contains('probing');
+        if (slot) {
+            slot.innerHTML = `<span class="srv-cube-badge ${compact ? 'probing ' : ''}tag-${escapeHtml(type)}">${escapeHtml(text)}</span>`;
+        } else if (img.style) {
+            img.style.display = 'none';
+        }
+    };
+
+    const resolveLinkTechTags = (link) => {
+        if (link && Array.isArray(link.techTags) && link.techTags.length > 0) {
+            return link.techTags.map(t => ({
+                text: t.text || '',
+                type: t.type || 'format',
+                badgeUrl: t.badgeUrl || ((t.badgeFile && window.__BADGES_BASE_URL__) ? (window.__BADGES_BASE_URL__ + t.badgeFile) : ''),
+            })).filter(t => t.text);
+        }
+        const rawName = (link && link.name) || '';
+        const baseUrl = window.__BADGES_BASE_URL__ || '';
+        return parseStreamTechTags(rawName).map(t => ({
+            text: t.text,
+            type: t.type || 'format',
+            badgeUrl: (t.badge && baseUrl) ? (baseUrl + t.badge) : '',
+        }));
+    };
+
+    const renderTechTagsHtml = (link, options = {}) => {
+        const compact = !!options.compact;
+        const maxTags = options.maxTags || 8;
+        const tags = resolveLinkTechTags(link).slice(0, maxTags);
+        return tags.map(t => {
+            const safeText = escapeHtml(t.text);
+            const safeType = escapeHtml(t.type || 'format');
+            if (t.badgeUrl) {
+                const safeUrl = escapeHtml(t.badgeUrl);
+                return `<span class="srv-tag-slot"><img src="${safeUrl}" class="srv-badge-img${compact ? ' probing' : ''}" alt="${safeText}" title="${safeText}" loading="lazy" data-badge-text="${safeText}" data-badge-type="${safeType}" onerror="window.__handleBadgeImgError(this);" /></span>`;
+            }
+            return `<span class="srv-cube-badge ${compact ? 'probing ' : ''}tag-${safeType}">${safeText}</span>`;
+        }).join('');
+    };
+    window.renderTechTagsHtml = renderTechTagsHtml;
+
     window.setServerFilter = (filterVal) => {
         activeServerFilter = filterVal;
         renderFilteredServers();
@@ -2250,7 +2346,7 @@
 
         const failedArr = (window.lastMeta && window.lastMeta.failedLinks) || [];
         const currentFailedJson = JSON.stringify(failedArr);
-        const listSignature = activeServerFilter + '::' + filtered.map(l => (l.url || '') + ':' + (l.name || '') + ':' + (l.quality || '') + ':' + (l.isTorrent || '') + ':' + (l.seeds || '') + ':' + (l.logoUrl || '')).join('|');
+        const listSignature = activeServerFilter + '::' + (window.__BADGES_BASE_URL__ || '') + '::' + (window.currentFileSize || '') + '::' + filtered.map(l => (l.url || '') + ':' + (l.name || '') + ':' + (l.quality || '') + ':' + (l.size || '') + ':' + (l.isTorrent || '') + ':' + (l.seeds || '') + ':' + (l.logoUrl || '') + ':' + ((l.techTags || []).map(t => t.badgeUrl || t.text).join(','))).join('|');
 
         if (serversListElem._lastSignature === listSignature && serversListElem._lastFailedJson === currentFailedJson && serversListElem.children.length === filtered.length) {
             // Update active state in-place without rebuilding DOM under hover cursor
@@ -2339,11 +2435,8 @@
             cleanName = cleanName.replace(/\[\s*\]|\(\s*\)/g, '').replace(/[\s\-_•/·:]+$/g, '').replace(/^[\s\-_•/·:]+/g, '').replace(/\s{2,}/g, ' ').trim();
             cleanName = escapeHtml(cleanName || ('Source ' + (l.index + 1)));
 
-            // Extract tags: render stable CSS cube badges directly to prevent 404 image thrashing
-            const tags = parseStreamTechTags(rawName);
-            const tagsHtml = tags.map(t => {
-                return `<span class="srv-cube-badge tag-${t.type}">${escapeHtml(t.text)}</span>`;
-            }).join('');
+            // Extract tags: render resolved badge images with CSS pill fallback on error
+            const tagsHtml = renderTechTagsHtml(l, { compact: false, maxTags: 8 });
             const sizeHtml = sizeText ? `<span class="srv-cube-badge tag-size">${escapeHtml(sizeText)}</span>` : '';
 
             // Logo HTML
@@ -2451,7 +2544,7 @@
                             pct = Math.min(100, Math.max(0, Math.round(activeEp.watchedPercentage)));
                         }
                         activeProgEl.style.width = `${pct}%`;
-                        if (pct >= 90) {
+                        if (pct >= 85) {
                             activeProgEl.classList.add('completed');
                             const activeCard = listEl.querySelector('.ep-row-desk.active, .ep-card-desk.active');
                             if (activeCard) activeCard.classList.add('watched');
@@ -2483,14 +2576,14 @@
                     } else if (typeof ep.watchedPercentage === 'number') {
                         progressPercent = Math.min(100, Math.max(0, Math.round(ep.watchedPercentage)));
                     }
-                    if (progressPercent >= 90) {
+                    if (progressPercent >= 85) {
                         isCompletedWatched = true;
                     }
                 } else {
                     if (typeof ep.watchedPercentage === 'number') {
                         progressPercent = Math.min(100, Math.max(0, Math.round(ep.watchedPercentage)));
                     }
-                    if (progressPercent >= 90 || ep.isSeen) {
+                    if (progressPercent >= 85 || ep.isSeen) {
                         isCompletedWatched = true;
                     }
                 }
@@ -2620,6 +2713,12 @@
 
     const handleMetadataUpdate = (meta) => {
         window.lastMeta = meta;
+        // Single authoritative flag — updated before any state_update can race us.
+        // handleStateUpdate reads this instead of the one-tick-stale window.lastMeta.
+        window._kotlinIsProbing = !!(meta && (meta.isProbing === true || meta.isExhausted === true));
+        if (meta && meta.badgesBaseUrl) {
+            window.__BADGES_BASE_URL__ = meta.badgesBaseUrl;
+        }
         const isLive = !!(meta && meta.isLive);
         window.isLiveStream = isLive;
         document.body.classList.toggle('is-live-stream', isLive);
@@ -2633,14 +2732,23 @@
         // during error recovery (trying next source) within the same episode.
         const activeEp = (meta.episodes || []).find(e => e.isActive);
         const activeId = activeEp ? activeEp.id : '';
+        const normalizeSessionBaseTitle = (rawTitle) => {
+            if (!rawTitle) return '';
+            return String(rawTitle).split(' - ')[0].trim().toLowerCase();
+        };
         if (meta.title) {
-            // A genuinely new playback session occurs on initial startup or when switching to a different episode.
-            // Spurious resets MUST NOT be triggered during playback, when the episode list asynchronously arrives,
-            // or when the title string is enriched/updated by metadata sources.
+            // A genuinely new playback session occurs on initial startup, when switching to a
+            // different episode ID, or when launching an unrelated title (base title changed).
+            // Title suffixes and asynchronous episode list arrival for the same title must not reset overlays.
             const isInitialSession = !currentTitle;
-            const isEpisodeChange = currentEpisodeId !== '' && activeId !== '' && currentEpisodeId !== activeId;
+            const prevBaseTitle = normalizeSessionBaseTitle(currentTitle);
+            const nextBaseTitle = normalizeSessionBaseTitle(meta.title);
+            const hasBaseTitleSwitch = prevBaseTitle !== '' && nextBaseTitle !== '' && prevBaseTitle !== nextBaseTitle;
+            const isEpisodeChange = (currentEpisodeId !== '' && activeId !== '' && currentEpisodeId !== activeId) ||
+                hasBaseTitleSwitch;
             const isNewSession = isInitialSession || isEpisodeChange;
             const isAlreadyPlaying = globalIsPlaying || currentPosMs > 50 || window.hasDismissedInitialProbing;
+            const hasIncomingLinks = Array.isArray(meta.links) && meta.links.length > 0;
 
             if (isNewSession) {
                 lastKnownQualityLabel = 'Auto';
@@ -2654,7 +2762,10 @@
                     window.hasDismissedInitialProbing = false;
                     userDismissedProbing = false;
                     // *** Atomically reset ALL state so stale timers/overlays can't race ***
-                    hardResetAllOverlays();
+                    hardResetAllOverlays({
+                        preservePreloadedHero: isInitialSession,
+                        hasIncomingLinks,
+                    });
                 }
             }
             currentTitle = meta.title;
@@ -2675,12 +2786,14 @@
 
                 // Clear stale link list only on genuine episode switch if no incoming links exist.
                 // Otherwise, keyed reconciliation preserves existing DOM nodes cleanly.
-                if (isEpisodeChange && (!meta.links || meta.links.length === 0) && pList) {
+                if (isEpisodeChange && !hasIncomingLinks && pList) {
                     pList.innerHTML = '';
                 }
 
-                // Reset status text
-                if (pStatus) pStatus.innerText = 'Discovering streaming sources…';
+                // Reset status text cleanly via the pacer only when no links are available yet
+                if (!hasIncomingLinks && pStatus) {
+                    setProbingStatus('Discovering streaming sources…', 'discovering', true);
+                }
 
                 // Unified Probing Hero & Backdrop Sync
                 let showTitle = meta.title || '';
@@ -2829,18 +2942,39 @@
             }
         }
 
+        const pauseBrandRatings = document.getElementById('pauseInfoBrandRatings');
         const pauseScore = document.getElementById('pauseInfoScore');
         const pauseScoreText = document.getElementById('pauseInfoScoreText');
         const activeEpForScore = (meta.episodes || []).find(e => e.isActive);
         const epScoreForPause = activeEpForScore ? activeEpForScore.score : null;
         const effectiveScoreForPause = (epScoreForPause && epScoreForPause > 0) ? epScoreForPause : (meta.rating && meta.rating > 0 ? meta.rating : null);
+        const brandBadges = Array.isArray(meta.ratingBadges) ? meta.ratingBadges : [];
 
-        if (effectiveScoreForPause && pauseScore && pauseScoreText) {
-            pauseScoreText.innerText = effectiveScoreForPause.toFixed(1);
-            pauseScore.style.display = 'inline-flex';
+        if (pauseBrandRatings && brandBadges.length > 0) {
+            pauseBrandRatings.innerHTML = brandBadges.map(rb => {
+                const srcKey = escapeHtml((rb.source || '').toLowerCase());
+                const labelFallback = (rb.source || 'score').toUpperCase();
+                const scoreTxt = escapeHtml(rb.scoreText || '');
+                const iconHtml = rb.iconUrl
+                    ? `<img src="${escapeHtml(rb.iconUrl)}" class="pause-brand-badge-img" alt="${escapeHtml(labelFallback)}" onerror="this.style.display='none';if(this.nextElementSibling)this.nextElementSibling.style.display='inline';" /><span class="pause-brand-badge-fallback" style="display:none;">${escapeHtml(labelFallback)}</span>`
+                    : `<span class="pause-brand-badge-fallback">${escapeHtml(labelFallback)}</span>`;
+                return `<span class="pause-brand-badge ${srcKey}">${iconHtml}<span>${scoreTxt}</span></span>`;
+            }).join('');
+            pauseBrandRatings.style.display = 'inline-flex';
+            if (pauseScore) pauseScore.style.display = 'none';
             hasMeta = true;
-        } else if (pauseScore) {
-            pauseScore.style.display = 'none';
+        } else {
+            if (pauseBrandRatings) {
+                pauseBrandRatings.innerHTML = '';
+                pauseBrandRatings.style.display = 'none';
+            }
+            if (effectiveScoreForPause && pauseScore && pauseScoreText) {
+                pauseScoreText.innerText = effectiveScoreForPause.toFixed(1);
+                pauseScore.style.display = 'inline-flex';
+                hasMeta = true;
+            } else if (pauseScore) {
+                pauseScore.style.display = 'none';
+            }
         }
 
         if (meta.year) {
@@ -3161,6 +3295,15 @@
                     const isDetailsVisible = localStorage.getItem('cs3_show_probing_details') === 'true';
                     applyProbingListVisibility(isDetailsVisible);
                 }
+            } else {
+                // Overlay is mid-dismiss but Kotlin says scraping is still live — abort the
+                // dismissal and snap back to active so the overlay never disappears and re-appears.
+                cancelProbingDismissalAnimations();
+                delete pOverlay.dataset.dismissing;
+                pOverlay.classList.remove('dismissing');
+                pOverlay.classList.add('active');
+                if (pContent) pContent.classList.remove('dismissing');
+                userDismissedProbing = false;
             }
 
             const resumeOvl = document.getElementById('resumeOverlay');
@@ -3253,6 +3396,9 @@
 
             // Steady Live Status label
             const totalLinks = (meta.links || []).length;
+            if (totalLinks > 0) {
+                _probingHasDiscoveredSources = true;
+            }
             const failedArr = meta.failedLinks || [];
             const failedCount = failedArr.length;
             const lastFailed = failedArr[failedArr.length - 1];
@@ -3271,7 +3417,7 @@
                     if (pBadge.style.display !== 'inline-flex') {
                         pBadge.style.display = 'inline-flex';
                     }
-                } else if (!pList || !pList.querySelector('.link-probing-item')) {
+                } else if (!_probingHasDiscoveredSources && (!pList || !pList.querySelector('.link-probing-item'))) {
                     if (pBadge.style.display !== 'none') {
                         pBadge.style.display = 'none';
                     }
@@ -3283,10 +3429,7 @@
                 if (failedCount >= totalLinks && totalLinks > 0) {
                     setProbingStatus(`All ${totalLinks} sources failed • Waiting for fallback…`, 'exhausted');
                 } else if (failedCount > 0 && lastFailed) {
-                    if (_scheduledProbingDismissTimer) {
-                        clearTimeout(_scheduledProbingDismissTimer);
-                        _scheduledProbingDismissTimer = null;
-                    }
+                    cancelProbingDismissalAnimations();
                     userDismissedProbing = false;
                     delete pOverlay.dataset.dismissing;
                     pOverlay.classList.remove('dismissing');
@@ -3301,7 +3444,7 @@
                     setProbingStatus(`Connecting to ${currName}${currQualityLabel}…`, 'connecting');
                 } else if (currIdx < 0 && totalLinks > 0) {
                     setProbingStatus(`Found ${totalLinks} source${totalLinks === 1 ? '' : 's'} • Selecting preferred link…`, 'selecting');
-                } else {
+                } else if (!_probingHasDiscoveredSources) {
                     setProbingStatus('Discovering streaming sources…', 'discovering');
                 }
             }
@@ -3331,6 +3474,7 @@
 
                 meta.links.forEach((l, i) => {
                     let st = 'waiting';
+                    let statusKey = '';
                     let statusBadgeHtml = '';
                     const failedInfo = failedArr.find(f => (f.url && f.url === l.url) || f.index === l.index);
 
@@ -3350,18 +3494,22 @@
                         qBadgeClass = '';
                         qLabel = `${qVal}p`;
                     }
+                    const qualityKey = qLabel ? `${qBadgeClass}:${qLabel}` : '';
                     const qualityHtml = qLabel ? `<span class="link-quality-badge ${qBadgeClass}">${qLabel}</span>` : '';
 
                     if (failedInfo) {
                         st = 'failed';
                         const cleanReason = failedInfo.reason ? (failedInfo.reason.length > 25 ? failedInfo.reason.slice(0, 25) + '…' : failedInfo.reason) : 'FAILED';
                         const err = `FAILED • ${cleanReason}`;
+                        statusKey = `failed:${err}`;
                         statusBadgeHtml = `<span class="link-status-badge failed"><svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg> ${err}</span>`;
                     } else if (currIdx >= 0 && l.index === currIdx) {
                         st = 'active';
+                        statusKey = 'active';
                         statusBadgeHtml = `<span class="link-status-badge testing"><div class="link-spinner"><span></span></div> TESTING</span>`;
                     } else {
                         st = 'waiting';
+                        statusKey = 'waiting';
                         statusBadgeHtml = `<span class="link-status-badge queue">QUEUED</span>`;
                     }
 
@@ -3371,42 +3519,72 @@
                     cleanProbingName = cleanProbingName.replace(/\[\s*\]|\(\s*\)/g, '').replace(/[\s\-_•/·:]+$/g, '').trim();
                     cleanProbingName = cleanProbingName || rawProbingName;
 
+                    const probingTagsHtml = renderTechTagsHtml(l, { compact: true, maxTags: 5 });
+                    const tagsKey = `${window.__BADGES_BASE_URL__ || ''}::${probingTagsHtml}`;
                     const targetClassName = `link-probing-item ${st}`;
                     let card = existingCards.get(l.url);
 
                     if (card) {
-                        // In-place patch without recreating DOM or resetting CSS spinners
+                        // Compare cached raw keys (not browser-normalized innerHTML) so valid nodes/images are never churned
                         if (card.className !== targetClassName) {
                             card.className = targetClassName;
                         }
-                        card.style.cursor = 'pointer';
-                        card.onclick = () => { send('changeLink', l.url); };
-                        const badgeContainer = card.querySelector('.link-badge-container');
-                        if (badgeContainer && badgeContainer.innerHTML !== statusBadgeHtml) {
-                            badgeContainer.innerHTML = statusBadgeHtml;
+                        if (!card._clickBound) {
+                            card._clickBound = true;
+                            card.style.cursor = 'pointer';
+                            card.onclick = () => { send('changeLink', card.dataset.url); };
                         }
-                        const qBadge = card.querySelector('.link-quality-badge');
-                        if (qualityHtml) {
-                            if (qBadge) {
-                                if (qBadge.outerHTML !== qualityHtml) qBadge.outerHTML = qualityHtml;
-                            } else {
-                                const titleWrap = card.querySelector('.link-title-wrap');
-                                if (titleWrap) titleWrap.insertAdjacentHTML('beforeend', qualityHtml);
+                        if (card._lastStatusKey !== statusKey) {
+                            card._lastStatusKey = statusKey;
+                            const badgeContainer = card.querySelector('.link-badge-container');
+                            if (badgeContainer) badgeContainer.innerHTML = statusBadgeHtml;
+                        }
+                        if (card._lastQualityKey !== qualityKey) {
+                            card._lastQualityKey = qualityKey;
+                            const qBadge = card.querySelector('.link-quality-badge');
+                            if (qualityHtml) {
+                                if (qBadge) {
+                                    qBadge.outerHTML = qualityHtml;
+                                } else {
+                                    const titleWrap = card.querySelector('.link-title-wrap');
+                                    if (titleWrap) titleWrap.insertAdjacentHTML('beforeend', qualityHtml);
+                                }
+                            } else if (qBadge) {
+                                qBadge.remove();
                             }
-                        } else if (qBadge) {
-                            qBadge.remove();
+                        }
+                        if (card._lastTagsKey !== tagsKey) {
+                            card._lastTagsKey = tagsKey;
+                            const tagsRow = card.querySelector('.link-probing-tags-row');
+                            if (probingTagsHtml) {
+                                if (tagsRow) {
+                                    tagsRow.innerHTML = probingTagsHtml;
+                                } else {
+                                    const mainWrap = card.querySelector('.link-probing-main');
+                                    if (mainWrap) mainWrap.insertAdjacentHTML('beforeend', `<div class="link-probing-tags-row">${probingTagsHtml}</div>`);
+                                }
+                            } else if (tagsRow) {
+                                tagsRow.remove();
+                            }
                         }
                     } else {
                         // Create new card
                         card = document.createElement('div');
                         card.className = targetClassName;
                         card.dataset.url = l.url;
+                        card._lastStatusKey = statusKey;
+                        card._lastQualityKey = qualityKey;
+                        card._lastTagsKey = tagsKey;
+                        card._clickBound = true;
                         card.style.cursor = 'pointer';
-                        card.onclick = () => { send('changeLink', l.url); };
+                        card.onclick = () => { send('changeLink', card.dataset.url); };
                         card.innerHTML = `
-                            <div class="link-title-wrap" style="display: flex; align-items: center; gap: 4px; min-width: 0;">
-                                <span style="font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 420px;">${escapeHtml(cleanProbingName)}</span>
-                                ${qualityHtml}
+                            <div class="link-probing-main">
+                                <div class="link-title-wrap" style="display: flex; align-items: center; gap: 4px; min-width: 0;">
+                                    <span style="font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 420px;">${escapeHtml(cleanProbingName)}</span>
+                                    ${qualityHtml}
+                                </div>
+                                ${probingTagsHtml ? `<div class="link-probing-tags-row">${probingTagsHtml}</div>` : ''}
                             </div>
                             <div class="link-badge-container">${statusBadgeHtml}</div>
                         `;
@@ -3438,7 +3616,7 @@
                         });
                     }
                 }
-            } else {
+            } else if (!_probingHasDiscoveredSources) {
                 // If cards are already rendered in the DOM, keep them stable.
                 // Never wipe existing cards with the initial spinner on transient empty updates.
                 const hasExistingCards = pList && pList.querySelector('.link-probing-item') !== null;
@@ -3451,7 +3629,7 @@
             }
 
             const pPlayBtn = document.getElementById('probingPlayBtn');
-            if (pPlayBtn && meta.links && meta.links.length > 0) {
+            if (pPlayBtn && (totalLinks > 0 || _probingHasDiscoveredSources) && pPlayBtn.style.display !== 'inline-flex') {
                 pPlayBtn.style.display = 'inline-flex';
             }
         } else if (meta.isProbing === false && !meta.isExhausted) {
@@ -3490,14 +3668,7 @@
         const scanBar = document.querySelector('.probing-scan-bar');
         if (meta.isExhausted === true) {
             userDismissedProbing = false;
-            if (window.probingDismissTimer) {
-                clearTimeout(window.probingDismissTimer);
-                window.probingDismissTimer = null;
-            }
-            if (_scheduledProbingDismissTimer) {
-                clearTimeout(_scheduledProbingDismissTimer);
-                _scheduledProbingDismissTimer = null;
-            }
+            cancelProbingDismissalAnimations();
             if (_probingPacerTimer) {
                 clearTimeout(_probingPacerTimer);
                 _probingPacerTimer = null; _probingPacerPending = null; _probingPacerCurrentText = ''; _probingPacerCurrentPhase = '';
@@ -3510,9 +3681,9 @@
                 pContent.classList.remove('dismissing');
             }
             if (scanBar && scanBar.style.display !== 'none') scanBar.style.display = 'none';
-            if (normActions) normActions.style.display = 'none';
+            if (normActions && normActions.style.display !== 'none') normActions.style.display = 'none';
             if (errActions) {
-                errActions.style.display = 'flex';
+                if (errActions.style.display !== 'flex') errActions.style.display = 'flex';
                 const errMsg = document.getElementById('probingErrorMessage');
                 if (errMsg) errMsg.innerText = meta.exhaustionReason || 'No stream sources found';
                 const retryBtn = document.getElementById('probingRetryBtn');
@@ -3538,9 +3709,9 @@
                 `;
             }
         } else {
-            if (errActions) errActions.style.display = 'none';
+            if (errActions && errActions.style.display !== 'none') errActions.style.display = 'none';
             if (scanBar && scanBar.style.display !== '') scanBar.style.display = '';
-            if (normActions && meta.isProbing === true) normActions.style.display = 'flex';
+            if (normActions && meta.isProbing === true && normActions.style.display !== 'flex') normActions.style.display = 'flex';
         }
 
         evaluateResumeOverlay();
@@ -4671,15 +4842,35 @@
             // Fade content out first
             if (pContent) pContent.classList.add('dismissing');
             
-            setTimeout(() => {
+            _dismissFadeOutTimer = setTimeout(() => {
+                _dismissFadeOutTimer = null;
                 // Crossfade the dark backdrop out and disable overlay
                 pOverlay.classList.add('dismissing');
                 pOverlay.classList.remove('active');
                 delete pOverlay.dataset.dismissing;
-                
-                setTimeout(() => {
+
+                const onTransitionEnd = (e) => {
+                    if (e.target !== pOverlay || e.propertyName !== 'opacity') return;
+                    pOverlay.removeEventListener('transitionend', onTransitionEnd);
+                    if (_dismissTransitionFn === onTransitionEnd) {
+                        _dismissTransitionEl = null;
+                        _dismissTransitionFn = null;
+                    }
+                    if (_dismissCleanupTimer) { clearTimeout(_dismissCleanupTimer); _dismissCleanupTimer = null; }
                     pOverlay.classList.remove('dismissing');
-                }, 450);
+                };
+                _dismissTransitionEl = pOverlay;
+                _dismissTransitionFn = onTransitionEnd;
+                pOverlay.addEventListener('transitionend', onTransitionEnd);
+                _dismissCleanupTimer = setTimeout(() => {
+                    _dismissCleanupTimer = null;
+                    pOverlay.removeEventListener('transitionend', onTransitionEnd);
+                    if (_dismissTransitionFn === onTransitionEnd) {
+                        _dismissTransitionEl = null;
+                        _dismissTransitionFn = null;
+                    }
+                    pOverlay.classList.remove('dismissing');
+                }, 600);
 
                 if (overlay) {
                     overlay.classList.remove('hide-main-ui');
@@ -4734,9 +4925,12 @@
         if (s.fileSize !== undefined) {
             const rawFs = s.fileSize || '';
             const fsNum = parseFloat(String(rawFs).replace(/[^\d.]/g, ''));
-            window.currentFileSize = (!isNaN(fsNum) && fsNum > 0) ? String(rawFs).trim() : '';
-            if (typeof updateClockDisplay === 'function') updateClockDisplay();
-            if (typeof renderFilteredServers === 'function') renderFilteredServers();
+            const nextFileSize = (!isNaN(fsNum) && fsNum > 0) ? String(rawFs).trim() : '';
+            if (nextFileSize !== window.currentFileSize) {
+                window.currentFileSize = nextFileSize;
+                if (typeof updateClockDisplay === 'function') updateClockDisplay();
+                if (typeof renderFilteredServers === 'function') renderFilteredServers();
+            }
         }
 
         if (typeof s.volume === 'number') {
@@ -5743,14 +5937,22 @@
     let originalSpeed = 1.0;
     const holdSpeedHud = document.getElementById('holdSpeedHud');
     const holdSpeedHudText = document.getElementById('holdSpeedHudText');
-    // speedMapping must match the one defined later
-    const holdSpeedMapping = [0.25, 0.35, 0.5, 0.65, 0.75, 0.9, 1.0, 1.25, 1.5, 1.75, 2.0, 2.5, 3.0];
-
     const restoreHoldSpeed = () => {
         if (!isHoldingSpeed) return;
         isHoldingSpeed = false;
         holdSpeedHud.classList.remove('show');
-        send('setMpvProperty', `speed:${originalSpeed}`);
+        applySpeed(originalSpeed);
+    };
+
+    window.__resetHoldSpeedState = () => {
+        clearTimeout(holdSpeedTimer);
+        clearTimeout(clickTimer);
+        clickCount = 0;
+        if (isHoldingSpeed) {
+            isHoldingSpeed = false;
+            holdSpeedHud.classList.remove('show');
+        }
+        wasHoldingSpeed = false;
     };
 
     const handleZoneHoldStart = (zoneName) => {
@@ -5759,7 +5961,10 @@
         holdSpeedTimer = setTimeout(() => {
             isHoldingSpeed = true;
             const slider = document.getElementById('speedSlider');
-            originalSpeed = slider ? (holdSpeedMapping[parseInt(slider.value) + 6] || 1.0) : 1.0;
+            const parsedSlider = slider ? parseFloat(slider.value) : NaN;
+            originalSpeed = (typeof window.currentSpeed === 'number' && !isNaN(window.currentSpeed))
+                ? window.currentSpeed
+                : (!isNaN(parsedSlider) ? parsedSlider : 1.0);
             const newSpeed = zoneName === 'left' ? 0.5 : 2.0;
             send('setMpvProperty', `speed:${newSpeed}`);
             holdSpeedHudText.innerText = zoneName === 'left' ? '0.5x Speed' : '2x Speed';
@@ -5919,7 +6124,7 @@
         evaluateUIStates();
         document.getElementById('overlay').style.opacity = '';
         forceShowLoading();
-        if (episodesData && currentEpisodeId) {
+        if (episodesData && currentEpisodeId && durationMs > 0 && (currentPosMs / durationMs) >= 0.80) {
             const curEp = episodesData.find(e => e.id === currentEpisodeId);
             if (curEp) {
                 curEp.isSeen = true;
@@ -7290,6 +7495,14 @@
 
     // ── Context Menu Logic ──────────────────────────────────────────
     let isLooping = false;
+    window.__resetLoopState = () => {
+        isLooping = false;
+        const loopBadge = document.getElementById('ctxLoopBadge');
+        if (loopBadge) {
+            loopBadge.innerText = 'Off';
+            loopBadge.style.color = 'rgba(255, 255, 255, 0.6)';
+        }
+    };
     let ctxActiveSubmenu = null;
     let ctxSubmenuCloseTimer = null;
 
@@ -8649,10 +8862,19 @@
 
     // Ready
     let _uiReadyDispatched = false;
+    let _readyRetryInterval = null;
     const notifyReady = () => {
         if (_uiReadyDispatched) return;
-        _uiReadyDispatched = true;
-        send('ui_ready');
+        if (window.chrome && window.chrome.webview) {
+            _uiReadyDispatched = true;
+            send('ui_ready');
+            if (_readyRetryInterval) {
+                clearInterval(_readyRetryInterval);
+                _readyRetryInterval = null;
+            }
+        } else {
+            send('ui_ready');
+        }
     };
 
     if (window.chrome && window.chrome.webview) {
@@ -8670,21 +8892,24 @@
         notifyReady();
     }
 
-    // Safety fallback: if WebView bridge initialization was delayed, retry handshake
-    let _readyRetryCount = 0;
-    const _readyRetryInterval = setInterval(() => {
-        _readyRetryCount++;
-        if (_readyRetryCount > 20) {
-            clearInterval(_readyRetryInterval);
-            return;
-        }
-        if (window.chrome && window.chrome.webview) {
-            if (!window._msgListenerAttached) {
-                window._msgListenerAttached = true;
-                window.chrome.webview.addEventListener('message', e => {
-                    handleMessage(e.data);
-                });
+    // Safety fallback: only retry until WebView bridge is available and ui_ready has been delivered
+    if (!_uiReadyDispatched) {
+        let _readyRetryCount = 0;
+        _readyRetryInterval = setInterval(() => {
+            _readyRetryCount++;
+            if (_uiReadyDispatched || _readyRetryCount > 20) {
+                clearInterval(_readyRetryInterval);
+                _readyRetryInterval = null;
+                return;
             }
-            send('ui_ready');
-        }
-    }, 250);
+            if (window.chrome && window.chrome.webview) {
+                if (!window._msgListenerAttached) {
+                    window._msgListenerAttached = true;
+                    window.chrome.webview.addEventListener('message', e => {
+                        handleMessage(e.data);
+                    });
+                }
+                notifyReady();
+            }
+        }, 250);
+    }

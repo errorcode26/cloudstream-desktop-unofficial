@@ -13,7 +13,7 @@ import java.io.File
 object PlayerLinkHandler {
 
     const val MIN_DURATION_TO_SAVE_SECONDS = 30L
-    const val RESUME_RESET_PERCENT = 90L
+    const val RESUME_RESET_PERCENT = 85L
     const val RESUME_MIN_PERCENT = 1L
 
     data class ValidatedLink(

@@ -214,7 +214,7 @@ fun BaseMpvPlayer(
     }
 
     LaunchedEffect(playerState, isLive) {
-        engine.playerState = playerState
+        engine.updatePlayerState(playerState)
         engine.isLive = isLive
     }
 
@@ -236,6 +236,7 @@ fun BaseMpvPlayer(
 
         if (link == null) {
             com.lagradost.cloudstream3.desktop.torrent.DesktopTorrentEngine.stopStream()
+            engine.notifyLoadFile()
             engine.stop()
             engine.pause()
             playerState?._isPaused?.value = true
@@ -456,6 +457,7 @@ fun BaseMpvPlayer(
         val safeUrl = urlTarget.replace("\\", "/")
         com.lagradost.common.logging.AppLogger.i("Loading embedded MPV URL: $safeUrl")
 
+        engine.notifyLoadFile()
         engine.executeCommand("stop")
 
         var waitAttempts = 0

@@ -110,8 +110,9 @@ class PlayerInboundDispatcher(
                             AppLogger.i("Player:Web", "Applying subtitle to MPV: path='$cleanPath', name='$cleanName', lang='$cleanLang'")
                             playerState?.executeCommand("sub-add \"$cleanPath\" select \"$cleanName\" \"$cleanLang\"")
                             playerState?.setMpvProperty("sub-visibility", "yes")
+                            playerState?.refreshTracksNow()
 
-                            delay(250)
+                            pushSyncStateToWebView()
                             pushMetadataToWebView()
 
                             val toastJson = playerObjectMapper.writeValueAsString(
@@ -170,8 +171,9 @@ class PlayerInboundDispatcher(
                             AppLogger.i("Player:Web", "Applying local subtitle to MPV: '$cleanPath' ($cleanName)")
                             playerState?.executeCommand("sub-add \"$cleanPath\" select \"$cleanName\"")
                             playerState?.setMpvProperty("sub-visibility", "yes")
+                            playerState?.refreshTracksNow()
 
-                            delay(250)
+                            pushSyncStateToWebView()
                             pushMetadataToWebView()
 
                             val toastJson = playerObjectMapper.writeValueAsString(
@@ -199,8 +201,9 @@ class PlayerInboundDispatcher(
                             AppLogger.i("Player:Web", "Applying dropped subtitle to MPV: '$cleanPath' ($cleanName)")
                             playerState?.executeCommand("sub-add \"$cleanPath\" select \"$cleanName\"")
                             playerState?.setMpvProperty("sub-visibility", "yes")
+                            playerState?.refreshTracksNow()
 
-                            delay(250)
+                            pushSyncStateToWebView()
                             pushMetadataToWebView()
 
                             val toastJson = playerObjectMapper.writeValueAsString(

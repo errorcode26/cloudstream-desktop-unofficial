@@ -37,6 +37,8 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
@@ -45,19 +47,25 @@ class EmbeddedPlayerViewModel(
     private val savePlaybackProgress: SavePlaybackProgress = SavePlaybackProgress(),
     private val trackerSyncEngine: TrackerSyncEngine? = runCatching { AppContainerHolder.container.trackerSyncEngine }.getOrNull(),
     private val trackingRepository: TrackingRepository? = runCatching { AppContainerHolder.container.trackingRepository }.getOrNull(),
+    clockMs: () -> Long = { System.currentTimeMillis() },
 ) : BaseMviViewModel<PlayerUiState, PlayerUiEvent, PlayerUiEffect>(
     initialState = PlayerUiState(),
 ) {
     val playerState = PlayerState()
     private var saveJob: Job? = null
+    private var flushJob: Job? = null
     private var timeoutJob: Job? = null
     private var countdownJob: Job? = null
+    private val historyPersistenceMutex = Mutex()
     private val scraper = PlayerStreamScraper(viewModelScope)
 
     private val linkRetries = mutableMapOf<String, Int>()
-    private val completionGuard = PlaybackCompletionGuard()
+    private val completionGuard = PlaybackCompletionGuard(clockMs)
     private val autoSyncedEpisodeKeys = ConcurrentHashMap.newKeySet<String>()
     private val hasShownNowPlayingToast = AtomicBoolean(false)
+    @Volatile
+    private var playbackGeneration = 0L
+    @Volatile
     private var lastSavedPositionSec = 0L
     private var autoPlayTimeoutMs: Long = 20_000L
     private var inactivityLimit: Int = 3
@@ -71,6 +79,11 @@ class EmbeddedPlayerViewModel(
         updatePhase = { phase, failed -> updatePhase(phase, failed) },
         onPlaybackError = { url, reason -> handlePlaybackError(url, reason) },
         getScrapeFlowControl = { scrapeFlowControl },
+        onNewEpisodeLaunchCommitted = { newLaunch ->
+            playbackGeneration++
+            lastSavedPositionSec = newLaunch.startPositionMs / 1000L
+            resetCompletionGuard(newLaunch)
+        },
     )
 
     private val sleepTimer = PlayerSleepTimer(
@@ -113,12 +126,18 @@ class EmbeddedPlayerViewModel(
 
         viewModelScope.launch(Dispatchers.IO) {
             playerState.positionMs.collect { posMs ->
+                val activeGen = playbackGeneration
                 val currentPosSec = posMs / 1000L
                 val durSec = playerState.durationMs.value / 1000L
                 val isPaused = playerState.isPaused.value
                 val currentData = uiState.value.launchData
+                val currentPhase = uiState.value.phase
+                val isPlayingPhase = currentPhase is PlayerPhase.Playing
 
                 if (currentPosSec <= 0L && lastSavedPositionSec > 0L) {
+                    return@collect
+                }
+                if (!isPlayingPhase) {
                     return@collect
                 }
 
@@ -127,19 +146,24 @@ class EmbeddedPlayerViewModel(
                     durSec = durSec,
                     isPaused = isPaused,
                     isBuffering = playerState.isBuffering.value,
-                    isPlayingPhase = uiState.value.phase is PlayerPhase.Playing,
+                    isPlayingPhase = true,
                 )
 
                 if (kotlin.math.abs(currentPosSec - lastSavedPositionSec) >= 5) {
                     lastSavedPositionSec = currentPosSec
-                    if (currentData != null && durSec > 0L) {
+                    if (currentData != null && durSec > 0L && activeGen == playbackGeneration) {
                         buildSafeProgressUpdate(
                             baseHistory = currentData.history,
                             posSec = currentPosSec,
                             durSec = durSec,
                             completionThreshold = 0.85f,
                         )?.let { (safeHistory, allowCompletion) ->
-                            savePosition(safeHistory, forceNotify = allowCompletion, allowCompletion = allowCompletion)
+                            savePosition(
+                                history = safeHistory,
+                                forceNotify = allowCompletion,
+                                allowCompletion = allowCompletion,
+                                expectedGeneration = activeGen,
+                            )
                         }
                         dispatchAutoTrackerCompletionIfEligible(currentData, currentPosSec, durSec)
                     }
@@ -258,6 +282,8 @@ class EmbeddedPlayerViewModel(
         playerState.detachMpv()
         sleepTimer.cancel()
         scrapeCoordinator.cancelAll()
+        playbackGeneration++
+        flushJob?.cancel()
         saveJob?.cancel()
         countdownJob?.cancel()
         timeoutJob?.cancel()
@@ -666,7 +692,12 @@ class EmbeddedPlayerViewModel(
         ) to canComplete
     }
 
-    private fun savePosition(history: WatchHistory, forceNotify: Boolean = false, allowCompletion: Boolean = false) {
+    private fun savePosition(
+        history: WatchHistory,
+        forceNotify: Boolean = false,
+        allowCompletion: Boolean = false,
+        expectedGeneration: Long = playbackGeneration,
+    ) {
         val name = history.showName.trim()
         if (name.isBlank() || name.equals("Unknown Channel", ignoreCase = true) || name.equals("Unknown", ignoreCase = true)) {
             return
@@ -674,21 +705,39 @@ class EmbeddedPlayerViewModel(
         if (!completionGuard.isDurationValidForPersistence(history.duration) || history.position <= 0L) {
             return
         }
+        val activeState = uiState.value
+        val activeEpisodeId = activeState.launchData?.history?.episodeId
+        if (expectedGeneration != playbackGeneration || (activeEpisodeId != null && history.episodeId != null && activeEpisodeId != history.episodeId)) {
+            return
+        }
         saveJob?.cancel()
         saveJob = viewModelScope.launch(Dispatchers.IO) {
-            WatchHistoryCoordinator.saveWithNextEpisodeQueue(
-                history = history,
-                hasNextEpisode = uiState.value.hasNextEpisode,
-                nextEpisode = uiState.value.nextEpisodeData,
-                saveProgress = savePlaybackProgress,
-                forceNotify = forceNotify,
-                allowCompletion = allowCompletion,
-            )
+            val previousFlush = flushJob
+            if (previousFlush != null && previousFlush.isActive) {
+                previousFlush.join()
+            }
+            historyPersistenceMutex.withLock {
+                if (expectedGeneration != playbackGeneration) return@withLock
+                val latestState = uiState.value
+                val latestEpId = latestState.launchData?.history?.episodeId
+                if (latestEpId != null && history.episodeId != null && latestEpId != history.episodeId) {
+                    return@withLock
+                }
+                WatchHistoryCoordinator.saveWithNextEpisodeQueue(
+                    history = history,
+                    hasNextEpisode = latestState.hasNextEpisode,
+                    nextEpisode = latestState.nextEpisodeData,
+                    saveProgress = savePlaybackProgress,
+                    forceNotify = forceNotify,
+                    allowCompletion = allowCompletion,
+                )
+            }
         }
     }
 
     private fun flushCurrentEpisodeProgress(markCompletedIfNearEnd: Boolean = false) {
-        val currentData = uiState.value.launchData ?: return
+        val activeState = uiState.value
+        val currentData = activeState.launchData ?: return
         val currentDurSec = playerState.durationMs.value / 1000L
         val currentPosSec = playerState.positionMs.value / 1000L
         if (currentDurSec <= 0 && currentData.history.duration <= 0) return
@@ -703,15 +752,23 @@ class EmbeddedPlayerViewModel(
             completionThreshold = threshold,
         ) ?: return
 
-        viewModelScope.launch(Dispatchers.IO + NonCancellable) {
-            WatchHistoryCoordinator.saveWithNextEpisodeQueue(
-                history = updatedHistory,
-                hasNextEpisode = uiState.value.hasNextEpisode,
-                nextEpisode = uiState.value.nextEpisodeData,
-                saveProgress = savePlaybackProgress,
-                forceNotify = true,
-                allowCompletion = allowCompletion,
-            )
+        val capturedHasNext = activeState.hasNextEpisode
+        val capturedNextEp = activeState.nextEpisodeData
+        saveJob?.cancel()
+        saveJob = null
+        val previousFlush = flushJob
+        flushJob = viewModelScope.launch(Dispatchers.IO + NonCancellable) {
+            previousFlush?.join()
+            historyPersistenceMutex.withLock {
+                WatchHistoryCoordinator.saveWithNextEpisodeQueue(
+                    history = updatedHistory,
+                    hasNextEpisode = capturedHasNext,
+                    nextEpisode = capturedNextEp,
+                    saveProgress = savePlaybackProgress,
+                    forceNotify = true,
+                    allowCompletion = allowCompletion,
+                )
+            }
         }
         dispatchAutoTrackerCompletionIfEligible(currentData, posSec, durSec)
     }
@@ -764,6 +821,7 @@ class EmbeddedPlayerViewModel(
     }
 
     private fun init(initialData: VideoLaunchData) {
+        playbackGeneration++
         linkRetries.clear()
         lastSavedPositionSec = initialData.startPositionMs / 1000L
         scrapeCoordinator.cancelAll()
@@ -964,6 +1022,7 @@ class EmbeddedPlayerViewModel(
         }
 
         flushCurrentEpisodeProgress(markCompletedIfNearEnd = true)
+        playbackGeneration++
         lastSavedPositionSec = 0L
 
         countdownJob?.cancel()

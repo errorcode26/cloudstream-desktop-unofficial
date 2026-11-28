@@ -68,6 +68,21 @@ class DesktopMpvEngine(
         isDestroyed = isDestroyed,
     )
 
+    fun updatePlayerState(state: PlayerState?) {
+        playerState = state
+        eventLoop.playerState = state
+    }
+
+    fun notifyLoadFile() {
+        eventLoop.notifyLoadFile()
+    }
+
+    fun refreshTracksNow() {
+        val handle = mpvHandle ?: return
+        if (isDestroyed.get()) return
+        trackManager.pollTracksAndChapters(handle)
+    }
+
     /**
      * Initializes the native MPV instance and configures options before initialization.
      */

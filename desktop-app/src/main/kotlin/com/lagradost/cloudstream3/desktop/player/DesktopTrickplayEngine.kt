@@ -210,12 +210,22 @@ class DesktopTrickplayEngine(private val scope: CoroutineScope) {
                 val seekCmd = "seek $timeSec absolute+keyframes"
                 lib.mpv_command_string(handle, seekCmd)
 
-                // Await decoder restart with a 2000ms timeout
-                withTimeoutOrNull(2000) {
+                // Await decoder restart with a 2000ms timeout; never capture or cache unseeked frames
+                val restarted = withTimeoutOrNull(2000) {
                     seekSignal.receive()
+                }
+                if (restarted == null) {
+                    AppLogger.w("DesktopTrickplayEngine", "Shadow MPV seek timed out at ${timeSec}s, skipping capture")
+                    return@withContext null
                 }
 
                 if (!isRunning.get()) return@withContext null
+
+                val actualPosSec = MpvLibrary.getPropertyDouble(handle, "time-pos", -1.0)
+                if (actualPosSec >= 0.0 && kotlin.math.abs(actualPosSec - (bucket / 1000.0)) > 10.0) {
+                    AppLogger.w("DesktopTrickplayEngine", "Shadow MPV position mismatch (${actualPosSec}s vs ${timeSec}s), skipping capture")
+                    return@withContext null
+                }
 
                 // Capture snapshot
                 val snapCmd = "screenshot-to-file \"$tempPath\" video"

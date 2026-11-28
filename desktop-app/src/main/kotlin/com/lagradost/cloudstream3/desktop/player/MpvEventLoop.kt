@@ -19,7 +19,7 @@ import java.util.concurrent.atomic.AtomicBoolean
  */
 internal class MpvEventLoop(
     private val scope: CoroutineScope,
-    private val playerState: PlayerState?,
+    @Volatile var playerState: PlayerState?,
     private val trackManager: MpvTrackManager,
     private val onPlaybackReady: () -> Unit,
     private val onPlaybackError: (String) -> Unit,
@@ -35,6 +35,12 @@ internal class MpvEventLoop(
     companion object {
         private const val LIVE_STALL_MS = 12_000L
         private const val MIN_GENUINE_EOF_DURATION_SEC = 60.0
+
+        /** Stale samples emitted by an outgoing file before MPV_EVENT_START_FILE must be ignored. */
+        internal fun shouldIgnoreSampleDuringTransition(
+            waitingForReset: Boolean,
+            hasStartedCurrentFile: Boolean,
+        ): Boolean = waitingForReset && !hasStartedCurrentFile
     }
 
     private fun isGenuineEndOfFile(posSec: Double, durSec: Double): Boolean {
@@ -55,6 +61,9 @@ internal class MpvEventLoop(
     var waitingForTimePosReset = false
 
     @Volatile
+    var hasStartedCurrentFile = true
+
+    @Volatile
     private var bufferingSince = 0L
     private var lastLiveRecoveryMs = 0L
 
@@ -62,7 +71,10 @@ internal class MpvEventLoop(
 
     fun notifyLoadFile() {
         waitingForTimePosReset = true
+        hasStartedCurrentFile = false
         hasEverPlayed = false
+        lastPos = 0.0
+        lastDur = 0.0
     }
 
     fun stop() {
@@ -107,12 +119,18 @@ internal class MpvEventLoop(
                             6 -> { // MPV_EVENT_START_FILE
                                 AppLogger.i("DesktopMpvEngine", "Starting new media stream (MPV_EVENT_START_FILE)")
                                 lastStreamErrorReason = null
+                                hasStartedCurrentFile = true
                                 waitingForTimePosReset = false
                                 hasEverPlayed = false
+                                lastPos = 0.0
+                                lastDur = 0.0
+                                bufferingSince = 0L
                                 playbackStartedAt = 0L
                                 diagnosticLogged = false
                                 hasFiredFinished = false
                                 trackManager.reset()
+                                playerState?._positionMs?.value = 0L
+                                playerState?._durationMs?.value = 0L
                                 playerState?._isAudioOnlyStream?.value = false
                                 playerState?._fileSize?.value = 0L
                             }
@@ -203,6 +221,7 @@ internal class MpvEventLoop(
                                 }
                             }
                             21 -> { // MPV_EVENT_PLAYBACK_RESTART
+                                if (shouldIgnoreSampleDuringTransition(waitingForTimePosReset, hasStartedCurrentFile)) continue
                                 waitingForTimePosReset = false
                                 lastTrackPollMs = System.currentTimeMillis()
                                 trackManager.pollTracksAndChapters(handle)
@@ -227,11 +246,12 @@ internal class MpvEventLoop(
                                         when (name) {
                                             "time-pos" -> {
                                                 if (prop.format == 5) {
+                                                    if (shouldIgnoreSampleDuringTransition(waitingForTimePosReset, hasStartedCurrentFile)) continue
                                                     val newPos = propData.getDouble(0)
                                                     if (newPos >= 0.0) lastPos = newPos
-                                                    if (lastPos > 0.1) waitingForTimePosReset = false
+                                                    if (hasStartedCurrentFile && lastPos > 0.1) waitingForTimePosReset = false
                                                     val isPausedForCache = MpvLibrary.getPropertyString(handle, "paused-for-cache") == "yes"
-                                                    if (!hasEverPlayed && lastPos > 0.1 && !isPausedForCache) {
+                                                    if (!hasEverPlayed && hasStartedCurrentFile && lastPos > 0.1 && !isPausedForCache) {
                                                         hasEverPlayed = true
                                                         playbackStartedAt = System.currentTimeMillis()
                                                         playerState?._isBuffering?.value = false
@@ -253,7 +273,7 @@ internal class MpvEventLoop(
                                                     }
 
                                                     val now = System.currentTimeMillis()
-                                                    if (now - lastUiPositionEmit >= 100) {
+                                                    if (!waitingForTimePosReset && hasEverPlayed && now - lastUiPositionEmit >= 100) {
                                                         lastUiPositionEmit = now
                                                         val posMs = (lastPos * 1000).toLong()
                                                         playerState?.updatePositionFromPlayer(posMs)
@@ -345,16 +365,16 @@ internal class MpvEventLoop(
                     if (now - lastPositionPollMs >= 100L) {
                         lastPositionPollMs = now
                         val currentDur = MpvLibrary.getPropertyDouble(handle, "duration", -1.0)
-                        if (currentDur > 0.0) {
+                        if (currentDur > 0.0 && !shouldIgnoreSampleDuringTransition(waitingForTimePosReset, hasStartedCurrentFile)) {
                             lastDur = currentDur
                             playerState?._durationMs?.value = (currentDur * 1000).toLong()
                         }
                         val pollPos = MpvLibrary.getPropertyDouble(handle, "time-pos", -1.0)
-                        if (pollPos >= 0.0) {
+                        if (pollPos >= 0.0 && !shouldIgnoreSampleDuringTransition(waitingForTimePosReset, hasStartedCurrentFile)) {
                             lastPos = pollPos
-                            if (lastPos > 0.1) waitingForTimePosReset = false
+                            if (hasStartedCurrentFile && lastPos > 0.1) waitingForTimePosReset = false
                             val isPausedForCache = MpvLibrary.getPropertyString(handle, "paused-for-cache") == "yes"
-                            if (!hasEverPlayed && lastPos > 0.1 && !isPausedForCache) {
+                            if (!hasEverPlayed && hasStartedCurrentFile && lastPos > 0.1 && !isPausedForCache) {
                                 hasEverPlayed = true
                                 playbackStartedAt = System.currentTimeMillis()
                                 playerState?._isBuffering?.value = false

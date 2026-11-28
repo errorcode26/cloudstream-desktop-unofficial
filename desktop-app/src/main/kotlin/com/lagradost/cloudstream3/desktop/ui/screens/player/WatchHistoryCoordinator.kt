@@ -1,6 +1,7 @@
 package com.lagradost.cloudstream3.desktop.ui.screens.player
 
 import com.lagradost.cloudstream3.Episode
+import com.lagradost.cloudstream3.desktop.domain.history.interactor.UpsertWatchHistory
 import com.lagradost.cloudstream3.desktop.domain.player.interactor.SavePlaybackProgress
 import com.lagradost.common.storage.DesktopDataStore
 import com.lagradost.common.storage.WatchHistory
@@ -9,9 +10,9 @@ internal object WatchHistoryCoordinator {
 
     /**
      * Saves the current episode watch progress.
-     * If the current episode is >= 90% completed and [hasNextEpisode] is true,
-     * it also creates or updates a queued placeholder for [nextEpisode] so the
-     * user can smoothly continue watching from the home/continue-watching row.
+     * If the current episode is completed (explicitly completed or >= WATCHED_THRESHOLD) and
+     * [hasNextEpisode] is true, it also creates or updates a queued placeholder for [nextEpisode] so
+     * the user can smoothly continue watching from the home/continue-watching row.
      */
     suspend fun saveWithNextEpisodeQueue(
         history: WatchHistory,
@@ -24,7 +25,7 @@ internal object WatchHistoryCoordinator {
         val currentDurSec = history.duration
         val currentPosSec = history.position
         val percentage = if (currentDurSec > 0) currentPosSec.toFloat() / currentDurSec else 0f
-        val isCompleted = allowCompletion && percentage >= 0.90f && currentDurSec > 0
+        val isCompleted = allowCompletion && percentage >= UpsertWatchHistory.WATCHED_THRESHOLD && currentDurSec > 0
 
         val finalHistory = if (isCompleted) {
             history.copy(position = currentDurSec)

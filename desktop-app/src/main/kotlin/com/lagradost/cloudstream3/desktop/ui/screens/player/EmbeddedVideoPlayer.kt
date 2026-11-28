@@ -110,6 +110,16 @@ fun EmbeddedVideoPlayer(
         }
     }
 
+    LaunchedEffect(phase) {
+        when (phase) {
+            is com.lagradost.cloudstream3.desktop.ui.screens.player.contract.PlayerPhase.Playing,
+            is com.lagradost.cloudstream3.desktop.ui.screens.player.contract.PlayerPhase.Exhausted,
+            is com.lagradost.cloudstream3.desktop.ui.screens.player.contract.PlayerPhase.Idle,
+            -> isLoading = false
+            else -> Unit
+        }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -128,7 +138,12 @@ fun EmbeddedVideoPlayer(
                     val activeLink = uiState.activeLink
                     val safeLink = if (isExiting || isLoadingNextEpisode) null else activeLink
 
-                    val rawDisplayLinks = uiState.nextEpisodeLinks.ifEmpty { actualLaunchData.links }
+                    val switchingEpisode = targetEpisodeData?.takeIf { it.data != actualLaunchData.history.episodeId }
+                    val rawDisplayLinks = if (switchingEpisode != null) {
+                        uiState.nextEpisodeLinks
+                    } else {
+                        uiState.nextEpisodeLinks.ifEmpty { actualLaunchData.links }
+                    }
                     val currentDisplayLinks = if (activeLink != null) {
                         val failed = rawDisplayLinks.filter { it.url in uiState.failedLinks }
                         val active = rawDisplayLinks.filter { it.url == activeLink.url }
@@ -146,18 +161,18 @@ fun EmbeddedVideoPlayer(
                         .mapIndexedNotNull { index, link -> uiState.failedLinks[link.url]?.let { index to it } }
                         .toMap()
 
-                    val displayTitle = if (targetEpisodeData != null) {
+                    val displayTitle = if (switchingEpisode != null) {
                         buildString {
                             append(actualLaunchData.history.showName)
-                            val s = targetEpisodeData.season
-                            val e = targetEpisodeData.episode
+                            val s = switchingEpisode.season
+                            val e = switchingEpisode.episode
                             if (s != null && e != null) {
                                 append(" - S${s}E$e")
                             } else if (e != null) {
                                 append(" - E$e")
                             }
-                            val name = targetEpisodeData.name
-                            if (!name.isNullOrBlank() && name != "Episode $e") {
+                            val name = switchingEpisode.name
+                            if (!name.isNullOrBlank() && name != "Episode $e" && !name.equals(actualLaunchData.history.showName, ignoreCase = true)) {
                                 append(" - $name")
                             }
                         }
@@ -199,6 +214,13 @@ fun EmbeddedVideoPlayer(
                     val contentRating = actualLaunchData.loadResponse?.contentRating
                     val rating = targetEpisodeData?.score?.toFloat(10)?.toDouble()
                         ?: actualLaunchData.loadResponse?.score?.toFloat(10)?.toDouble()
+                    val cacheShowUrl = actualLaunchData.loadResponse?.url ?: actualLaunchData.history.showUrl
+                    val enrichedCacheState = remember(cacheShowUrl) {
+                        if (cacheShowUrl.isNotBlank()) com.lagradost.cloudstream3.desktop.ui.screens.details.EnrichedDetailsCache.get(cacheShowUrl) else null
+                    }
+                    val currentEpForRating = episodes.find { it.data == displayEpisodeId }
+                    val resolvedEpScore = currentEpForRating?.score?.toFloat(10)?.toDouble()?.takeIf { it > 0.0 }
+                    val resolvedEpSource = enrichedCacheState?.episodeRatingSources?.get((displaySeasonNumber ?: 1) to (displayEpisodeNumber ?: 0))
                     // Always use the start position from launchData — it is the canonical
                     // source of truth set by the ViewModel. Falling back to playerState.positionMs
                     val computedStartPos = actualLaunchData.startPositionMs
@@ -238,6 +260,11 @@ fun EmbeddedVideoPlayer(
                         tags = tags,
                         contentRating = contentRating,
                         rating = rating,
+                        imdbScore = enrichedCacheState?.enrichedImdbRating,
+                        tmdbScore = enrichedCacheState?.enrichedTmdbRating,
+                        anilistScore = enrichedCacheState?.enrichedAniListRating,
+                        episodeScore = resolvedEpScore,
+                        episodeRatingSource = resolvedEpSource,
                         actors = actualLaunchData.enrichedActors ?: actualLaunchData.loadResponse?.actors ?: emptyList(),
                         isAnime = actualLaunchData.loadResponse?.type == com.lagradost.cloudstream3.TvType.Anime ||
                             actualLaunchData.loadResponse?.type == com.lagradost.cloudstream3.TvType.AnimeMovie ||

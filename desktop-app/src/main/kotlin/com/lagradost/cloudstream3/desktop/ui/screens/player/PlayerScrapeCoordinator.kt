@@ -31,9 +31,45 @@ class PlayerScrapeCoordinator(
     private val updatePhase: (PlayerPhase, Map<String, String>?) -> Unit,
     private val onPlaybackError: (failedUrl: String, reason: String) -> Unit,
     private val getScrapeFlowControl: () -> String?,
+    private val onNewEpisodeLaunchCommitted: (VideoLaunchData) -> Unit = {},
 ) {
     private var loadLinksJob: Job? = null
     private var scrapeGraceJob: Job? = null
+
+    private fun buildEpisodeLaunchData(
+        current: VideoLaunchData,
+        sortedLinks: List<ExtractorLink>,
+        subtitles: List<SubtitleFile>,
+        newHistory: com.lagradost.common.storage.WatchHistory?,
+        targetEpisodeData: Episode?,
+        startPos: Long,
+        pastDurationSec: Long?,
+        newSeasonActors: List<com.lagradost.cloudstream3.ActorData>?,
+    ): VideoLaunchData = if (targetEpisodeData != null && newHistory != null) {
+        current.copy(
+            links = sortedLinks,
+            subtitles = subtitles,
+            history = newHistory.copy(position = startPos / 1000L, duration = pastDurationSec ?: 0L),
+            initialIndex = 0,
+            startPositionMs = startPos,
+            enrichedActors = newSeasonActors,
+            title = buildString {
+                append(newHistory.showName)
+                if (newHistory.season != null && newHistory.episode != null) {
+                    append(" - S${newHistory.season}E${newHistory.episode}")
+                } else if (newHistory.episode != null) {
+                    append(" - E${newHistory.episode}")
+                }
+            },
+        )
+    } else {
+        current.copy(
+            links = sortedLinks,
+            subtitles = subtitles,
+            initialIndex = 0,
+            enrichedActors = newSeasonActors,
+        )
+    }
 
     fun cancelAll() {
         scrapeGraceJob?.cancel()
@@ -107,8 +143,13 @@ class PlayerScrapeCoordinator(
         loadLinksJob?.cancel()
         scope.launch(Dispatchers.IO) {
             val state = getState()
-            val currentLinks = state.nextEpisodeLinks.ifEmpty { state.launchData?.links ?: emptyList() }
             val current = state.launchData
+            val isSwitchingEpisode = state.targetEpisodeData != null && state.targetEpisodeData.data != current?.history?.episodeId
+            val currentLinks = if (isSwitchingEpisode) {
+                state.nextEpisodeLinks
+            } else {
+                state.nextEpisodeLinks.ifEmpty { state.launchData?.links ?: emptyList() }
+            }
             val startPos = current?.startPositionMs ?: 0L
             val sortedLinks = PlayerStreamSelector.sortLinks(currentLinks, startPos)
             val best = PlayerStreamSelector.pickBestActiveLink(sortedLinks, state.failedLinks.keys, startPos)
@@ -161,6 +202,9 @@ class PlayerScrapeCoordinator(
                     },
                 )
 
+                if (epData != null) {
+                    onNewEpisodeLaunchCommitted(newLaunchData)
+                }
                 updateState {
                     copy(
                         launchData = newLaunchData,
@@ -283,33 +327,22 @@ class PlayerScrapeCoordinator(
             AppLogger.i("EmbeddedPlayerViewModel:${provider.name}", "Using cached links for episode: $targetEpisodeId")
             val sortedLinks = PlayerStreamSelector.sortLinks(cached.links, startPos)
 
-            val newLaunchData = if (targetEpisodeData != null && newHistory != null) {
-                current.copy(
-                    links = sortedLinks,
-                    subtitles = cached.subtitles,
-                    history = newHistory.copy(position = startPos / 1000L, duration = pastHistory?.duration ?: 0L),
-                    initialIndex = 0,
-                    startPositionMs = startPos,
-                    enrichedActors = newSeasonActors,
-                    title = buildString {
-                        append(newHistory.showName)
-                        if (newHistory.season != null && newHistory.episode != null) {
-                            append(" - S${newHistory.season}E${newHistory.episode}")
-                        } else if (newHistory.episode != null) {
-                            append(" - E${newHistory.episode}")
-                        }
-                    },
-                )
-            } else {
-                current.copy(
-                    links = sortedLinks,
-                    subtitles = cached.subtitles,
-                    initialIndex = 0,
-                )
-            }
+            val newLaunchData = buildEpisodeLaunchData(
+                current = current,
+                sortedLinks = sortedLinks,
+                subtitles = cached.subtitles,
+                newHistory = newHistory,
+                targetEpisodeData = targetEpisodeData,
+                startPos = startPos,
+                pastDurationSec = pastHistory?.duration,
+                newSeasonActors = newSeasonActors,
+            )
 
             val bestLink = PlayerStreamSelector.pickBestActiveLink(sortedLinks, emptySet(), startPos)
             AppLogger.i("EmbeddedPlayerViewModel:${provider.name}", "Cache hit — picked link: ${bestLink?.url?.take(60)}")
+            if (targetEpisodeData != null && newHistory != null) {
+                onNewEpisodeLaunchCommitted(newLaunchData)
+            }
             updateState {
                 copy(
                     nextEpisodeLinks = sortedLinks,
@@ -329,42 +362,33 @@ class PlayerScrapeCoordinator(
         }
 
         var fastPlayJob: Job? = null
+        var fastPlayHighScoreScheduled = false
+        val fastPlayLock = Any()
 
         val triggerFastPlayback: () -> Unit = {
             val isScrapingPhase = getState().phase is PlayerPhase.Scraping
             if (hasStartedPlaying.compareAndSet(false, true) || isScrapingPhase) {
                 hasStartedPlaying.set(true)
                 var bestLinkToProbe: ExtractorLink? = null
+                var committedLaunch: VideoLaunchData? = null
                 updateState {
                     val currentLinks = nextEpisodeLinks
                     val sorted = PlayerStreamSelector.sortLinks(currentLinks, startPos)
                     val best = PlayerStreamSelector.pickBestActiveLink(sorted, failedLinks.keys, startPos)
                     if (best != null) {
                         bestLinkToProbe = best
-                        val launch = if (targetEpisodeData != null && newHistory != null) {
-                            current.copy(
-                                links = sorted,
-                                subtitles = nextEpisodeSubtitles,
-                                history = newHistory.copy(position = startPos / 1000L, duration = pastHistory?.duration ?: 0L),
-                                initialIndex = 0,
-                                startPositionMs = startPos,
-                                enrichedActors = newSeasonActors,
-                                title = buildString {
-                                    append(newHistory.showName)
-                                    if (newHistory.season != null && newHistory.episode != null) {
-                                        append(" - S${newHistory.season}E${newHistory.episode}")
-                                    } else if (newHistory.episode != null) {
-                                        append(" - E${newHistory.episode}")
-                                    }
-                                },
-                            )
-                        } else {
-                            current.copy(
-                                links = sorted,
-                                subtitles = nextEpisodeSubtitles,
-                                initialIndex = 0,
-                                enrichedActors = newSeasonActors,
-                            )
+                        val launch = buildEpisodeLaunchData(
+                            current = current,
+                            sortedLinks = sorted,
+                            subtitles = nextEpisodeSubtitles,
+                            newHistory = newHistory,
+                            targetEpisodeData = targetEpisodeData,
+                            startPos = startPos,
+                            pastDurationSec = pastHistory?.duration,
+                            newSeasonActors = newSeasonActors,
+                        )
+                        if (targetEpisodeData != null && newHistory != null) {
+                            committedLaunch = launch
                         }
                         copy(
                             nextEpisodeLinks = sorted,
@@ -376,6 +400,7 @@ class PlayerScrapeCoordinator(
                         this
                     }
                 }
+                committedLaunch?.let(onNewEpisodeLaunchCommitted)
                 val link = bestLinkToProbe
                 if (link != null) {
                     AppLogger.i("EmbeddedPlayerViewModel:${provider.name}", "Fast-play triggered: probing ${link.name} (quality=${link.quality}p)")
@@ -459,9 +484,13 @@ class PlayerScrapeCoordinator(
             }
         }
 
+        val hasFlushedInitialBatch = AtomicBoolean(false)
         val flusherJob = scope.launch(Dispatchers.Default) {
             while (isActive) {
-                delay(150L)
+                delay(if (hasFlushedInitialBatch.get()) 300L else 150L)
+                if (pendingLinks.isNotEmpty() || pendingSubs.isNotEmpty()) {
+                    hasFlushedInitialBatch.set(true)
+                }
                 flushBatch()
             }
         }
@@ -481,16 +510,21 @@ class PlayerScrapeCoordinator(
                     val isPlaying = hasStartedPlaying.get()
                     if (!isPlaying && autoPlay && getState().phase is PlayerPhase.Scraping) {
                         val score = QualityDataHelper.getLinkScore(link)
-                        if (score >= QualityDataHelper.FAST_PLAY_SCORE_THRESHOLD) {
-                            fastPlayJob?.cancel()
-                            fastPlayJob = scope.launch(Dispatchers.IO) {
-                                delay(900)
-                                triggerFastPlayback()
-                            }
-                        } else if (fastPlayJob == null) {
-                            fastPlayJob = scope.launch(Dispatchers.IO) {
-                                delay(2000)
-                                triggerFastPlayback()
+                        synchronized(fastPlayLock) {
+                            if (score >= QualityDataHelper.FAST_PLAY_SCORE_THRESHOLD) {
+                                if (!fastPlayHighScoreScheduled) {
+                                    fastPlayHighScoreScheduled = true
+                                    fastPlayJob?.cancel()
+                                    fastPlayJob = scope.launch(Dispatchers.IO) {
+                                        delay(900)
+                                        triggerFastPlayback()
+                                    }
+                                }
+                            } else if (fastPlayJob == null) {
+                                fastPlayJob = scope.launch(Dispatchers.IO) {
+                                    delay(2000)
+                                    triggerFastPlayback()
+                                }
                             }
                         }
                     }
@@ -556,36 +590,25 @@ class PlayerScrapeCoordinator(
                 }
             } else {
                 var bestLinkToProbe: ExtractorLink? = null
+                var committedLaunch: VideoLaunchData? = null
                 updateState {
                     if (nextEpisodeLinks.isNotEmpty()) {
                         hasStartedPlaying.set(true)
                         val best = PlayerStreamSelector.pickBestActiveLink(sortedLinks, emptySet(), startPos)
                         if (best != null) {
                             bestLinkToProbe = best
-                            val launch = if (targetEpisodeData != null && newHistory != null) {
-                                current.copy(
-                                    links = sortedLinks,
-                                    subtitles = nextEpisodeSubtitles,
-                                    history = newHistory.copy(position = startPos / 1000L, duration = pastHistory?.duration ?: 0L),
-                                    initialIndex = 0,
-                                    startPositionMs = startPos,
-                                    enrichedActors = newSeasonActors,
-                                    title = buildString {
-                                        append(newHistory.showName)
-                                        if (newHistory.season != null && newHistory.episode != null) {
-                                            append(" - S${newHistory.season}E${newHistory.episode}")
-                                        } else if (newHistory.episode != null) {
-                                            append(" - E${newHistory.episode}")
-                                        }
-                                    },
-                                )
-                            } else {
-                                current.copy(
-                                    links = sortedLinks,
-                                    subtitles = nextEpisodeSubtitles,
-                                    initialIndex = 0,
-                                    enrichedActors = newSeasonActors,
-                                )
+                            val launch = buildEpisodeLaunchData(
+                                current = current,
+                                sortedLinks = sortedLinks,
+                                subtitles = nextEpisodeSubtitles,
+                                newHistory = newHistory,
+                                targetEpisodeData = targetEpisodeData,
+                                startPos = startPos,
+                                pastDurationSec = pastHistory?.duration,
+                                newSeasonActors = newSeasonActors,
+                            )
+                            if (targetEpisodeData != null && newHistory != null) {
+                                committedLaunch = launch
                             }
                             copy(
                                 nextEpisodeLinks = sortedLinks,
@@ -616,6 +639,7 @@ class PlayerScrapeCoordinator(
                         )
                     }
                 }
+                committedLaunch?.let(onNewEpisodeLaunchCommitted)
 
                 val linkToProbe = bestLinkToProbe
                 if (linkToProbe != null) {
@@ -692,6 +716,7 @@ class PlayerScrapeCoordinator(
                 }
             } else {
                 var bestFallbackToProbe: ExtractorLink? = null
+                var committedLaunch: VideoLaunchData? = null
                 updateState {
                     if (nextEpisodeLinks.isNotEmpty()) {
                         hasStartedPlaying.set(true)
@@ -699,30 +724,18 @@ class PlayerScrapeCoordinator(
                         val best = PlayerStreamSelector.pickBestActiveLink(sortedLinks, emptySet(), startPos)
                         if (best != null) {
                             bestFallbackToProbe = best
-                            val launch = if (targetEpisodeData != null && newHistory != null) {
-                                current.copy(
-                                    links = sortedLinks,
-                                    subtitles = nextEpisodeSubtitles,
-                                    history = newHistory.copy(position = startPos / 1000L, duration = pastHistory?.duration ?: 0L),
-                                    initialIndex = 0,
-                                    startPositionMs = startPos,
-                                    enrichedActors = newSeasonActors,
-                                    title = buildString {
-                                        append(newHistory.showName)
-                                        if (newHistory.season != null && newHistory.episode != null) {
-                                            append(" - S${newHistory.season}E${newHistory.episode}")
-                                        } else if (newHistory.episode != null) {
-                                            append(" - E${newHistory.episode}")
-                                        }
-                                    },
-                                )
-                            } else {
-                                current.copy(
-                                    links = sortedLinks,
-                                    subtitles = nextEpisodeSubtitles,
-                                    initialIndex = 0,
-                                    enrichedActors = newSeasonActors,
-                                )
+                            val launch = buildEpisodeLaunchData(
+                                current = current,
+                                sortedLinks = sortedLinks,
+                                subtitles = nextEpisodeSubtitles,
+                                newHistory = newHistory,
+                                targetEpisodeData = targetEpisodeData,
+                                startPos = startPos,
+                                pastDurationSec = pastHistory?.duration,
+                                newSeasonActors = newSeasonActors,
+                            )
+                            if (targetEpisodeData != null && newHistory != null) {
+                                committedLaunch = launch
                             }
                             LinkCache.set(targetEpisodeId, sortedLinks, nextEpisodeSubtitles)
                             copy(
@@ -755,6 +768,7 @@ class PlayerScrapeCoordinator(
                         )
                     }
                 }
+                committedLaunch?.let(onNewEpisodeLaunchCommitted)
 
                 val fallbackToProbe = bestFallbackToProbe
                 if (fallbackToProbe != null) {

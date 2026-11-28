@@ -152,4 +152,54 @@ class PlaybackCompletionGuardTest {
 
         assertFalse(guard.canAutoTrackCompleted(posSec = 1154L, durSec = 1440L, completionThreshold = 0.80f))
     }
+
+    @Test
+    fun `allows next episode 80 percent completion across resumed 40 percent prior watch without clamping`() {
+        var fakeNow = 1000L
+        val guard = PlaybackCompletionGuard(clockMs = { fakeNow })
+        // Session 1 stopped at 40% (576s / 1440s); session 2 resumes and watches to 80.2% (1155s)
+        guard.reset(isMovie = false, expectedDurationMinutes = 24, priorPositionSec = 576L, priorDurationSec = 1440L)
+
+        for (sec in 576L..1155L) {
+            guard.recordTick(posSec = sec, durSec = 1440L, isPaused = false, isBuffering = false, isPlayingPhase = true)
+            fakeNow += 1000L
+        }
+
+        assertTrue(guard.canMarkCompleted(posSec = 1155L, durSec = 1440L, completionThreshold = 0.80f))
+        assertEquals(1440L, guard.clampPersistablePosition(posSec = 1155L, durSec = 1440L, completionThreshold = 0.80f))
+    }
+
+    @Test
+    fun `allows completion on short final resume segment from 76 percent past 80 percent`() {
+        var fakeNow = 1000L
+        val guard = PlaybackCompletionGuard(clockMs = { fakeNow })
+        guard.reset(isMovie = false, expectedDurationMinutes = 24, priorPositionSec = 1094L, priorDurationSec = 1440L)
+
+        // User watches only 62s in the final session to cross 80% before clicking Next Episode
+        for (sec in 1094L..1156L) {
+            guard.recordTick(posSec = sec, durSec = 1440L, isPaused = false, isBuffering = false, isPlayingPhase = true)
+            fakeNow += 1000L
+        }
+
+        assertTrue(guard.canMarkCompleted(posSec = 1156L, durSec = 1440L, completionThreshold = 0.80f))
+    }
+
+    @Test
+    fun `rejects scrub to 80 percent even when resuming prior partial progress`() {
+        var fakeNow = 1000L
+        val guard = PlaybackCompletionGuard(clockMs = { fakeNow })
+        guard.reset(isMovie = false, expectedDurationMinutes = 24, priorPositionSec = 576L, priorDurationSec = 1440L)
+
+        for (sec in 576L..580L) {
+            guard.recordTick(posSec = sec, durSec = 1440L, isPaused = false, isBuffering = false, isPlayingPhase = true)
+            fakeNow += 1000L
+        }
+        // Jump immediately to 1180s and watch 5s
+        for (sec in 1180L..1185L) {
+            guard.recordTick(posSec = sec, durSec = 1440L, isPaused = false, isBuffering = false, isPlayingPhase = true)
+            fakeNow += 1000L
+        }
+
+        assertFalse(guard.canMarkCompleted(posSec = 1185L, durSec = 1440L, completionThreshold = 0.80f))
+    }
 }

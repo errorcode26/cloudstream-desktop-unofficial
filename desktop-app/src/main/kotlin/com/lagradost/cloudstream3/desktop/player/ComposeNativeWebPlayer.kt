@@ -79,6 +79,11 @@ fun ComposeNativeWebPlayer(
     onRetryPlayback: (() -> Unit)? = null,
     parentId: String? = null,
     providerName: String? = null,
+    imdbScore: Double? = null,
+    tmdbScore: Double? = null,
+    anilistScore: Double? = null,
+    episodeScore: Double? = null,
+    episodeRatingSource: com.lagradost.cloudstream3.desktop.metadata.RatingSource? = null,
 ) {
     val scope = rememberCoroutineScope()
     val persistentSubtitles = remember { mutableStateListOf<String>() }
@@ -235,20 +240,22 @@ fun ComposeNativeWebPlayer(
     var hasAutoSelectedQuality by remember(link) { mutableStateOf(false) }
 
     val trickplayEngine = remember(link) {
-        if (link != null) {
-            runCatching {
-                DesktopTrickplayEngine(scope).apply {
+        if (link != null) DesktopTrickplayEngine(scope) else null
+    }
+    val currentTrickplayEngine by rememberUpdatedState(trickplayEngine)
+
+    LaunchedEffect(trickplayEngine, link, title) {
+        if (trickplayEngine != null && link != null) {
+            withContext(Dispatchers.IO) {
+                runCatching {
                     val validated = com.lagradost.player.impl.PlayerLinkHandler.validate(link, title).getOrNull()
                     val targetUrl = validated?.url ?: link.url
                     val targetHeaders = validated?.headers ?: link.headers
-                    start(targetUrl, targetHeaders)
+                    trickplayEngine.start(targetUrl, targetHeaders)
                 }
-            }.getOrNull()
-        } else {
-            null
+            }
         }
     }
-    val currentTrickplayEngine by rememberUpdatedState(trickplayEngine)
 
     DisposableEffect(trickplayEngine) {
         onDispose {
@@ -347,6 +354,11 @@ fun ComposeNativeWebPlayer(
                 exhaustionReason = exhaustionReason,
                 exhaustionDiagnostics = exhaustionDiagnostics,
                 resolvedImdbId = resolvedImdbId,
+                imdbScore = imdbScore,
+                tmdbScore = tmdbScore,
+                anilistScore = anilistScore,
+                episodeScore = episodeScore,
+                episodeRatingSource = episodeRatingSource,
             )
 
             val wrapper = MetadataUpdatePayloadWrapper(value = payload)
@@ -376,11 +388,29 @@ fun ComposeNativeWebPlayer(
         }
     }
 
-    LaunchedEffect(isUiReady, isLoading, links, currentLinkIndex, episodes, currentEpisodeId, currentEpisodeNumber, currentSeasonNumber, audioTracks, subtitleTracks, videoTracks, chapters, currentChapterIndex, proxyAudioTracks, proxySubtitleTracks, proxyVideoTracks, autoFetchedSubtitleTracks, loadingStatusText, isProbing, isScraping, failedLinks, backdropUrl, logoUrl, title, activeShader, activeLazyVideoTrackUrl, activeLazyAudioTrackUrl, activeSkipInterval, skipIntervals, resolution, liveFileSize, plot, year, tags, contentRating, rating, activeSubtitleOverrideEnabled, subtitleSettingsVersion, isLive, isAudioOnlyStream, isAudioMode, actors, isAnime, isExhausted, exhaustionReason, exhaustionDiagnostics, watchHistoryList) {
+    var lastSyncPriorityKey by remember { mutableStateOf<Any?>(null) }
+    var lastSyncPushAtMs by remember { mutableStateOf(0L) }
+    LaunchedEffect(isUiReady, isLoading, links, currentLinkIndex, episodes, currentEpisodeId, currentEpisodeNumber, currentSeasonNumber, audioTracks, subtitleTracks, videoTracks, chapters, currentChapterIndex, proxyAudioTracks, proxySubtitleTracks, proxyVideoTracks, autoFetchedSubtitleTracks, loadingStatusText, isProbing, isScraping, failedLinks, backdropUrl, logoUrl, title, activeShader, activeLazyVideoTrackUrl, activeLazyAudioTrackUrl, activeSkipInterval, skipIntervals, resolution, liveFileSize, plot, year, tags, contentRating, rating, imdbScore, tmdbScore, anilistScore, episodeScore, episodeRatingSource, activeSubtitleOverrideEnabled, subtitleSettingsVersion, isLive, isAudioOnlyStream, isAudioMode, actors, isAnime, isExhausted, exhaustionReason, exhaustionDiagnostics, watchHistoryList) {
         if (isUiReady) {
-            if (isScraping && !isProbing && !isExhausted && !isLoading) {
-                kotlinx.coroutines.delay(250L)
+            val priorityKey = listOf(
+                isProbing,
+                isExhausted,
+                currentLinkIndex,
+                failedLinks.size,
+                currentEpisodeId,
+                isAudioMode,
+                activeLazyVideoTrackUrl,
+                activeLazyAudioTrackUrl,
+            )
+            val isPriorityChange = priorityKey != lastSyncPriorityKey
+            lastSyncPriorityKey = priorityKey
+            if (!isPriorityChange && isScraping && !isExhausted) {
+                val elapsed = System.currentTimeMillis() - lastSyncPushAtMs
+                if (elapsed < 220L) {
+                    kotlinx.coroutines.delay(220L - elapsed)
+                }
             }
+            lastSyncPushAtMs = System.currentTimeMillis()
             pushSyncStateToWebView()
         }
     }
